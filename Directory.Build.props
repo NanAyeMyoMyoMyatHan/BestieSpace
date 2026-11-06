@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <NuGetAudit>false</NuGetAudit>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <MaxCpuCount>1</MaxCpuCount>
+  </PropertyGroup>
+</Project>

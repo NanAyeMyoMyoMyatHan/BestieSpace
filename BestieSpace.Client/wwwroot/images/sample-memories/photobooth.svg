@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8D7F1"/>
+      <stop offset="100%" stop-color="#D8B4E2"/>
+    </linearGradient>
+  </defs>
+  <rect width="500" height="500" rx="24" fill="url(#bg3)"/>
+  <!-- Two cute characters hugging -->
+  <g transform="translate(130, 140)">
+    <!-- Character 1 (Pink Bear) -->
+    <circle cx="90" cy="130" r="65" fill="#FFB3C6" stroke="#4A3B3C" stroke-width="5"/>
+    <circle cx="40" cy="80" r="22" fill="#FFB3C6" stroke="#4A3B3C" stroke-width="5"/>
+    <circle cx="140" cy="80" r="22" fill="#FFB3C6" stroke="#4A3B3C" stroke-width="5"/>
+    <circle cx="75" cy="125" r="6" fill="#4A3B3C"/>
+    <circle cx="105" cy="125" r="6" fill="#4A3B3C"/>
+    <ellipse cx="90" cy="135" rx="10" ry="7" fill="#FFF"/>
+    <circle cx="90" cy="132" r="4" fill="#4A3B3C"/>
+    <ellipse cx="65" cy="135" rx="6" ry="4" fill="#FF8FAB"/>
+    <ellipse cx="115" cy="135" rx="6" ry="4" fill="#FF8FAB"/>
+
+    <!-- Character 2 (Cream Bunny) -->
+    <circle cx="180" cy="140" r="60" fill="#FFFDF9" stroke="#4A3B3C" stroke-width="5"/>
+    <ellipse cx="160" cy="60" rx="16" ry="45" fill="#FFFDF9" stroke="#4A3B3C" stroke-width="5"/>
+    <ellipse cx="200" cy="60" rx="16" ry="45" fill="#FFFDF9" stroke="#4A3B3C" stroke-width="5"/>
+    <ellipse cx="160" cy="60" rx="9" ry="28" fill="#FFCCD5"/>
+    <ellipse cx="200" cy="60" rx="9" ry="28" fill="#FFCCD5"/>
+    <circle cx="165" cy="135" r="5" fill="#4A3B3C"/>
+    <circle cx="195" cy="135" r="5" fill="#4A3B3C"/>
+    <ellipse cx="155" cy="142" rx="6" ry="4" fill="#FF8FAB"/>
+    <ellipse cx="205" cy="142" rx="6" ry="4" fill="#FF8FAB"/>
+    <path d="M 177,143 Q 180,148 183,143" stroke="#4A3B3C" stroke-width="3" fill="none"/>
+    
+    <!-- Heart between them -->
+    <path d="M 135,100 C 130,85 110,90 120,110 L 135,125 L 150,110 C 160,90 140,85 135,100 Z" fill="#FB6F92"/>
+  </g>
+  <text x="250" y="440" font-family="'Fredoka', sans-serif" font-size="28" font-weight="bold" fill="#4A3B3C" text-anchor="middle">Silly Photobooth 🍓📸</text>
+</svg>

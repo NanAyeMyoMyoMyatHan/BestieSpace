@@ -1,0 +1,32 @@
+## Visual Studio & .NET ignores
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Database & Local Data
+*.db
+*.db-shm
+*.db-wal
+bestiespace.db
+
+## Uploaded Files (preserve folders via .gitkeep)
+BestieSpace.Api/wwwroot/uploads/memories/*
+BestieSpace.Api/wwwroot/uploads/chat-photos/*
+BestieSpace.Api/wwwroot/uploads/voice-notes/*
+!BestieSpace.Api/wwwroot/uploads/memories/.gitkeep
+!BestieSpace.Api/wwwroot/uploads/chat-photos/.gitkeep
+!BestieSpace.Api/wwwroot/uploads/voice-notes/.gitkeep
+
+## OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

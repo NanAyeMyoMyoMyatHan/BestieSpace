@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FF8FAB"/>
+      <stop offset="40%" stop-color="#FFDAC1"/>
+      <stop offset="80%" stop-color="#FFE5EC"/>
+      <stop offset="100%" stop-color="#B5EAD7"/>
+    </linearGradient>
+  </defs>
+  <rect width="500" height="500" rx="24" fill="url(#sky)"/>
+  <circle cx="250" cy="260" r="75" fill="#FFF" opacity="0.9"/>
+  <path d="M 0,330 Q 120,310 250,330 T 500,325 L 500,500 L 0,500 Z" fill="#64B5F6" opacity="0.7"/>
+  <path d="M 0,370 Q 150,350 300,375 T 500,365 L 500,500 L 0,500 Z" fill="#42A5F5" opacity="0.8"/>
+  <g transform="translate(225, 200)">
+    <!-- Heart in sunset -->
+    <path d="M 25,15 C 10,-5 -15,10 5,35 L 25,55 L 45,35 C 65,10 40,-5 25,15 Z" fill="#FB6F92"/>
+  </g>
+  <text x="250" y="440" font-family="'Fredoka', sans-serif" font-size="28" font-weight="bold" fill="#FFF" text-anchor="middle">Sunset Pinky Promise 🌅💖</text>
+</svg>

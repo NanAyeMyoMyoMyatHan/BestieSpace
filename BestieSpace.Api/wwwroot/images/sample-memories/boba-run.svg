@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE5EC"/>
+      <stop offset="100%" stop-color="#FFC2D1"/>
+    </linearGradient>
+    <linearGradient id="tea" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE2B8"/>
+      <stop offset="100%" stop-color="#E8B87D"/>
+    </linearGradient>
+  </defs>
+  <rect width="500" height="500" rx="24" fill="url(#bg1)"/>
+  <circle cx="80" cy="90" r="25" fill="#FFF" opacity="0.5"/>
+  <circle cx="420" cy="120" r="18" fill="#FFF" opacity="0.5"/>
+  <!-- Boba Cup 1 -->
+  <g transform="translate(150, 160)">
+    <path d="M 30,50 L 50,220 C 52,240 148,240 150,220 L 170,50 Z" fill="url(#tea)" stroke="#4A3B3C" stroke-width="6"/>
+    <ellipse cx="100" cy="50" rx="70" ry="15" fill="#FFF0F5" stroke="#4A3B3C" stroke-width="6"/>
+    <rect x="90" y="-30" width="20" height="90" rx="6" fill="#FF8FAB" stroke="#4A3B3C" stroke-width="5" transform="rotate(-10 100 20)"/>
+    <!-- Boba Pearls -->
+    <circle cx="80" cy="200" r="14" fill="#4A3B3C"/>
+    <circle cx="115" cy="205" r="14" fill="#4A3B3C"/>
+    <circle cx="70" cy="180" r="13" fill="#4A3B3C"/>
+    <circle cx="100" cy="175" r="13" fill="#4A3B3C"/>
+    <circle cx="130" cy="190" r="13" fill="#4A3B3C"/>
+    <!-- Cute Eyes -->
+    <circle cx="85" cy="120" r="6" fill="#4A3B3C"/>
+    <circle cx="115" cy="120" r="6" fill="#4A3B3C"/>
+    <ellipse cx="75" cy="126" rx="5" ry="3" fill="#FF8FAB"/>
+    <ellipse cx="125" cy="126" rx="5" ry="3" fill="#FF8FAB"/>
+    <path d="M 96,128 Q 100,135 104,128" stroke="#4A3B3C" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <!-- Sparkles -->
+  <text x="250" y="440" font-family="'Fredoka', sans-serif" font-size="28" font-weight="bold" fill="#FB6F92" text-anchor="middle">Boba Date Forever 🧋✨</text>
+</svg>

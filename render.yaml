@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: bestiespace
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/dashboard
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DATA_DIR
+        value: /app/data
