@@ -395,14 +395,14 @@ public class BestieApiClient : IBestieApiClient
             return new PasswordHintDto
             {
                 Username = "mochi_maker",
-                Hint = "Friends forever (bestie4ever!)"
+                Hint = "Your secret creator password 🌸"
             };
         }
 
         return new PasswordHintDto
         {
             Username = "strawberry_bestie",
-            Hint = "How much I miss you (missyou3000!)"
+            Hint = "Your secret bestie password 💕"
         };
     }
 

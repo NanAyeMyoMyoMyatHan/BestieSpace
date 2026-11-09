@@ -3,82 +3,530 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject IBestieApiClient ApiClient
 @inject AuthenticationStateProvider AuthStateProvider
+@inject BestieAuthenticationStateProvider BestieAuth
+@inject NavigationManager Navigation
 
-<div class="top-row ps-3 pe-3 navbar navbar-dark d-flex justify-content-between align-items-center">
-    <a class="navbar-brand" href="">BestieSpace 🌸</a>
-    <AuthorizeView>
-        <Authorized>
-            <NotificationCenter />
-        </Authorized>
-    </AuthorizeView>
-</div>
+<header class="kawaii-navbar-container">
+    <div class="kawaii-navbar">
+        <!-- Brand Logo -->
+        <NavLink href="" class="navbar-brand" Match="NavLinkMatch.All">
+            <span class="brand-strawberry-icon">🍓</span>
+            <span class="brand-name">Bestie<span class="brand-name-highlight">Space</span> 🌸</span>
+        </NavLink>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> 🏠 Home
+        <!-- Desktop Navigation Menu -->
+        <nav class="navbar-links">
+            <NavLink class="nav-link-item" href="" Match="NavLinkMatch.All">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Home</span>
             </NavLink>
-        </div>
 
-        <AuthorizeView>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="register">
-                        <span class="bi bi-person-plus-fill-nav-menu" aria-hidden="true"></span> ✨ Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="login">
-                        <span class="bi bi-box-arrow-in-right-nav-menu" aria-hidden="true"></span> 🔑 Sign In
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="friends">
-                <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> 👭 Friends & Profile
+            <NavLink class="nav-link-item" href="photos">
+                <span class="nav-icon">📸</span>
+                <span class="nav-text">Photos</span>
             </NavLink>
-        </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link d-flex justify-content-between align-items-center" href="circles">
-                <span><span class="bi bi-chat-heart-fill-nav-menu" aria-hidden="true"></span> 👑 Bestie Circles</span>
-                @if (unreadCirclesCount > 0)
+            <NavLink class="nav-link-item" href="notes">
+                <span class="nav-icon">✉️</span>
+                <span class="nav-text">Notes</span>
+            </NavLink>
+
+            <NavLink class="nav-link-item" href="chat">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">Chat</span>
+                @if (unreadChatCount > 0)
                 {
-                    <span class="badge bg-danger rounded-pill" style="font-size: 0.72rem; padding: 2px 7px;">@unreadCirclesCount</span>
+                    <span class="nav-unread-dot">@unreadChatCount</span>
                 }
             </NavLink>
-        </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="admin/rbac">
-                <span class="bi bi-shield-lock-fill-nav-menu" aria-hidden="true"></span> 🛡️ Admin RBAC
+            <NavLink class="nav-link-item" href="circles">
+                <span class="nav-icon">👑</span>
+                <span class="nav-text">Circles</span>
             </NavLink>
-        </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            <NavLink class="nav-link-item" href="friends">
+                <span class="nav-icon">👭</span>
+                <span class="nav-text">Friends</span>
             </NavLink>
-        </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
+            @if (isAdmin)
+            {
+                <NavLink class="nav-link-item admin-link" href="admin/rbac">
+                    <span class="nav-icon">🛡️</span>
+                    <span class="nav-text">Admin</span>
+                </NavLink>
+            }
+        </nav>
+
+        <!-- Right Side Utility: Notifications & User Session -->
+        <div class="navbar-actions">
+            <AuthorizeView>
+                <Authorized>
+                    <NotificationCenter />
+
+                    <a href="/friends" class="user-profile-pill" title="View Profile & Friends">
+                        <span class="user-avatar-sticker">@(userSession?.AvatarSticker ?? "🎀")</span>
+                        <span class="user-display-name">@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "Bestie")</span>
+                    </a>
+
+                    <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutAsync" title="Sign Out or Switch Account">
+                        <span>🔒</span>
+                        <span class="logout-text">Sign Out</span>
+                    </button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn-navbar-login">
+                        <span>🔑</span> Sign In
+                    </a>
+                    <a href="/register" class="btn-navbar-register">
+                        <span>✨</span> Register
+                    </a>
+                </NotAuthorized>
+            </AuthorizeView>
+
+            <!-- Mobile Hamburger Toggle -->
+            <button type="button" class="navbar-hamburger" @onclick="ToggleMobileMenu" aria-label="Toggle navigation menu">
+                <span>@(isMobileMenuOpen ? "✕" : "☰")</span>
+            </button>
         </div>
-    </nav>
-</div>
+    </div>
+
+    <!-- Mobile Navigation Drawer / Dropdown -->
+    @if (isMobileMenuOpen)
+    {
+        <div class="mobile-nav-drawer" @onclick="CloseMobileMenu">
+            <div class="mobile-nav-content" @onclick:stopPropagation="true">
+                <div class="mobile-nav-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="brand-strawberry-icon">🍓</span>
+                        <span class="brand-name">BestieSpace 🌸</span>
+                    </div>
+                    <button class="mobile-close-btn" @onclick="CloseMobileMenu">✕</button>
+                </div>
+
+                <div class="mobile-nav-links">
+                    <NavLink class="mobile-link" href="" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
+                        <span>🏠 Home Dashboard</span>
+                    </NavLink>
+                    <NavLink class="mobile-link" href="photos" @onclick="CloseMobileMenu">
+                        <span>📸 Polaroid Photos</span>
+                    </NavLink>
+                    <NavLink class="mobile-link" href="notes" @onclick="CloseMobileMenu">
+                        <span>✉️ Secret Notes</span>
+                    </NavLink>
+                    <NavLink class="mobile-link" href="chat" @onclick="CloseMobileMenu">
+                        <span>💬 Clubhouse & Circle Chat</span>
+                        @if (unreadChatCount > 0)
+                        {
+                            <span class="nav-unread-dot">@unreadChatCount</span>
+                        }
+                    </NavLink>
+                    <NavLink class="mobile-link" href="circles" @onclick="CloseMobileMenu">
+                        <span>👑 Bestie Circles</span>
+                    </NavLink>
+                    <NavLink class="mobile-link" href="friends" @onclick="CloseMobileMenu">
+                        <span>👭 Friends & Profile</span>
+                    </NavLink>
+                    @if (isAdmin)
+                    {
+                        <NavLink class="mobile-link admin-link" href="admin/rbac" @onclick="CloseMobileMenu">
+                            <span>🛡️ Dynamic RBAC Admin</span>
+                        </NavLink>
+                    }
+                </div>
+
+                <div class="mobile-auth-footer">
+                    <AuthorizeView>
+                        <Authorized>
+                            <div class="mobile-user-info">
+                                <span>@(userSession?.AvatarSticker ?? "🎀")</span>
+                                <span>Signed in as <strong>@(userSession?.DisplayName ?? context.User.Identity?.Name)</strong></span>
+                            </div>
+                            <button type="button" class="btn-mobile-logout" @onclick="HandleLogoutAsync">
+                                <span>🔒 Sign Out / Switch Account</span>
+                            </button>
+                        </Authorized>
+                        <NotAuthorized>
+                            <div class="mobile-auth-buttons">
+                                <a href="/login" class="btn-navbar-login" @onclick="CloseMobileMenu">
+                                    <span>🔑 Sign In</span>
+                                </a>
+                                <a href="/register" class="btn-navbar-register" @onclick="CloseMobileMenu">
+                                    <span>✨ Register</span>
+                                </a>
+                            </div>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </div>
+    }
+</header>
+
+<style>
+.kawaii-navbar-container {
+    position: sticky;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    background: rgba(255, 253, 249, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 2px solid #FFC2D1;
+    box-shadow: 0 4px 20px rgba(255, 143, 171, 0.18);
+    font-family: 'Fredoka', 'Quicksand', sans-serif;
+}
+
+.kawaii-navbar {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+/* Brand */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #4A3B3C;
+    transition: transform 0.2s ease;
+    user-select: none;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.04);
+}
+
+.brand-strawberry-icon {
+    font-size: 1.6rem;
+    animation: gentleWiggle 3s infinite ease-in-out;
+}
+
+@@keyframes gentleWiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-8deg); }
+    75% { transform: rotate(8deg); }
+}
+
+.brand-name {
+    letter-spacing: -0.3px;
+}
+
+.brand-name-highlight {
+    color: #FB6F92;
+}
+
+/* Nav Links */
+.navbar-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    list-style: none;
+}
+
+.nav-link-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 9999px;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #5C4A4C;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.nav-link-item:hover {
+    background: #FFF0F5;
+    color: #FB6F92;
+    transform: translateY(-1px);
+}
+
+.nav-link-item.active {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.35);
+}
+
+.nav-link-item.admin-link {
+    color: #7B2CBF;
+}
+
+.nav-link-item.admin-link:hover {
+    background: #F3E8FF;
+    color: #6A1B9A;
+}
+
+.nav-link-item.admin-link.active {
+    background: linear-gradient(135deg, #9D4EDD 0%, #7B2CBF 100%);
+    color: #FFFFFF !important;
+}
+
+.nav-unread-dot {
+    background: #FF0055;
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    box-shadow: 0 2px 6px rgba(255, 0, 85, 0.4);
+    line-height: 1.2;
+}
+
+/* Right Side Actions */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-profile-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFF0F5;
+    border: 1.5px solid #FFC2D1;
+    border-radius: 9999px;
+    padding: 5px 12px;
+    text-decoration: none;
+    color: #4A3B3C;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.user-profile-pill:hover {
+    background: #FFE5EC;
+    transform: translateY(-1px);
+}
+
+.user-avatar-sticker {
+    font-size: 1.15rem;
+}
+
+.user-display-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-navbar-logout {
+    background: #FFFDF9;
+    border: 1.5px solid #FFC2D1;
+    color: #7E6566;
+    border-radius: 9999px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+}
+
+.btn-navbar-logout:hover {
+    background: #FFE5EC;
+    color: #FB6F92;
+    border-color: #FB6F92;
+}
+
+.btn-navbar-login {
+    background: #FFFFFF;
+    border: 2px solid #FFC2D1;
+    color: #FB6F92;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 7px 16px;
+    border-radius: 9999px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.2s;
+}
+
+.btn-navbar-login:hover {
+    background: #FFF0F5;
+}
+
+.btn-navbar-register {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 7px 18px;
+    border-radius: 9999px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.35);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-navbar-register:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(251, 111, 146, 0.45);
+}
+
+.navbar-hamburger {
+    display: none;
+    background: #FFF0F5;
+    border: 2px solid #FFC2D1;
+    border-radius: 12px;
+    padding: 6px 12px;
+    font-size: 1.3rem;
+    color: #FB6F92;
+    cursor: pointer;
+}
+
+/* Mobile responsive */
+@@media (max-width: 900px) {
+    .navbar-links {
+        display: none;
+    }
+
+    .logout-text {
+        display: none;
+    }
+
+    .navbar-hamburger {
+        display: block;
+    }
+}
+
+/* Mobile Nav Drawer */
+.mobile-nav-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(74, 59, 60, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 10001;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.mobile-nav-content {
+    background: #FFFDF9;
+    width: 290px;
+    height: 100%;
+    padding: 24px 20px;
+    box-shadow: -6px 0 24px rgba(74, 59, 60, 0.2);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.25s ease-out;
+}
+
+@@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.mobile-nav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #FFDEE7;
+    margin-bottom: 16px;
+}
+
+.mobile-close-btn {
+    background: #FFF0F5;
+    border: 1.5px solid #FFC2D1;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1rem;
+    color: #FB6F92;
+    cursor: pointer;
+}
+
+.mobile-nav-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.mobile-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-radius: 14px;
+    text-decoration: none;
+    color: #4A3B3C;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.mobile-link:hover, .mobile-link.active {
+    background: #FFE5EC;
+    color: #FB6F92;
+}
+
+.mobile-auth-footer {
+    padding-top: 16px;
+    border-top: 2px solid #FFDEE7;
+}
+
+.mobile-user-info {
+    font-size: 0.9rem;
+    color: #7E6566;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-mobile-logout {
+    width: 100%;
+    background: #FFE5EC;
+    border: 1.5px solid #FFC2D1;
+    color: #FB6F92;
+    font-weight: 700;
+    padding: 10px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.mobile-auth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+</style>
 
 @code {
-    private int unreadCirclesCount = 0;
+    private bool isMobileMenuOpen = false;
+    private bool isAdmin = false;
+    private int unreadChatCount = 0;
+    private UserSessionDto? userSession;
 
     protected override async Task OnInitializedAsync()
     {
+        userSession = BestieAuth.CurrentUser;
+        isAdmin = BestieAuth.HasRole("Admin") || BestieAuth.HasRole("Administrator") || BestieAuth.HasPermission("USER_MANAGE");
+
         try
         {
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -87,10 +535,27 @@
                 var summary = await ApiClient.GetUnreadSummaryAsync();
                 if (summary != null)
                 {
-                    unreadCirclesCount = summary.TotalUnreadCount;
+                    unreadChatCount = summary.TotalUnreadCount;
                 }
             }
         }
         catch { }
+    }
+
+    private void ToggleMobileMenu()
+    {
+        isMobileMenuOpen = !isMobileMenuOpen;
+    }
+
+    private void CloseMobileMenu()
+    {
+        isMobileMenuOpen = false;
+    }
+
+    private async Task HandleLogoutAsync()
+    {
+        CloseMobileMenu();
+        await BestieAuth.LogoutAsync();
+        Navigation.NavigateTo("/login", true);
     }
 }

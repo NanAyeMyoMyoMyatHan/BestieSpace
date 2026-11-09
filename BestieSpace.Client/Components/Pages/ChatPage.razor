@@ -1,0 +1,467 @@
+@page "/chat"
+@rendermode InteractiveServer
+
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IBestieApiClient ApiClient
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject ILogger<ChatPage> Logger
+
+<PageTitle>Bestie Clubhouse Chat 💬🌸 | BestieSpace</PageTitle>
+
+<div class="chat-hub-container">
+    <div class="page-header-card">
+        <div class="header-content">
+            <span class="header-icon">💬</span>
+            <div>
+                <h1>Bestie Clubhouse & Circle Chats</h1>
+                <p>Private real-time chat rooms with photos, cute stickers, voice notes & read receipts ✨</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <a href="/circles" class="btn-kawaii-secondary">
+                <span>👑 Manage Circles</span>
+            </a>
+            <a href="/friends" class="btn-kawaii-secondary">
+                <span>👭 Bestie Friends</span>
+            </a>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <span class="spinner">🌸</span>
+            <p>Loading your Bestie Chat Rooms...</p>
+        </div>
+    }
+    else if (myCircles == null || !myCircles.Any())
+    {
+        <div class="empty-state-card">
+            <span class="empty-icon">💬🧸</span>
+            <h3>No chat rooms joined yet!</h3>
+            <p>
+                Each Bestie Circle has its own private real-time chat room where up to 9 close besties can hang out, send photos, stickers, and voice notes!
+            </p>
+            <div class="empty-actions">
+                <a href="/circles" class="btn-kawaii-primary">
+                    <span>👑 Create or Join a Circle</span>
+                </a>
+                <a href="/friends" class="btn-kawaii-secondary">
+                    <span>👭 Find Besties First</span>
+                </a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="circles-chat-grid">
+            @foreach (var circle in myCircles)
+            {
+                var unreadCount = 0;
+                circleUnreadCounts?.TryGetValue(circle.CircleId, out unreadCount);
+
+                <div class="circle-chat-card @(unreadCount > 0 ? "has-unread" : "")" @onclick="() => OpenCircleChat(circle.CircleId)">
+                    <div class="circle-chat-badge-row">
+                        <span class="circle-icon">@(string.IsNullOrWhiteSpace(circle.CircleIcon) ? "🌸" : circle.CircleIcon)</span>
+                        @if (unreadCount > 0)
+                        {
+                            <span class="unread-pill-pulse">✨ @unreadCount new @(unreadCount == 1 ? "msg" : "msgs")</span>
+                        }
+                        else
+                        {
+                            <span class="status-pill-synced">✓ All read</span>
+                        }
+                    </div>
+
+                    <h3 class="circle-title">@circle.CircleName</h3>
+                    <p class="circle-desc">@(string.IsNullOrWhiteSpace(circle.Description) ? "Our cozy private circle clubhouse 💕" : circle.Description)</p>
+
+                    <div class="circle-meta-row">
+                        <span class="meta-tag">👥 @circle.MemberCount / 9 Members</span>
+                        @if (circle.IsOwner)
+                        {
+                            <span class="meta-tag-owner">👑 Circle Host</span>
+                        }
+                        else
+                        {
+                            <span class="meta-tag-member">🌸 Member</span>
+                        }
+                    </div>
+
+                    <div class="circle-card-action">
+                        <button class="btn-enter-chat" @onclick:stopPropagation="true" @onclick="() => OpenCircleChat(circle.CircleId)">
+                            <span>💬 Enter Chat Room ➜</span>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+.chat-hub-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 20px 80px 20px;
+    font-family: 'Fredoka', 'Quicksand', sans-serif;
+}
+
+.page-header-card {
+    background: linear-gradient(135deg, #FFFDF9 0%, #FFE5EC 100%);
+    border: 3px solid #FFC2D1;
+    border-radius: 28px;
+    padding: 28px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 10px 30px rgba(255, 143, 171, 0.2);
+    margin-bottom: 36px;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.header-icon {
+    font-size: 3rem;
+    background: #FFF;
+    border-radius: 50%;
+    width: 68px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 16px rgba(255, 143, 171, 0.25);
+    border: 2px solid #FFC2D1;
+}
+
+.page-header-card h1 {
+    color: #4A3B3C;
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.page-header-card p {
+    color: #7E6566;
+    font-size: 1rem;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-kawaii-primary {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF !important;
+    font-weight: 700;
+    padding: 12px 24px;
+    border-radius: 9999px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-kawaii-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(251, 111, 146, 0.45);
+}
+
+.btn-kawaii-secondary {
+    background: #FFFFFF;
+    color: #FB6F92 !important;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 9999px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 2px solid #FFC2D1;
+    box-shadow: 0 4px 12px rgba(255, 143, 171, 0.15);
+    transition: transform 0.2s, background-color 0.2s;
+}
+
+.btn-kawaii-secondary:hover {
+    background: #FFF0F5;
+    transform: translateY(-2px);
+}
+
+.loading-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #7E6566;
+    font-size: 1.1rem;
+}
+
+.loading-state .spinner {
+    font-size: 2.5rem;
+    display: inline-block;
+    animation: spinSlow 3s linear infinite;
+    margin-bottom: 12px;
+}
+
+@@keyframes spinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.empty-state-card {
+    background: #FFFFFF;
+    border: 3px dashed #FFC2D1;
+    border-radius: 28px;
+    padding: 60px 24px;
+    text-align: center;
+    max-width: 540px;
+    margin: 40px auto;
+}
+
+.empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.empty-state-card h3 {
+    color: #4A3B3C;
+    font-weight: 700;
+    font-size: 1.4rem;
+    margin-bottom: 8px;
+}
+
+.empty-state-card p {
+    color: #7E6566;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 24px;
+}
+
+.empty-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Circles Chat Grid */
+.circles-chat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 28px;
+}
+
+.circle-chat-card {
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFFDF9 100%);
+    border: 3px solid #FFC2D1;
+    border-radius: 26px;
+    padding: 26px 24px;
+    box-shadow: 0 10px 24px rgba(255, 143, 171, 0.16);
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.circle-chat-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 16px 36px rgba(251, 111, 146, 0.28);
+    border-color: #FB6F92;
+}
+
+.circle-chat-card.has-unread {
+    border-color: #FB6F92;
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F7 100%);
+}
+
+.circle-chat-badge-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.circle-icon {
+    font-size: 2.2rem;
+    background: #FFF0F5;
+    width: 54px;
+    height: 54px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #FFC2D1;
+}
+
+.unread-pill-pulse {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 9999px;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.4);
+    animation: unreadPulse 2s infinite ease-in-out;
+}
+
+@@keyframes unreadPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+.status-pill-synced {
+    background: #E2F0CB;
+    color: #4A6B2C;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 9999px;
+}
+
+.circle-title {
+    color: #4A3B3C;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.circle-desc {
+    color: #7E6566;
+    font-size: 0.92rem;
+    line-height: 1.4;
+    margin-bottom: 16px;
+    flex: 1;
+}
+
+.circle-meta-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.meta-tag {
+    background: #FFF0F5;
+    color: #7E6566;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #FFD1DC;
+}
+
+.meta-tag-owner {
+    background: #FFF8E7;
+    color: #B27B00;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #FFE082;
+}
+
+.meta-tag-member {
+    background: #E8D7F1;
+    color: #6A3E8A;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid #D1B3E0;
+}
+
+.circle-card-action {
+    margin-top: auto;
+}
+
+.btn-enter-chat {
+    width: 100%;
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 12px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(251, 111, 146, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-enter-chat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+}
+</style>
+
+@code {
+    private List<CircleDto>? myCircles;
+    private Dictionary<int, int>? circleUnreadCounts;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCirclesAndUnreadAsync();
+    }
+
+    private async Task LoadCirclesAndUnreadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            if (auth.User.Identity?.IsAuthenticated == true)
+            {
+                var circlesTask = ApiClient.GetMyCirclesAsync();
+                var unreadTask = ApiClient.GetUnreadSummaryAsync();
+
+                await Task.WhenAll(circlesTask, unreadTask);
+
+                myCircles = await circlesTask;
+                var unread = await unreadTask;
+                if (unread != null && unread.Circles != null)
+                {
+                    circleUnreadCounts = unread.Circles.ToDictionary(c => c.CircleId, c => c.UnreadCount);
+                }
+            }
+            else
+            {
+                Nav.NavigateTo("/login");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load circles for chat hub");
+            myCircles = new List<CircleDto>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCircleChat(int circleId)
+    {
+        Nav.NavigateTo($"/circles/{circleId}/chat");
+    }
+}

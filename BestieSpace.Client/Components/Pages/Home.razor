@@ -10,7 +10,7 @@
 <PageTitle>BestieSpace 🌸 | Our Secret Cozy Space</PageTitle>
 
 <!-- =========================================================
-     STEP 0: CUTE SECRET BESTIE LOGIN SCREEN
+     STEP 0: CUTE SECRET BESTIE LOGIN SCREEN (If not signed in)
      ========================================================= -->
 @if (currentUserSession == null)
 {
@@ -116,12 +116,12 @@
                 <!-- Secret Password Form View -->
                 <div class="login-input-group">
                     <div class="login-field">
-                        <label class="login-label">Cute Nickname</label>
+                        <label class="login-label">Cute Nickname or Email</label>
                         <div class="login-input-box">
                             <span class="login-input-icon">🍓</span>
                             <input type="text" 
                                    class="login-input" 
-                                   placeholder="e.g., strawberry_bestie" 
+                                   placeholder="e.g., strawberry_bestie or email" 
                                    @bind="loginUsername" 
                                    @bind:event="oninput"
                                    @onkeydown="HandleLoginKeyDown" />
@@ -199,7 +199,6 @@
      ========================================================= -->
 <div class="welcome-gate-overlay @(isGateOpen || currentUserSession == null ? "gate-hidden" : "")">
     <div class="welcome-card">
-        <!-- Floating Corner Stickers -->
         <div class="floating-sticker sticker-1">🎀</div>
         <div class="floating-sticker sticker-2">✨</div>
         <div class="floating-sticker sticker-3">🧸</div>
@@ -211,53 +210,21 @@
 
         <h1 class="welcome-title">Hi My Sweet @(currentUserSession?.DisplayName ?? "Bestie")!</h1>
         <p class="welcome-subtitle">
-            I built a cozy, pastel world just for the two of us. <br />
+            Welcome to our cozy, pastel clubhouse. <br />
             Packed with our photos, heartfelt letters, secret envelopes, and live chat!
         </p>
 
         <button class="welcome-btn" @onclick="OpenWelcomeGate">
-            <span>Click to open your surprise 💌</span>
+            <span>Click to enter our clubhouse 💌</span>
             <span style="font-size: 1.4rem;">✨</span>
         </button>
     </div>
 </div>
 
 <!-- =========================================================
-     STEP 2: MAIN EXPERIENCE
+     STEP 2: MAIN DASHBOARD EXPERIENCE
      ========================================================= -->
 <div class="main-wrapper" style="@(isGateOpen && currentUserSession != null ? "opacity: 1;" : "opacity: 0.05; pointer-events: none;") transition: opacity 0.6s ease;">
-    
-    <!-- Top Account Bar -->
-    @if (currentUserSession != null)
-    {
-        <div class="top-user-bar">
-            <div class="user-identity-badge">
-                <span>@(currentUserSession.AvatarSticker)</span>
-                <span>Hi, <strong>@(currentUserSession.DisplayName)</strong>!</span>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <NotificationCenter />
-                <a href="/friends" class="btn-friends-shortcut" title="Bestie Friends & Profile Hub">
-                    <span>👭 Friends & Profile</span>
-                </a>
-                <a href="/circles" class="btn-circles-shortcut" title="Bestie Circles & Private Chats">
-                    <span>👑 Circles Hub</span>
-                </a>
-                @if (canAccessAdminConsole)
-                {
-                    <a href="/admin/rbac" class="btn-admin-shortcut" title="Security & Permissions Console">
-                        <span>👑 Admin Console</span>
-                    </a>
-                }
-                <button type="button" class="btn-vip-ticket-shortcut" @onclick="() => showVipModal = true" title="View Printable VIP Pass">
-                    <span>🎟️ Bestie VIP Card</span>
-                </button>
-                <button class="btn-lock-diary" @onclick="LogoutAsync" title="Switch Account or Lock Diary">
-                    <span>🔒 Switch Account / Lock</span>
-                </button>
-            </div>
-        </div>
-    }
     
     <!-- Top Header -->
     <header class="kawaii-header">
@@ -270,623 +237,165 @@
         <p class="brand-tagline">Our secret digital memory box & real-time clubhouse</p>
     </header>
 
-    <!-- Navigation Pills -->
-    <nav class="kawaii-nav-tabs">
-        <button class="nav-pill-btn @(activeSection == "all" || activeSection == "letter" ? "active" : "")" 
-                @onclick="@(() => activeSection = "letter")">
-            <span>💌</span> Heartfelt Letter & Meter
-        </button>
-        <button class="nav-pill-btn @(activeSection == "memories" ? "active" : "")" 
-                @onclick="@(() => activeSection = "memories")">
-            <span>📸</span> Polaroid Gallery (@(dashboard?.Memories.Count ?? 0))
-        </button>
-        <button class="nav-pill-btn @(activeSection == "notes" ? "active" : "")" 
-                @onclick="@(() => activeSection = "notes")">
-            <span>✉️</span> Mystery Envelopes (@(dashboard?.SecretNotes.Count ?? 0))
-        </button>
-        <button class="nav-pill-btn @(activeSection == "chat" ? "active" : "")" 
-                @onclick="@(() => activeSection = "chat")">
-            <span>💬</span> Multimedia Chat (@(visibleChatMessages.Count + unreadQueue.Count))
-        </button>
-        <button class="nav-pill-btn @(activeSection == "all" ? "active" : "")" 
-                @onclick="@(() => activeSection = "all")">
-            <span>✨</span> View All
-        </button>
-    </nav>
-
     <!-- SECTION 1: HEARTFELT LETTER & MISS YOU METER -->
-    @if (activeSection == "all" || activeSection == "letter")
-    {
-        <section class="letter-section" id="letter-section">
-            <div class="stationery-card">
-                <div class="washi-tape-top"></div>
+    <section class="letter-section" id="letter-section">
+        <div class="stationery-card">
+            <div class="washi-tape-top"></div>
 
-                <div class="letter-header">
-                    <div class="letter-title">
-                        <span>💌</span>
-                        <span>@(dashboard?.AppStats.MainLetterTitle ?? "To My Favorite Human in the Entire World 🌸")</span>
+            <div class="letter-header">
+                <div class="letter-title">
+                    <span>💌</span>
+                    <span>@(dashboard?.AppStats.MainLetterTitle ?? "To My Favorite Human in the Entire World 🌸")</span>
+                </div>
+                <div class="letter-from-to">
+                    <span>With all my love: @(dashboard?.AppStats.SenderNickname ?? "Me 🎀") ➜ @(dashboard?.AppStats.RecipientNickname ?? "Bestie 🌸")</span>
+                </div>
+            </div>
+
+            <div class="letter-content">
+                @(dashboard?.AppStats.MainLetterContent ?? "Loading our heartfelt letter...")
+            </div>
+
+            <!-- Miss You Meter Box -->
+            <div class="miss-you-box">
+                <div class="miss-you-info">
+                    <div class="miss-you-counter-badge">
+                        <div class="miss-you-counter-number">@missYouCount</div>
+                        <div class="miss-you-counter-label">Hugs Sent 💖</div>
                     </div>
-                    <div class="letter-from-to">
-                        <span>With all my love: @(dashboard?.AppStats.SenderNickname ?? "Me 🎀") ➜ @(dashboard?.AppStats.RecipientNickname ?? "Bestie 🌸")</span>
+                    <div class="miss-you-desc">
+                        <div class="miss-you-desc-title">The Live Miss-You Meter 🌸</div>
+                        <div class="miss-you-desc-text">
+                            Every time you miss me, tap the button! It syncs in real time across the database and sends warm virtual hugs!
+                        </div>
                     </div>
                 </div>
 
-                <div class="letter-content">
-                    @(dashboard?.AppStats.MainLetterContent ?? "Loading our heartfelt letter...")
+                <button class="btn-miss-you-hug" @onclick="HandleMissYouClick">
+                    <span>I Miss You Too! 💖</span>
+                    <span style="font-size: 1.4rem;">🧸</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 2: CLUBHOUSE FEATURE MENU GRID -->
+    <section class="features-menu-section">
+        <div class="section-header-center">
+            <span class="badge-pill-kawaii">🌸 Clubhouse Navigation Menu</span>
+            <h2 class="section-title">Explore BestieSpace Features</h2>
+            <p class="section-subtitle">Everything is organized cleanly into dedicated spaces for you and your besties 💕</p>
+        </div>
+
+        <div class="features-cards-grid">
+            <!-- Feature 1: Polaroid Photos -->
+            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/photos")'>
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">📸</span>
+                    <span class="feature-badge">@(dashboard?.Memories.Count ?? 0) Memories</span>
                 </div>
+                <h3 class="feature-card-title">Polaroid Memories</h3>
+                <p class="feature-card-desc">
+                    Browse our photo albums pinned with washi tape and cute stickers. Upload new photos and view zoomable polaroids.
+                </p>
+                <div class="feature-card-footer">
+                    <a href="/photos" class="btn-feature-link" @onclick:stopPropagation="true">
+                        <span>Open Photo Album 📸</span>
+                    </a>
+                </div>
+            </div>
 
-                <!-- Miss You Meter Box -->
-                <div class="miss-you-box">
-                    <div class="miss-you-info">
-                        <div class="miss-you-counter-badge">
-                            <div class="miss-you-counter-number">@missYouCount</div>
-                            <div class="miss-you-counter-label">Hugs Sent 💖</div>
-                        </div>
-                        <div class="miss-you-desc">
-                            <div class="miss-you-desc-title">The Live Miss-You Meter 🌸</div>
-                            <div class="miss-you-desc-text">
-                                Every time you miss me, tap the button! It syncs in real time across the database and sends warm virtual hugs!
-                            </div>
-                        </div>
-                    </div>
+            <!-- Feature 2: Secret Notes -->
+            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/notes")'>
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">✉️</span>
+                    <span class="feature-badge">@(dashboard?.SecretNotes.Count(n => n.IsUnlocked) ?? 0) / @(dashboard?.SecretNotes.Count ?? 0) Opened</span>
+                </div>
+                <h3 class="feature-card-title">Mystery Envelopes</h3>
+                <p class="feature-card-desc">
+                    Break the wax seal on surprise letters and heartfelt handwritten notes created just for your eyes.
+                </p>
+                <div class="feature-card-footer">
+                    <a href="/notes" class="btn-feature-link" @onclick:stopPropagation="true">
+                        <span>Open Secret Notes ✉️</span>
+                    </a>
+                </div>
+            </div>
 
-                    <button class="btn-miss-you-hug" @onclick="HandleMissYouClick">
-                        <span>I Miss You Too! 💖</span>
-                        <span style="font-size: 1.4rem;">🧸</span>
+            <!-- Feature 3: Private Chat -->
+            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/chat")'>
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">💬</span>
+                    <span class="feature-badge badge-signalr">⚡ Live SignalR</span>
+                </div>
+                <h3 class="feature-card-title">Clubhouse & Circle Chat</h3>
+                <p class="feature-card-desc">
+                    Real-time private group chats with photo sharing, cute sticker trays, audio voice messages, and per-user read receipts.
+                </p>
+                <div class="feature-card-footer">
+                    <a href="/chat" class="btn-feature-link" @onclick:stopPropagation="true">
+                        <span>Enter Chat Room 💬</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Feature 4: Bestie Circles -->
+            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/circles")'>
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">👑</span>
+                    <span class="feature-badge">Up to 9 Besties</span>
+                </div>
+                <h3 class="feature-card-title">Bestie Circles</h3>
+                <p class="feature-card-desc">
+                    Manage private friend circles. Invite close friends, view membership rosters, and customize circle icons and details.
+                </p>
+                <div class="feature-card-footer">
+                    <a href="/circles" class="btn-feature-link" @onclick:stopPropagation="true">
+                        <span>Manage Circles 👑</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Feature 5: Friends & Profile -->
+            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/friends")'>
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">👭</span>
+                    <span class="feature-badge">Social Hub</span>
+                </div>
+                <h3 class="feature-card-title">Friends & Profiles</h3>
+                <p class="feature-card-desc">
+                    Search for besties, manage incoming friend requests, update your display name, bio, and choose your favorite avatar sticker.
+                </p>
+                <div class="feature-card-footer">
+                    <a href="/friends" class="btn-feature-link" @onclick:stopPropagation="true">
+                        <span>View Friends Hub 👭</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Feature 6: VIP Pass Keepsake -->
+            <div class="feature-menu-card card-vip-keepsake" @onclick="() => showVipModal = true">
+                <div class="feature-card-header">
+                    <span class="feature-card-icon">🎟️</span>
+                    <span class="feature-badge">Keepsake Pass</span>
+                </div>
+                <h3 class="feature-card-title">Official VIP Pass</h3>
+                <p class="feature-card-desc">
+                    View, copy, or print your official Bestie Clubhouse VIP Pass to invite your best friends into your cozy circle!
+                </p>
+                <div class="feature-card-footer">
+                    <button type="button" class="btn-feature-link btn-vip-link" @onclick:stopPropagation="true" @onclick="() => showVipModal = true">
+                        <span>View VIP Pass 🎟️</span>
                     </button>
                 </div>
             </div>
-        </section>
-    }
+        </div>
+    </section>
 
-    <!-- SECTION 2: POLAROID PHOTO GALLERY -->
-    @if (activeSection == "all" || activeSection == "memories")
-    {
-        <section class="gallery-section" id="memories-section">
-            <div class="section-header-row">
-                <div>
-                    <h2 class="section-title">
-                        <span>📸</span>
-                        <span>Our Polaroid Memories</span>
-                    </h2>
-                    <p class="section-subtitle">Moments we froze in time, captured with cute corner stickers</p>
-                </div>
-
-                <button class="btn-kawaii-primary" @onclick="() => showAddPhotoModal = true">
-                    <span>Add Our Photo 📸</span>
-                </button>
-            </div>
-
-            <div class="polaroid-grid">
-                @if (dashboard?.Memories != null)
-                {
-                    @foreach (var memory in dashboard.Memories)
-                    {
-                        var angle = memory.RotationAngle != 0 ? memory.RotationAngle : -1.5;
-                        var stickerEmoji = GetStickerEmoji(memory.StickerType);
-
-                        <div class="polaroid-frame" 
-                             style="transform: rotate(@(angle)deg);"
-                             @onclick="() => OpenLightbox(GetFullMediaUrl(memory.ImageUrl), memory.Caption)">
-                            <div class="polaroid-washi"></div>
-                            <div class="polaroid-corner-sticker">@stickerEmoji</div>
-                            <div class="polaroid-img-wrapper">
-                                <img src="@GetFullMediaUrl(memory.ImageUrl)" alt="@memory.Caption" class="polaroid-img" />
-                            </div>
-                            <div class="polaroid-caption">@memory.Caption</div>
-                            <div class="polaroid-date">@memory.MemoryDate.ToString("MMMM dd, yyyy")</div>
-                        </div>
-                    }
-                }
-            </div>
-        </section>
-    }
-
-    <!-- SECTION 3: "EXPLORE MORE" MYSTERY ENVELOPES -->
-    @if (activeSection == "all" || activeSection == "notes")
-    {
-        <section class="envelopes-section" id="notes-section">
-            <div class="section-header-row">
-                <div>
-                    <h2 class="section-title">
-                        <span>✉️</span>
-                        <span>"Explore More" Mystery Envelopes</span>
-                    </h2>
-                    <p class="section-subtitle">Click an envelope to break the seal and unlock a heartfelt secret note</p>
-                </div>
-            </div>
-
-            <div class="envelopes-grid">
-                @if (dashboard?.SecretNotes != null)
-                {
-                    @foreach (var note in dashboard.SecretNotes)
-                    {
-                        <div class="envelope-card @(note.IsUnlocked ? "unlocked-envelope" : "")"
-                             @onclick="() => HandleEnvelopeClick(note)">
-                            <div class="envelope-icon-circle">
-                                <span>@(note.IsUnlocked ? "📖" : note.StickerIcon)</span>
-                            </div>
-                            <h3 class="envelope-title">@note.Title</h3>
-                            <p class="envelope-hint">@note.PreviewHint</p>
-
-                            @if (note.IsUnlocked)
-                            {
-                                <span class="envelope-status-badge status-unlocked">
-                                    <span>✨ Unlocked</span>
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="envelope-status-badge status-sealed">
-                                    <span>🎀 Sealed • Tap to Open</span>
-                                </span>
-                            }
-                        </div>
-                    }
-                }
-            </div>
-        </section>
-    }
-
-    <!-- SECTION 4: REAL-TIME MULTIMEDIA BESTIE CHAT BOX -->
-    @if (activeSection == "all" || activeSection == "chat")
-    {
-        <section class="chat-section" id="chat-section">
-            <div class="section-header-row">
-                <div>
-                    <h2 class="section-title">
-                        <span>💬</span>
-                        <span>Our Real-Time Bestie Clubhouse</span>
-                    </h2>
-                    <p class="section-subtitle">Chat in real-time with text, cute stickers, photos, and voice notes</p>
-                </div>
-            </div>
-
-            <div class="chat-card">
-                <!-- Chat Top Bar -->
-                <div class="chat-top-bar">
-                    <div class="chat-header-info">
-                        <div class="chat-avatar-group">
-                            <span>🎀</span>
-                            <span style="margin-left: -8px;">🌸</span>
-                        </div>
-                        <div>
-                            <div class="chat-title-text">
-                                <span class="chat-status-dot"></span>
-                                Bestie Private Line
-                            </div>
-                            @if (otherUserPresence != null)
-                            {
-                                if (otherUserPresence.IsOnline)
-                                {
-                                    <div class="presence-badge presence-badge-online">
-                                        <span class="presence-pulsing-dot"></span>
-                                        <span>@(otherUserPresence.DisplayName) is online right now! 💖</span>
-                                    </div>
-                                }
-                                else
-                                {
-                                    <div class="presence-badge presence-badge-offline">
-                                        <span>🌙</span>
-                                        <span>@(otherUserPresence.DisplayName) @GetRelativeTime(otherUserPresence.LastSeenAt)</span>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div style="font-size: 0.8rem; color: var(--text-cocoa-light);">
-                                    @(isSignalRConnected ? "Live Connected • Instant Sync 💫" : "Reconnecting... 🌸")
-                                </div>
-                            }
-                        </div>
-                    </div>
-
-                    <!-- Auto-Play Toggle & Connected User Badge -->
-                    <div class="sender-toggle-wrapper">
-                        <button class="autoplay-toggle-btn @(autoPlayVoiceNotes ? "active" : "")"
-                                @onclick="() => autoPlayVoiceNotes = !autoPlayVoiceNotes"
-                                title="Auto-play voice notes when they pop up">
-                            <span>@(autoPlayVoiceNotes ? "🔊 Voice Auto-Play: ON" : "🔈 Voice Auto-Play: OFF")</span>
-                        </button>
-                        <div class="user-identity-badge" style="border-width: 1.5px; padding: 4px 12px; font-size: 0.82rem;">
-                            <span>@(currentUserSession?.AvatarSticker ?? "🌸")</span>
-                            <span>Chatting as: <strong>@(currentUserSession?.DisplayName ?? currentSender)</strong></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- While You Were Away Cute Banner -->
-                @if (unreadCountDisplay > 0 || unreadQueue.Count > 0)
-                {
-                    var count = unreadCountDisplay > 0 ? unreadCountDisplay : unreadQueue.Count;
-                    <div class="unread-queue-banner">
-                        <span>💌</span>
-                        <span>While you were away: <strong>@count</strong> sweet message@(count > 1 ? "s" : "") waiting for you!</span>
-                        <span style="font-size: 1.1rem; animation: pulseRecording 1.2s infinite;">✨</span>
-                    </div>
-                }
-
-                <!-- Chat Messages Scroll Area -->
-                <div class="chat-messages-container" id="chat-scroll-container">
-                    @if (visibleChatMessages.Count == 0 && !showTypingIndicator)
-                    {
-                        <div style="text-align: center; color: var(--text-cocoa-light); padding: 40px 0;">
-                            <div style="font-size: 40px; margin-bottom: 8px;">🌸</div>
-                            <p>No messages yet! Say hi to your bestie below 💖</p>
-                        </div>
-                    }
-                    else
-                    {
-                        @foreach (var msg in visibleChatMessages)
-                        {
-                            var isMe = msg.SenderName == currentSender || msg.SenderName.Contains("Me");
-                            var rowClass = isMe ? "chat-me" : "chat-bestie";
-                            var bubbleAnimate = msg.Id == newlyPoppedMessageId ? "chat-bubble-popup-animate" : "";
-
-                            <div class="chat-row @rowClass">
-                                <div class="chat-sender-tag">
-                                    <span>@msg.SenderName</span>
-                                </div>
-
-                                @switch (msg.MessageType?.ToLowerInvariant())
-                                {
-                                    case "text":
-                                        <div class="chat-bubble @bubbleAnimate">
-                                            @msg.Content
-                                            <div class="chat-status-meta">
-                                                <span class="chat-time">@msg.Timestamp.ToString("h:mm tt")</span>
-                                                @if (isMe)
-                                                {
-                                                    <span class="chat-seen-indicator">@(msg.IsRead ? "Seen 💖" : "Delivered ✨")</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="chat-seen-indicator">Seen 💖</span>
-                                                }
-                                            </div>
-                                        </div>
-                                        break;
-
-                                    case "sticker":
-                                        <div class="chat-bubble chat-bubble-sticker @bubbleAnimate">
-                                            <div style="font-size: 72px; text-align: center; line-height: 1.1;">
-                                                @GetStickerVisual(msg.Content)
-                                            </div>
-                                            <div class="chat-status-meta">
-                                                <span class="chat-time" style="color: var(--text-cocoa-light);">@msg.Timestamp.ToString("h:mm tt")</span>
-                                                @if (isMe)
-                                                {
-                                                    <span class="chat-seen-indicator" style="color: var(--text-cocoa-light);">@(msg.IsRead ? "Seen 💖" : "Delivered ✨")</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="chat-seen-indicator" style="color: var(--text-cocoa-light);">Seen 💖</span>
-                                                }
-                                            </div>
-                                        </div>
-                                        break;
-
-                                    case "photo":
-                                        <div class="chat-bubble @bubbleAnimate" style="padding: 10px;">
-                                            <img src="@GetFullMediaUrl(msg.MediaUrl)" 
-                                                 alt="Shared photo" 
-                                                 class="chat-photo-thumb"
-                                                 @onclick="() => OpenLightbox(GetFullMediaUrl(msg.MediaUrl), msg.Content ?? msg.SenderName)" />
-                                            @if (!string.IsNullOrWhiteSpace(msg.Content))
-                                            {
-                                                <div style="margin-top: 6px; font-size: 0.95rem;">@msg.Content</div>
-                                            }
-                                            <div class="chat-status-meta">
-                                                <span class="chat-time">@msg.Timestamp.ToString("h:mm tt")</span>
-                                                @if (isMe)
-                                                {
-                                                    <span class="chat-seen-indicator">@(msg.IsRead ? "Seen 💖" : "Delivered ✨")</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="chat-seen-indicator">Seen 💖</span>
-                                                }
-                                            </div>
-                                        </div>
-                                        break;
-
-                                    case "voice":
-                                        {
-                                            var currentMsg = msg;
-                                            var audioId = $"audio-{currentMsg.Id}";
-                                            var duration = currentMsg.VoiceDurationSeconds.HasValue 
-                                                ? $"0:{((int)currentMsg.VoiceDurationSeconds.Value):D2}" 
-                                                : "0:05";
-                                            var isFreshPop = currentMsg.Id == newlyPoppedMessageId;
-
-                                            <div class="chat-bubble @bubbleAnimate @(isFreshPop ? "voice-note-highlight" : "")">
-                                                @if (isFreshPop || !currentMsg.IsRead)
-                                                {
-                                                    <div class="voice-glowing-badge" @onclick="() => ToggleAudioPlayback(audioId)">
-                                                        <span>🌸</span>
-                                                        <span>New Voice Note • Tap to listen 🎧</span>
-                                                    </div>
-                                                }
-                                                <div class="pastel-audio-player">
-                                                    <button class="audio-play-btn" @onclick="() => ToggleAudioPlayback(audioId)">
-                                                        @(currentlyPlayingAudioId == audioId ? "⏸" : "▶")
-                                                    </button>
-                                                    <div class="audio-wave-bar">
-                                                        <span style="height: 12px;"></span>
-                                                        <span style="height: 18px;"></span>
-                                                        <span style="height: 24px;"></span>
-                                                        <span style="height: 14px;"></span>
-                                                        <span style="height: 20px;"></span>
-                                                        <span style="height: 16px;"></span>
-                                                        <span style="height: 22px;"></span>
-                                                        <span style="height: 10px;"></span>
-                                                    </div>
-                                                    <span class="audio-duration">@duration</span>
-                                                </div>
-                                                <audio id="@audioId" src="@GetFullMediaUrl(currentMsg.MediaUrl)" 
-                                                       @onended="() => currentlyPlayingAudioId = null"></audio>
-                                                <div class="chat-status-meta">
-                                                    <span class="chat-time">@currentMsg.Timestamp.ToString("h:mm tt")</span>
-                                                    @if (isMe)
-                                                    {
-                                                        <span class="chat-seen-indicator">@(currentMsg.IsRead ? "Seen 💖" : "Delivered ✨")</span>
-                                                    }
-                                                    else
-                                                    {
-                                                        <span class="chat-seen-indicator">Seen 💖</span>
-                                                    }
-                                                </div>
-                                            </div>
-                                        }
-                                        break;
-
-                                    default:
-                                        <div class="chat-bubble @bubbleAnimate">
-                                            @msg.Content
-                                            <div class="chat-status-meta">
-                                                <span class="chat-time">@msg.Timestamp.ToString("h:mm tt")</span>
-                                            </div>
-                                        </div>
-                                        break;
-                                }
-                            </div>
-                        }
-
-                        <!-- Typing / Recording Indicator Bubble -->
-                        @if (showTypingIndicator)
-                        {
-                            <div class="chat-row chat-bestie">
-                                <div class="chat-sender-tag">
-                                    <span>@(currentSender == "Me 🎀" ? "Bestie 🌸" : "Me 🎀")</span>
-                                </div>
-                                <div class="typing-bubble-wrapper">
-                                    <span class="typing-indicator-label">@typingIndicatorText</span>
-                                    <div class="typing-dots">
-                                        <span class="typing-dot"></span>
-                                        <span class="typing-dot"></span>
-                                        <span class="typing-dot"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    }
-                </div>
-
-                <!-- Collapsible Sticker Tray -->
-                @if (showStickerTray)
-                {
-                    <div class="sticker-tray">
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("hugging-bear"))">
-                            <span class="sticker-emoji-icon">🧸</span>
-                            <span class="sticker-label">Hug</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("missing-you-cat"))">
-                            <span class="sticker-emoji-icon">😿</span>
-                            <span class="sticker-label">Miss You</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("sparkling-heart"))">
-                            <span class="sticker-emoji-icon">💖</span>
-                            <span class="sticker-label">Love</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("boba-cheers"))">
-                            <span class="sticker-emoji-icon">🧋</span>
-                            <span class="sticker-label">Boba Cheers</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("cute-bunny"))">
-                            <span class="sticker-emoji-icon">🐰</span>
-                            <span class="sticker-label">Bunny</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("sweet-strawberry"))">
-                            <span class="sticker-emoji-icon">🍓</span>
-                            <span class="sticker-label">Berry Sweet</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("pinky-promise"))">
-                            <span class="sticker-emoji-icon">🤞</span>
-                            <span class="sticker-label">Promise</span>
-                        </button>
-                        <button class="sticker-item-btn" @onclick="@(() => SendStickerMessage("besties-forever"))">
-                            <span class="sticker-emoji-icon">👭</span>
-                            <span class="sticker-label">BFFs</span>
-                        </button>
-                    </div>
-                }
-
-                <!-- Chat Input Controls -->
-                <div class="chat-bottom-bar">
-                    @if (isRecordingVoice)
-                    {
-                        <div class="recording-bar">
-                            <div class="recording-indicator">
-                                <span class="rec-pulse-dot"></span>
-                                <span>Recording voice note... 0:@(recordingSeconds.ToString("D2"))</span>
-                            </div>
-                            <div class="recording-actions">
-                                <button class="btn-rec-action btn-rec-cancel" @onclick="CancelVoiceRecording">Cancel</button>
-                                <button class="btn-rec-action btn-rec-send" @onclick="StopAndSendVoiceRecording">Send 💖</button>
-                            </div>
-                        </div>
-                    }
-
-                    <div class="chat-input-row" style="margin-top: @(isRecordingVoice ? "10px" : "0");">
-                        <!-- Stickers Toggle Button -->
-                        <button class="chat-icon-btn" title="Pick Kawaii Sticker" @onclick="() => showStickerTray = !showStickerTray">
-                            🧸
-                        </button>
-
-                        <!-- Photo Upload Button -->
-                        <label class="chat-icon-btn" title="Send a Photo 📸" style="margin: 0;">
-                            📸
-                            <InputFile OnChange="HandleChatPhotoUpload" accept="image/*" style="display: none;" />
-                        </label>
-
-                        <!-- Voice Note Button -->
-                        <button class="chat-icon-btn @(isRecordingVoice ? "recording" : "")" 
-                                title="Record Voice Note 🎤" 
-                                @onclick="ToggleVoiceRecording">
-                            🎤
-                        </button>
-
-                        <!-- Text Input -->
-                        <input type="text" 
-                               class="chat-text-input" 
-                               placeholder="Type a sweet message to your bestie..."
-                               @bind="chatInputText" 
-                               @bind:event="oninput"
-                               @onkeydown="HandleKeyDown" />
-
-                        <!-- Send Button -->
-                        <button class="chat-send-btn" title="Send" @onclick="SendTextMessage">
-                            💖
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </section>
-    }
 </div>
 
 <!-- =========================================================
-     MODAL 1: ADD POLAROID PHOTO
-     ========================================================= -->
-@if (showAddPhotoModal)
-{
-    <div class="kawaii-modal-backdrop" @onclick="() => showAddPhotoModal = false">
-        <div class="kawaii-modal-card" @onclick:stopPropagation="true">
-            <button class="modal-close-btn" @onclick="() => showAddPhotoModal = false">✕</button>
-
-            <div class="modal-header-icon">📸✨</div>
-            <h2 class="modal-title">Add Our Polaroid</h2>
-            <p class="modal-subtitle">Add a sweet memory to our gallery with a cute corner sticker!</p>
-
-            <div class="form-group">
-                <label class="form-label">Pick Our Photo</label>
-                <InputFile OnChange="HandleMemoryPhotoSelection" accept="image/*" class="form-control-kawaii" />
-            </div>
-
-            @if (!string.IsNullOrEmpty(photoPreviewDataUrl))
-            {
-                <div style="text-align: center; margin-bottom: 16px;">
-                    <img src="@photoPreviewDataUrl" alt="Preview" style="max-height: 180px; border-radius: 12px; border: 3px solid #FFC2D1;" />
-                </div>
-            }
-
-            <div class="form-group">
-                <label class="form-label">Heartfelt Caption</label>
-                <input type="text" class="form-control-kawaii" 
-                       placeholder="e.g. Eating ice cream by the beach laughing endlessly! 🍦" 
-                       @bind="newPhotoCaption" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Memory Date</label>
-                <input type="date" class="form-control-kawaii" @bind="newPhotoDate" />
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Corner Sticker Type</label>
-                <div class="sticker-select-group">
-                    <div class="sticker-pill-radio @(newPhotoSticker == "bow" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "bow")">
-                        <span>🎀</span> Bow
-                    </div>
-                    <div class="sticker-pill-radio @(newPhotoSticker == "bear" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "bear")">
-                        <span>🧸</span> Bear
-                    </div>
-                    <div class="sticker-pill-radio @(newPhotoSticker == "sparkle" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "sparkle")">
-                        <span>✨</span> Sparkle
-                    </div>
-                    <div class="sticker-pill-radio @(newPhotoSticker == "heart" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "heart")">
-                        <span>💖</span> Heart
-                    </div>
-                </div>
-            </div>
-
-            <div style="text-align: right; margin-top: 24px;">
-                <button class="btn-kawaii-primary" @onclick="SubmitNewMemory" disabled="@isUploadingPhoto">
-                    @if (isUploadingPhoto)
-                    {
-                        <span>Uploading... 🌸</span>
-                    }
-                    else
-                    {
-                        <span>Pin to Gallery 📌</span>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- =========================================================
-     MODAL 2: SECRET NOTE STATIONERY
-     ========================================================= -->
-@if (showSecretNoteModal && activeSecretNote != null)
-{
-    <div class="kawaii-modal-backdrop" @onclick="() => showSecretNoteModal = false">
-        <div class="kawaii-modal-card" @onclick:stopPropagation="true">
-            <button class="modal-close-btn" @onclick="() => showSecretNoteModal = false">✕</button>
-
-            <div class="modal-header-icon">@activeSecretNote.StickerIcon</div>
-            <h2 class="modal-title">@activeSecretNote.Title</h2>
-            <p class="modal-subtitle">@activeSecretNote.PreviewHint</p>
-
-            <div class="secret-note-paper">
-                <div class="secret-note-text">
-                    @activeSecretNote.Content
-                </div>
-            </div>
-
-            <div style="text-align: center; color: var(--text-cocoa-light); font-size: 0.9rem;">
-                <span>✨ Sealed with love • Forever your bestie 💕</span>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- =========================================================
-     MODAL 3: PHOTO LIGHTBOX
-     ========================================================= -->
-@if (showLightboxModal)
-{
-    <div class="kawaii-modal-backdrop" @onclick="() => showLightboxModal = false">
-        <div class="lightbox-card" @onclick:stopPropagation="true">
-            <button class="modal-close-btn" style="top: 10px; right: 10px;" @onclick="() => showLightboxModal = false">✕</button>
-            <img src="@activeLightboxUrl" alt="@activeLightboxCaption" class="lightbox-img" />
-            @if (!string.IsNullOrWhiteSpace(activeLightboxCaption))
-            {
-                <div style="color: var(--white); font-size: 1.2rem; font-weight: 600; margin-top: 14px; text-shadow: 0 2px 8px rgba(0,0,0,0.6);">
-                    @activeLightboxCaption
-                </div>
-            }
-        </div>
-    </div>
-}
-
-<!-- =========================================================
-     MODAL 4: CUTE VIP INVITATION PASS
+     MODAL: CUTE VIP INVITATION PASS
      ========================================================= -->
 @if (showVipModal)
 {
@@ -904,11 +413,11 @@
                 <div class="vip-ticket-body">
                     <div class="vip-info-cell">
                         <div class="vip-info-label">VIP Member</div>
-                        <div class="vip-info-val">Sweet Bestie 🌸</div>
+                        <div class="vip-info-val">@(currentUserSession?.DisplayName ?? "Sweet Bestie 🌸")</div>
                     </div>
                     <div class="vip-info-cell">
                         <div class="vip-info-label">Nickname</div>
-                        <div class="vip-info-val">strawberry_bestie</div>
+                        <div class="vip-info-val">@(currentUserSession?.Username ?? "strawberry_bestie")</div>
                     </div>
                     <div class="vip-info-cell">
                         <div class="vip-info-label">Access Level</div>
@@ -950,90 +459,194 @@
     </div>
 }
 
+<style>
+/* Dashboard Specific Styles */
+.features-menu-section {
+    max-width: 1100px;
+    margin: 40px auto 80px auto;
+    padding: 0 20px;
+}
+
+.section-header-center {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.badge-pill-kawaii {
+    display: inline-block;
+    background: #FFF0F5;
+    color: #FB6F92;
+    border: 1.5px solid #FFC2D1;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    margin-bottom: 12px;
+}
+
+.section-header-center .section-title {
+    color: #4A3B3C;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.section-header-center .section-subtitle {
+    color: #7E6566;
+    font-size: 1.05rem;
+}
+
+.features-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 28px;
+}
+
+.feature-menu-card {
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFFDF9 100%);
+    border: 3px solid #FFC2D1;
+    border-radius: 26px;
+    padding: 26px 24px;
+    box-shadow: 0 10px 24px rgba(255, 143, 171, 0.16);
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.feature-menu-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 16px 36px rgba(251, 111, 146, 0.28);
+    border-color: #FB6F92;
+}
+
+.feature-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.feature-card-icon {
+    font-size: 2.4rem;
+    background: #FFF0F5;
+    width: 58px;
+    height: 58px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #FFC2D1;
+    transition: transform 0.2s ease;
+}
+
+.feature-menu-card:hover .feature-card-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.feature-badge {
+    background: #FFF0F5;
+    color: #FB6F92;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    border: 1px solid #FFC2D1;
+}
+
+.feature-badge.badge-signalr {
+    background: #E2F0CB;
+    color: #4A6B2C;
+    border-color: #C5E1A5;
+}
+
+.feature-card-title {
+    color: #4A3B3C;
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.feature-card-desc {
+    color: #7E6566;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    flex: 1;
+}
+
+.feature-card-footer {
+    margin-top: auto;
+}
+
+.btn-feature-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF !important;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 12px;
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(251, 111, 146, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-feature-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+}
+
+.btn-vip-link {
+    background: linear-gradient(135deg, #FFB703 0%, #FB8500 100%);
+    box-shadow: 0 4px 14px rgba(251, 133, 0, 0.3);
+}
+
+.btn-vip-link:hover {
+    box-shadow: 0 6px 18px rgba(251, 133, 0, 0.45);
+}
+</style>
+
 @code {
-    private bool isGateOpen = false;
-    private string activeSection = "all";
     private DashboardDto? dashboard;
-    private int missYouCount = 1000;
-    
-    // Auth Session & Cute Secret Login State
+    private int missYouCount = 0;
+    private bool isGateOpen = false;
+
+    // Login Gate State
     private UserSessionDto? currentUserSession;
-    private bool canAccessAdminConsole =>
-        currentUserSession != null &&
-        (AuthProvider.HasRole("SuperAdmin") ||
-         AuthProvider.HasRole("Admin") ||
-         AuthProvider.HasPermission("ROLE_VIEW") ||
-         AuthProvider.HasPermission("USER_MANAGE") ||
-         (currentUserSession.Roles != null && (currentUserSession.Roles.Contains("SuperAdmin") || currentUserSession.Roles.Contains("Admin"))));
-    private string activeLoginTab = "pin"; // "pin" or "password"
+    private string activeLoginTab = "pin";
     private string enteredPin = "";
-    private bool isPinLoggingIn = false;
-    private bool isPinWiggling = false;
     private string loginUsername = "";
     private string loginPassword = "";
     private bool showPassword = false;
-    private bool isLoggingIn = false;
     private string? loginErrorMessage;
+    private bool isLoggingIn = false;
+    private bool isPinLoggingIn = false;
+    private bool isPinWiggling = false;
     private bool isLoginWiggling = false;
     private bool showHintBox = false;
 
-    // Real-Time Presence State
-    private UserPresenceDto? otherUserPresence;
-
-    // Chat state & Offline Message Queue
-    private List<ChatMessageDto> allLoadedMessages = new();
-    private List<ChatMessageDto> visibleChatMessages = new();
-    private Queue<ChatMessageDto> unreadQueue = new();
-    private bool isPoppingUpQueue = false;
-    private bool showTypingIndicator = false;
-    private string typingIndicatorText = "🎀 Sending you a note...";
-    private int? newlyPoppedMessageId = null;
-    private bool autoPlayVoiceNotes = true;
-    private int unreadCountDisplay = 0;
-
-    private string currentSender = "Sweet Bestie 🌸";
-    private string chatInputText = "";
-    private bool showStickerTray = false;
-    private bool isRecordingVoice = false;
-    private int recordingSeconds = 0;
-    private System.Threading.Timer? recordingTimer;
-    private DotNetObjectReference<Home>? dotNetHelper;
+    // Hub and Modals
     private HubConnection? hubConnection;
-    private bool isSignalRConnected = false;
-
-    // Modals
-    private bool showAddPhotoModal = false;
-    private bool showSecretNoteModal = false;
-    private SecretNoteDto? activeSecretNote;
-    private bool showLightboxModal = false;
-    private string activeLightboxUrl = "";
-    private string activeLightboxCaption = "";
     private bool showVipModal = false;
     private bool isTicketCopied = false;
 
-    // Add Photo Form State
-    private string newPhotoCaption = "";
-    private string newPhotoSticker = "bow";
-    private DateTime newPhotoDate = DateTime.Today;
-    private IBrowserFile? selectedPhotoFile;
-    private string? photoPreviewDataUrl;
-    private bool isUploadingPhoto = false;
-
-    // Audio Playback
-    private string? currentlyPlayingAudioId;
-
     protected override async Task OnInitializedAsync()
     {
-        dotNetHelper = DotNetObjectReference.Create(this);
-
         var authState = await AuthProvider.GetAuthenticationStateAsync();
         if (AuthProvider.CurrentUser != null)
         {
-            ApplyUserSession(AuthProvider.CurrentUser);
+            currentUserSession = AuthProvider.CurrentUser;
+            isGateOpen = true;
         }
 
         await LoadDashboardAsync();
-        await LoadChatMessagesAsync();
         await InitializeSignalRAsync();
     }
 
@@ -1044,37 +657,49 @@
             var authState = await AuthProvider.GetAuthenticationStateAsync();
             if (AuthProvider.CurrentUser != null)
             {
-                ApplyUserSession(AuthProvider.CurrentUser);
+                currentUserSession = AuthProvider.CurrentUser;
+                isGateOpen = true;
                 await InvokeAsync(StateHasChanged);
             }
         }
     }
 
-    private void ApplyUserSession(UserSessionDto session)
+    private async Task LoadDashboardAsync()
     {
-        currentUserSession = session;
-        currentSender = session.RoleKey == "Bestie" ? "Bestie 🌸" : "Me 🎀";
-        PartitionMessagesForCurrentViewer();
-
-        if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+        try
         {
-            _ = hubConnection.SendAsync("RegisterUser", currentSender);
-        }
-
-        _ = Task.Run(async () =>
-        {
-            try
+            dashboard = await ApiClient.GetDashboardAsync();
+            if (dashboard?.AppStats != null)
             {
-                var otherRole = session.RoleKey == "Bestie" ? "Me" : "Bestie";
-                otherUserPresence = await ApiClient.GetPresenceAsync(otherRole);
-                await InvokeAsync(StateHasChanged);
+                missYouCount = dashboard.AppStats.MissYouCount;
             }
-            catch { }
-        });
-
-        if (isGateOpen && unreadQueue.Count > 0)
+        }
+        catch (Exception ex)
         {
-            _ = ProcessUnreadQueueAsync();
+            Logger.LogError(ex, "Failed to load dashboard statistics");
+        }
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/bestieChat"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            hubConnection.On<int>("UpdateMissYouCount", (count) =>
+            {
+                missYouCount = count;
+                InvokeAsync(StateHasChanged);
+            });
+
+            await hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to connect SignalR in Home dashboard");
         }
     }
 
@@ -1110,7 +735,7 @@
             if (res.IsSuccess && res.User != null)
             {
                 currentUserSession = res.User;
-                ApplyUserSession(currentUserSession);
+                isGateOpen = true;
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
                 enteredPin = "";
@@ -1138,7 +763,109 @@
         finally
         {
             isPinLoggingIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLoginAsync()
+    {
+        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
+        {
+            loginErrorMessage = "Please type your cute nickname/email and secret password! 🌸";
+            TriggerWiggle();
+            return;
+        }
+
+        isLoggingIn = true;
+        loginErrorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var res = await AuthProvider.LoginAsync(loginUsername.Trim(), loginPassword);
+
+            if (res.IsSuccess && res.User != null)
+            {
+                currentUserSession = res.User;
+                isGateOpen = true;
+                await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
+                await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
+            }
+            else
+            {
+                loginErrorMessage = res.Message ?? "Incorrect nickname or secret password. Please try again! 🥺";
+                TriggerWiggle();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Password login error");
+            loginErrorMessage = "Incorrect nickname or secret password. Please try again! 🥺";
+            TriggerWiggle();
+        }
+        finally
+        {
+            isLoggingIn = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLoginKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await HandleLoginAsync();
+        }
+    }
+
+    private void ToggleHintBox()
+    {
+        showHintBox = !showHintBox;
+    }
+
+    private void TriggerWiggle()
+    {
+        isLoginWiggling = true;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(550);
+            isLoginWiggling = false;
             await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task OpenWelcomeGate()
+    {
+        isGateOpen = true;
+        await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
+    }
+
+    private async Task HandleMissYouClick()
+    {
+        missYouCount++;
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
+            await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
+        }
+        catch { }
+
+        try
+        {
+            var res = await ApiClient.IncrementMissYouAsync();
+            if (res != null)
+            {
+                missYouCount = res.MissYouCount;
+            }
+
+            if (hubConnection != null && hubConnection.State == HubConnectionState.Connected)
+            {
+                await hubConnection.SendAsync("SendMissYouHug", missYouCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to increment miss you count via API");
         }
     }
 
@@ -1147,9 +874,8 @@
         try
         {
             var invite = "🍓✨ --- OFFICIAL VIP PASS: BESTIE CLUBHOUSE --- ✨🍓\n"
-                       + "🌸 Member: Sweet Bestie 🌸\n"
-                       + "🍓 Nickname: strawberry_bestie\n"
-                       + "🔑 Secret Password: missyou3000!\n"
+                       + $"🌸 Member: {currentUserSession?.DisplayName ?? "Sweet Bestie 🌸"}\n"
+                       + $"🍓 Nickname: {currentUserSession?.Username ?? "strawberry_bestie"}\n"
                        + "🎀 4-Digit Quick-PIN: 3000 🍓\n"
                        + "💌 Welcome to our cozy clubhouse! 💕";
             await JSRuntime.InvokeVoidAsync("bestieTicket.copyText", invite);
@@ -1179,777 +905,15 @@
         }
     }
 
-    private string GetRelativeTime(DateTime? utcTime)
-    {
-        if (!utcTime.HasValue) return "was here earlier 🌸";
-        var diff = DateTime.UtcNow - utcTime.Value;
-        if (diff.TotalMinutes < 1) return "was here just now ✨";
-        if (diff.TotalMinutes < 60) return $"was here {(int)diff.TotalMinutes}m ago 🌸";
-        if (diff.TotalHours < 24) return $"was here {(int)diff.TotalHours}h ago 🧸";
-        return $"was here {utcTime.Value.ToLocalTime():MMM d} 💌";
-    }
-
-    private async Task HandleLoginAsync()
-    {
-        if (string.IsNullOrWhiteSpace(loginUsername) || string.IsNullOrWhiteSpace(loginPassword))
-        {
-            loginErrorMessage = "Please enter both your nickname and secret code 🌸";
-            TriggerWiggle();
-            return;
-        }
-
-        isLoggingIn = true;
-        loginErrorMessage = null;
-
-        try
-        {
-            var response = await AuthProvider.LoginAsync(loginUsername.Trim(), loginPassword.Trim());
-
-            if (response.IsSuccess && response.User != null)
-            {
-                currentUserSession = response.User;
-                ApplyUserSession(currentUserSession);
-                await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
-                await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
-
-                loginUsername = "";
-                loginPassword = "";
-                await InvokeAsync(StateHasChanged);
-            }
-            else
-            {
-                loginErrorMessage = response.Message ?? "Oopsie! Wrong secret code 🥺 Try again!";
-                TriggerWiggle();
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Login exception");
-            loginErrorMessage = "Oopsie! Wrong secret code 🥺 Try again!";
-            TriggerWiggle();
-        }
-        finally
-        {
-            isLoggingIn = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task LogoutAsync()
-    {
-        await AuthProvider.LogoutAsync();
-        currentUserSession = null;
-        loginErrorMessage = null;
-        loginUsername = "";
-        loginPassword = "";
-        enteredPin = "";
-        otherUserPresence = null;
-        isGateOpen = false;
-
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("bestieAuth.clearSession");
-        }
-        catch { }
-
-        PartitionMessagesForCurrentViewer();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private void TriggerWiggle()
-    {
-        isLoginWiggling = true;
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(550);
-            isLoginWiggling = false;
-            await InvokeAsync(StateHasChanged);
-        });
-    }
-
-    private void ToggleHintBox()
-    {
-        showHintBox = !showHintBox;
-    }
-
-    private void QuickFillBestie()
-    {
-        if (activeLoginTab == "pin")
-        {
-            enteredPin = "3000";
-            _ = HandlePinSubmitAsync("3000");
-        }
-        else
-        {
-            loginUsername = "strawberry_bestie";
-            loginPassword = "missyou3000!";
-            loginErrorMessage = null;
-        }
-    }
-
-    private void QuickFillCreator()
-    {
-        if (activeLoginTab == "pin")
-        {
-            enteredPin = "4040";
-            _ = HandlePinSubmitAsync("4040");
-        }
-        else
-        {
-            loginUsername = "mochi_maker";
-            loginPassword = "bestie4ever!";
-            loginErrorMessage = null;
-        }
-    }
-
-    private async Task HandleLoginKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await HandleLoginAsync();
-        }
-    }
-
-    private bool IsSentByCurrentViewer(ChatMessageDto msg)
-    {
-        if (currentUserSession != null)
-        {
-            if (currentUserSession.RoleKey == "Bestie")
-            {
-                return msg.SenderName.Contains("Bestie", StringComparison.OrdinalIgnoreCase);
-            }
-            return msg.SenderName.Contains("Me", StringComparison.OrdinalIgnoreCase);
-        }
-        return msg.SenderName == currentSender || msg.SenderName.Contains("Me");
-    }
-
-    private async Task LoadDashboardAsync()
-    {
-        try
-        {
-            dashboard = await ApiClient.GetDashboardAsync();
-            if (dashboard?.AppStats != null)
-            {
-                missYouCount = dashboard.AppStats.MissYouCount;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading dashboard");
-        }
-    }
-
-    private async Task LoadChatMessagesAsync()
-    {
-        try
-        {
-            var msgs = await ApiClient.GetChatMessagesAsync(currentSender);
-            if (msgs != null)
-            {
-                allLoadedMessages = msgs;
-                PartitionMessagesForCurrentViewer();
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading chat messages");
-        }
-    }
-
-    private void PartitionMessagesForCurrentViewer()
-    {
-        visibleChatMessages.Clear();
-        unreadQueue.Clear();
-
-        foreach (var msg in allLoadedMessages)
-        {
-            if (IsSentByCurrentViewer(msg) || msg.IsRead)
-            {
-                visibleChatMessages.Add(msg);
-            }
-            else
-            {
-                unreadQueue.Enqueue(msg);
-            }
-        }
-
-        unreadCountDisplay = unreadQueue.Count;
-    }
-
-    private async Task InitializeSignalRAsync()
-    {
-        try
-        {
-            var hubUrl = $"{ApiClient.ApiBaseUrl}/chathub";
-            hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl)
-                .WithAutomaticReconnect()
-                .Build();
-
-            hubConnection.On<ChatMessageDto>("ReceiveMessage", async (incomingMessage) =>
-            {
-                if (!allLoadedMessages.Any(m => m.Id == incomingMessage.Id))
-                {
-                    allLoadedMessages.Add(incomingMessage);
-                }
-
-                if (IsSentByCurrentViewer(incomingMessage))
-                {
-                    if (!visibleChatMessages.Any(m => m.Id == incomingMessage.Id))
-                    {
-                        visibleChatMessages.Add(incomingMessage);
-                    }
-                    await InvokeAsync(StateHasChanged);
-                    await ScrollChatToBottomAsync();
-                }
-                else
-                {
-                    // Incoming message from the other bestie
-                    unreadQueue.Enqueue(incomingMessage);
-                    unreadCountDisplay = unreadQueue.Count;
-                    await InvokeAsync(StateHasChanged);
-
-                    if (isGateOpen)
-                    {
-                        _ = ProcessUnreadQueueAsync();
-                    }
-                }
-            });
-
-            hubConnection.On<MessagesReadNotification>("MessagesRead", async (notification) =>
-            {
-                if (notification.MessageIds != null)
-                {
-                    foreach (var id in notification.MessageIds)
-                    {
-                        var m = allLoadedMessages.FirstOrDefault(x => x.Id == id);
-                        if (m != null)
-                        {
-                            m.IsRead = true;
-                            m.ReadAt = notification.ReadAt;
-                        }
-                        var vm = visibleChatMessages.FirstOrDefault(x => x.Id == id);
-                        if (vm != null)
-                        {
-                            vm.IsRead = true;
-                            vm.ReadAt = notification.ReadAt;
-                        }
-                    }
-                    await InvokeAsync(StateHasChanged);
-                }
-            });
-
-            hubConnection.On<UserPresenceDto>("UserPresenceChanged", async (presence) =>
-            {
-                if (currentUserSession == null || presence.RoleKey != currentUserSession.RoleKey)
-                {
-                    otherUserPresence = presence;
-                    await InvokeAsync(StateHasChanged);
-                }
-            });
-
-            await hubConnection.StartAsync();
-            isSignalRConnected = true;
-
-            // Register current active viewer
-            await hubConnection.SendAsync("RegisterUser", currentSender);
-
-            // Fetch initial presence of other user if logged in
-            if (currentUserSession != null)
-            {
-                try
-                {
-                    var otherRole = currentUserSession.RoleKey == "Bestie" ? "Me" : "Bestie";
-                    otherUserPresence = await ApiClient.GetPresenceAsync(otherRole);
-                    await InvokeAsync(StateHasChanged);
-                }
-                catch { }
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "SignalR connection error (API may be starting up)");
-            isSignalRConnected = false;
-        }
-    }
-
-    private async Task OpenWelcomeGate()
-    {
-        isGateOpen = true;
-        await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
-        await ScrollChatToBottomAsync();
-
-        if (unreadQueue.Count > 0)
-        {
-            _ = ProcessUnreadQueueAsync();
-        }
-    }
-
-    private async Task ProcessUnreadQueueAsync()
-    {
-        if (isPoppingUpQueue) return;
-        isPoppingUpQueue = true;
-
-        try
-        {
-            while (unreadQueue.Count > 0)
-            {
-                var nextMsg = unreadQueue.Peek();
-
-                // 1. Show cute animated typing / recording indicator bubble for 1000ms
-                if (nextMsg.MessageType == "voice")
-                {
-                    typingIndicatorText = "🎤 Sending a voice note...";
-                }
-                else if (nextMsg.MessageType == "photo")
-                {
-                    typingIndicatorText = "📸 Sending a photo...";
-                }
-                else if (nextMsg.MessageType == "sticker")
-                {
-                    typingIndicatorText = "🧸 Picking a sweet sticker...";
-                }
-                else
-                {
-                    typingIndicatorText = "🎀 Sending you a note...";
-                }
-
-                showTypingIndicator = true;
-                await InvokeAsync(StateHasChanged);
-                await ScrollChatToBottomAsync();
-
-                await Task.Delay(1000);
-
-                // 2. Dequeue and pop message into the visible list with bounce animation
-                unreadQueue.Dequeue();
-                showTypingIndicator = false;
-                newlyPoppedMessageId = nextMsg.Id;
-
-                if (!visibleChatMessages.Any(m => m.Id == nextMsg.Id))
-                {
-                    visibleChatMessages.Add(nextMsg);
-                }
-
-                // Trigger subtle cute pop sound via Web Audio API synthesis
-                try
-                {
-                    await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
-                }
-                catch { }
-
-                await InvokeAsync(StateHasChanged);
-                await ScrollChatToBottomAsync();
-
-                // 3. Highlight Voice Note and auto-play if enabled
-                if (nextMsg.MessageType == "voice" && autoPlayVoiceNotes)
-                {
-                    var audioId = $"audio-{nextMsg.Id}";
-                    _ = ToggleAudioPlayback(audioId);
-                }
-
-                // 4. Mark read in SQL Server / SQLite and broadcast via SignalR
-                try
-                {
-                    var markReq = new MarkMessagesReadRequest
-                    {
-                        MessageIds = new List<int> { nextMsg.Id },
-                        ReaderName = currentSender
-                    };
-                    await ApiClient.MarkMessagesReadAsync(markReq);
-                    nextMsg.IsRead = true;
-                    nextMsg.ReadAt = DateTime.UtcNow;
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "Failed to mark message {Id} as read", nextMsg.Id);
-                    nextMsg.IsRead = true;
-                }
-
-                unreadCountDisplay = unreadQueue.Count;
-                await InvokeAsync(StateHasChanged);
-
-                // 5. Wait 800ms before starting next message in queue
-                await Task.Delay(800);
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error processing unread message queue");
-        }
-        finally
-        {
-            showTypingIndicator = false;
-            isPoppingUpQueue = false;
-            unreadCountDisplay = 0;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task HandleMissYouClick(MouseEventArgs e)
-    {
-        missYouCount++;
-        await JSRuntime.InvokeVoidAsync("bestieAnimations.spawnFloatingHearts", e.ClientX, e.ClientY);
-
-        try
-        {
-            var res = await ApiClient.IncrementMissYouAsync();
-            if (res != null)
-            {
-                missYouCount = res.MissYouCount;
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to increment miss you count via API");
-        }
-    }
-
-    private async Task HandleEnvelopeClick(SecretNoteDto note)
-    {
-        activeSecretNote = note;
-        showSecretNoteModal = true;
-
-        if (!note.IsUnlocked)
-        {
-            note.IsUnlocked = true;
-            try
-            {
-                var updated = await ApiClient.UnlockNoteAsync(note.Id);
-                if (updated != null)
-                {
-                    note.Content = updated.Content;
-                    note.UnlockedAt = updated.UnlockedAt;
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to unlock note ID {Id}", note.Id);
-            }
-        }
-    }
-
-    private void OpenLightbox(string url, string caption)
-    {
-        activeLightboxUrl = url;
-        activeLightboxCaption = caption;
-        showLightboxModal = true;
-    }
-
-    private async Task HandleMemoryPhotoSelection(InputFileChangeEventArgs e)
-    {
-        selectedPhotoFile = e.File;
-        try
-        {
-            var buffer = new byte[selectedPhotoFile.Size];
-            await selectedPhotoFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).ReadAsync(buffer);
-            var base64 = Convert.ToBase64String(buffer);
-            photoPreviewDataUrl = $"data:{selectedPhotoFile.ContentType};base64,{base64}";
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to generate photo preview");
-        }
-    }
-
-    private async Task SubmitNewMemory()
-    {
-        if (string.IsNullOrWhiteSpace(newPhotoCaption))
-        {
-            newPhotoCaption = "Our happy memory! 🌸";
-        }
-
-        isUploadingPhoto = true;
-
-        try
-        {
-            using var form = new MultipartFormDataContent();
-            form.Add(new StringContent(newPhotoCaption), "caption");
-            form.Add(new StringContent(newPhotoSticker), "stickerType");
-            form.Add(new StringContent(newPhotoDate.ToString("o")), "memoryDate");
-
-            if (selectedPhotoFile != null)
-            {
-                var stream = selectedPhotoFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-                var streamContent = new StreamContent(stream);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(selectedPhotoFile.ContentType);
-                form.Add(streamContent, "photo", selectedPhotoFile.Name);
-            }
-
-            var created = await ApiClient.AddMemoryAsync(form);
-            if (created != null && dashboard != null)
-            {
-                dashboard.Memories.Insert(0, created);
-            }
-
-            showAddPhotoModal = false;
-            newPhotoCaption = "";
-            selectedPhotoFile = null;
-            photoPreviewDataUrl = null;
-            await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error uploading new memory");
-        }
-        finally
-        {
-            isUploadingPhoto = false;
-        }
-    }
-
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !e.ShiftKey)
-        {
-            await SendTextMessage();
-        }
-    }
-
-    private async Task SendTextMessage()
-    {
-        if (string.IsNullOrWhiteSpace(chatInputText)) return;
-
-        var text = chatInputText.Trim();
-        chatInputText = "";
-
-        var req = new SendTextOrStickerRequest
-        {
-            SenderName = currentSender,
-            MessageType = "text",
-            Content = text
-        };
-
-        var created = await ApiClient.SendTextOrStickerAsync(req);
-        if (created != null)
-        {
-            if (!allLoadedMessages.Any(m => m.Id == created.Id))
-            {
-                allLoadedMessages.Add(created);
-            }
-            if (!visibleChatMessages.Any(m => m.Id == created.Id))
-            {
-                visibleChatMessages.Add(created);
-            }
-            StateHasChanged();
-            await ScrollChatToBottomAsync();
-        }
-    }
-
-    private async Task SendStickerMessage(string stickerCode)
-    {
-        showStickerTray = false;
-        var req = new SendTextOrStickerRequest
-        {
-            SenderName = currentSender,
-            MessageType = "sticker",
-            Content = stickerCode
-        };
-
-        var created = await ApiClient.SendTextOrStickerAsync(req);
-        if (created != null)
-        {
-            if (!allLoadedMessages.Any(m => m.Id == created.Id))
-            {
-                allLoadedMessages.Add(created);
-            }
-            if (!visibleChatMessages.Any(m => m.Id == created.Id))
-            {
-                visibleChatMessages.Add(created);
-            }
-            StateHasChanged();
-            await ScrollChatToBottomAsync();
-        }
-    }
-
-    private async Task HandleChatPhotoUpload(InputFileChangeEventArgs e)
-    {
-        var file = e.File;
-        if (file == null) return;
-
-        try
-        {
-            using var form = new MultipartFormDataContent();
-            var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            var streamContent = new StreamContent(stream);
-            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
-            form.Add(streamContent, "photo", file.Name);
-            form.Add(new StringContent(currentSender), "senderName");
-
-            var created = await ApiClient.UploadPhotoAsync(form);
-            if (created != null)
-            {
-                if (!allLoadedMessages.Any(m => m.Id == created.Id))
-                {
-                    allLoadedMessages.Add(created);
-                }
-                if (!visibleChatMessages.Any(m => m.Id == created.Id))
-                {
-                    visibleChatMessages.Add(created);
-                }
-                StateHasChanged();
-                await ScrollChatToBottomAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to upload chat photo");
-        }
-    }
-
-    private async Task ToggleVoiceRecording()
-    {
-        if (isRecordingVoice)
-        {
-            await StopAndSendVoiceRecording();
-        }
-        else
-        {
-            var started = await JSRuntime.InvokeAsync<bool>("voiceRecorder.startRecording", dotNetHelper);
-            if (started)
-            {
-                isRecordingVoice = true;
-                recordingSeconds = 0;
-                recordingTimer = new System.Threading.Timer(async _ =>
-                {
-                    recordingSeconds++;
-                    await InvokeAsync(StateHasChanged);
-                }, null, 1000, 1000);
-            }
-        }
-    }
-
-    private async Task StopAndSendVoiceRecording()
-    {
-        if (!isRecordingVoice) return;
-
-        StopRecordingTimer();
-        isRecordingVoice = false;
-
-        await JSRuntime.InvokeVoidAsync("voiceRecorder.stopAndUpload", 
-            ApiClient.ApiBaseUrl, 
-            currentSender, 
-            dotNetHelper);
-    }
-
-    private async Task CancelVoiceRecording()
-    {
-        StopRecordingTimer();
-        isRecordingVoice = false;
-        await JSRuntime.InvokeVoidAsync("voiceRecorder.cancelRecording");
-    }
-
-    private void StopRecordingTimer()
-    {
-        recordingTimer?.Dispose();
-        recordingTimer = null;
-    }
-
-    [JSInvokable]
-    public void OnRecordingStarted()
-    {
-        // Handled via startRecording return
-    }
-
-    [JSInvokable]
-    public async Task OnRecordingComplete(System.Text.Json.JsonElement result)
-    {
-        try
-        {
-            var id = result.GetProperty("id").GetInt32();
-            if (!allLoadedMessages.Any(m => m.Id == id))
-            {
-                var msg = new ChatMessageDto
-                {
-                    Id = id,
-                    SenderName = result.GetProperty("senderName").GetString() ?? currentSender,
-                    MessageType = "voice",
-                    Content = "Voice note 🎤",
-                    MediaUrl = result.GetProperty("mediaUrl").GetString(),
-                    VoiceDurationSeconds = result.TryGetProperty("voiceDurationSeconds", out var dur) ? dur.GetDouble() : 5,
-                    Timestamp = DateTime.UtcNow,
-                    IsRead = false
-                };
-                allLoadedMessages.Add(msg);
-                visibleChatMessages.Add(msg);
-                await InvokeAsync(StateHasChanged);
-                await ScrollChatToBottomAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error handling voice note completion callback");
-        }
-    }
-
-    [JSInvokable]
-    public void OnRecordingError(string message)
-    {
-        Logger.LogError("Voice recording error: {Message}", message);
-    }
-
-    private async Task ToggleAudioPlayback(string audioId)
-    {
-        if (currentlyPlayingAudioId == audioId)
-        {
-            await JSRuntime.InvokeVoidAsync("pastelAudioPlayer.pause", audioId);
-            currentlyPlayingAudioId = null;
-        }
-        else
-        {
-            if (currentlyPlayingAudioId != null)
-            {
-                await JSRuntime.InvokeVoidAsync("pastelAudioPlayer.pause", currentlyPlayingAudioId);
-            }
-            await JSRuntime.InvokeVoidAsync("pastelAudioPlayer.play", audioId);
-            currentlyPlayingAudioId = audioId;
-        }
-    }
-
-    private async Task ScrollChatToBottomAsync()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("bestieAnimations.scrollToBottom", "chat-scroll-container");
-        }
-        catch { }
-    }
-
-    private string GetFullMediaUrl(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url)) return "/images/sample-memories/photobooth.svg";
-        if (url.StartsWith("http://") || url.StartsWith("https://") || url.StartsWith("data:")) return url;
-        return url;
-    }
-
-    private static string GetStickerEmoji(string stickerType) => stickerType?.ToLower() switch
-    {
-        "bow" => "🎀",
-        "bear" => "🧸",
-        "sparkle" => "✨",
-        "heart" => "💖",
-        _ => "💖"
-    };
-
-    private static string GetStickerVisual(string? code) => code?.ToLower() switch
-    {
-        "hugging-bear" => "🧸",
-        "missing-you-cat" => "😿",
-        "sparkling-heart" => "💖",
-        "boba-cheers" => "🧋",
-        "cute-bunny" => "🐰",
-        "sweet-strawberry" => "🍓",
-        "pinky-promise" => "🤞",
-        "besties-forever" => "👭",
-        _ => "🌸"
-    };
-
     public async ValueTask DisposeAsync()
     {
-        StopRecordingTimer();
-        dotNetHelper?.Dispose();
-        if (hubConnection is not null)
+        if (hubConnection != null)
         {
-            await hubConnection.DisposeAsync();
+            try
+            {
+                await hubConnection.DisposeAsync();
+            }
+            catch { }
         }
     }
 }

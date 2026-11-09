@@ -1,0 +1,361 @@
+@page "/photos"
+@page "/memories"
+@rendermode InteractiveServer
+
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
+@using Microsoft.AspNetCore.Components.Forms
+@inject IBestieApiClient ApiClient
+@inject NavigationManager Nav
+@inject ILogger<MemoriesPage> Logger
+
+<PageTitle>Polaroid Memories 📸🌸 | BestieSpace</PageTitle>
+
+<div class="memories-page-container">
+    <div class="page-header-card">
+        <div class="header-content">
+            <span class="header-icon">📸</span>
+            <div>
+                <h1>Our Polaroid Memories</h1>
+                <p>Special moments we froze in time, pinned with cute washi tape and corner stickers ✨</p>
+            </div>
+        </div>
+
+        <button class="btn-kawaii-primary" @onclick="() => showAddPhotoModal = true">
+            <span>➕ Pin New Memory 📸</span>
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <span class="spinner">🌸</span>
+            <p>Loading our photo memories...</p>
+        </div>
+    }
+    else if (memories == null || !memories.Any())
+    {
+        <div class="empty-state-card">
+            <span class="empty-icon">🧸📸</span>
+            <h3>No memories pinned yet!</h3>
+            <p>Upload your first photo together and pick a cute corner sticker to pin it to our gallery 🌸</p>
+            <button class="btn-kawaii-primary mt-3" @onclick="() => showAddPhotoModal = true">
+                <span>➕ Pin First Memory</span>
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="polaroid-grid">
+            @foreach (var memory in memories)
+            {
+                var angle = memory.RotationAngle != 0 ? memory.RotationAngle : -1.5;
+                var stickerEmoji = GetStickerEmoji(memory.StickerType);
+
+                <div class="polaroid-frame" 
+                     style="transform: rotate(@(angle)deg);"
+                     @onclick="() => OpenLightbox(GetFullMediaUrl(memory.ImageUrl), memory.Caption)">
+                    <div class="polaroid-washi"></div>
+                    <div class="polaroid-corner-sticker">@stickerEmoji</div>
+                    <div class="polaroid-img-wrapper">
+                        <img src="@GetFullMediaUrl(memory.ImageUrl)" alt="@memory.Caption" class="polaroid-img" loading="lazy" />
+                    </div>
+                    <div class="polaroid-caption">@memory.Caption</div>
+                    <div class="polaroid-date">@memory.MemoryDate.ToString("MMMM dd, yyyy")</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- =========================================================
+     MODAL 1: ADD PHOTO MEMORY
+     ========================================================= -->
+@if (showAddPhotoModal)
+{
+    <div class="kawaii-modal-backdrop" @onclick="() => showAddPhotoModal = false">
+        <div class="kawaii-modal-card" @onclick:stopPropagation="true">
+            <button class="modal-close-btn" @onclick="() => showAddPhotoModal = false">✕</button>
+
+            <div class="modal-header-icon">📸✨</div>
+            <h2 class="modal-title">Pin a Polaroid Memory</h2>
+            <p class="modal-subtitle">Upload a photo, pick a cute sticker, and write a sweet caption!</p>
+
+            @if (!string.IsNullOrWhiteSpace(uploadErrorMessage))
+            {
+                <div class="form-error-banner">
+                    <span>🥺 @uploadErrorMessage</span>
+                </div>
+            }
+
+            <div class="form-group">
+                <label class="form-label">Choose Photo *</label>
+                <InputFile OnChange="HandleFileSelected" accept="image/*" class="form-control-kawaii" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Heartfelt Caption *</label>
+                <input type="text" class="form-control-kawaii" placeholder="e.g., That golden hour picnic with cookies 🍪" 
+                       @bind="newPhotoCaption" maxlength="200" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Memory Date</label>
+                <input type="date" class="form-control-kawaii" @bind="newPhotoDate" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Corner Sticker</label>
+                <div class="sticker-select-group">
+                    <div class="sticker-pill-radio @(newPhotoSticker == "bow" ? "selected" : "")" 
+                         @onclick="@(() => newPhotoSticker = "bow")">
+                        <span>🎀</span> Bow
+                    </div>
+                    <div class="sticker-pill-radio @(newPhotoSticker == "bear" ? "selected" : "")" 
+                         @onclick="@(() => newPhotoSticker = "bear")">
+                        <span>🧸</span> Bear
+                    </div>
+                    <div class="sticker-pill-radio @(newPhotoSticker == "sparkle" ? "selected" : "")" 
+                         @onclick="@(() => newPhotoSticker = "sparkle")">
+                        <span>✨</span> Sparkle
+                    </div>
+                    <div class="sticker-pill-radio @(newPhotoSticker == "heart" ? "selected" : "")" 
+                         @onclick="@(() => newPhotoSticker = "heart")">
+                        <span>💖</span> Heart
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 24px;">
+                <button class="btn-kawaii-primary" @onclick="SubmitNewMemory" disabled="@(isUploadingPhoto || string.IsNullOrWhiteSpace(newPhotoCaption))">
+                    @if (isUploadingPhoto)
+                    {
+                        <span>Uploading... 🌸</span>
+                    }
+                    else
+                    {
+                        <span>Pin to Gallery 📌</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =========================================================
+     MODAL 2: PHOTO LIGHTBOX
+     ========================================================= -->
+@if (showLightboxModal)
+{
+    <div class="kawaii-modal-backdrop" @onclick="() => showLightboxModal = false">
+        <div class="lightbox-card" @onclick:stopPropagation="true">
+            <button class="modal-close-btn" style="top: 10px; right: 10px;" @onclick="() => showLightboxModal = false">✕</button>
+            <img src="@activeLightboxUrl" alt="@activeLightboxCaption" class="lightbox-img" />
+            @if (!string.IsNullOrWhiteSpace(activeLightboxCaption))
+            {
+                <div class="lightbox-caption-box">@activeLightboxCaption</div>
+            }
+        </div>
+    </div>
+}
+
+<style>
+.memories-page-container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+.page-header-card {
+    background: linear-gradient(135deg, #FFF0F5 0%, #FFE5EC 100%);
+    border: 2px solid var(--card-blush-border, #FFC2D1);
+    border-radius: 28px;
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 28px;
+    box-shadow: 0 10px 30px rgba(255, 143, 171, 0.2);
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-icon {
+    font-size: 42px;
+}
+
+.page-header-card h1 {
+    margin: 0 0 4px 0;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #4A3B3C;
+}
+
+.page-header-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #7E6566;
+}
+
+.loading-state, .empty-state-card {
+    text-align: center;
+    background: #ffffff;
+    border: 2px dashed #FFC2D1;
+    border-radius: 28px;
+    padding: 60px 20px;
+    color: #7E6566;
+    margin-top: 20px;
+}
+
+.empty-icon {
+    font-size: 54px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.empty-state-card h3 {
+    color: #4A3B3C;
+    margin-bottom: 8px;
+}
+
+.form-error-banner {
+    background: #FFEBEE;
+    color: #C62828;
+    padding: 10px 14px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 0.88rem;
+}
+
+.lightbox-caption-box {
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 14px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    text-align: center;
+}
+</style>
+
+@code {
+    private List<MemoryDto> memories = new();
+    private bool isLoading = true;
+
+    // Add Photo Modal
+    private bool showAddPhotoModal = false;
+    private bool isUploadingPhoto = false;
+    private string newPhotoCaption = string.Empty;
+    private DateTime newPhotoDate = DateTime.Today;
+    private string newPhotoSticker = "bow";
+    private IBrowserFile? selectedBrowserFile;
+    private string? uploadErrorMessage;
+
+    // Lightbox
+    private bool showLightboxModal = false;
+    private string? activeLightboxUrl;
+    private string? activeLightboxCaption;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMemoriesAsync();
+    }
+
+    private async Task LoadMemoriesAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var dash = await ApiClient.GetDashboardAsync();
+            if (dash?.Memories != null)
+            {
+                memories = dash.Memories;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load memories");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedBrowserFile = e.File;
+        uploadErrorMessage = null;
+    }
+
+    private async Task SubmitNewMemory()
+    {
+        if (string.IsNullOrWhiteSpace(newPhotoCaption)) return;
+        isUploadingPhoto = true;
+        uploadErrorMessage = null;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(newPhotoCaption), "caption");
+            content.Add(new StringContent(newPhotoSticker), "stickerType");
+            content.Add(new StringContent(newPhotoDate.ToString("o")), "memoryDate");
+
+            if (selectedBrowserFile != null)
+            {
+                var streamContent = new StreamContent(selectedBrowserFile.OpenReadStream(maxAllowedSize: 15 * 1024 * 1024));
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(selectedBrowserFile.ContentType);
+                content.Add(streamContent, "photo", selectedBrowserFile.Name);
+            }
+
+            var created = await ApiClient.AddMemoryAsync(content);
+            if (created != null)
+            {
+                memories.Insert(0, created);
+                showAddPhotoModal = false;
+                newPhotoCaption = string.Empty;
+                selectedBrowserFile = null;
+            }
+            else
+            {
+                uploadErrorMessage = "Could not save photo memory. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to upload photo memory");
+            uploadErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isUploadingPhoto = false;
+        }
+    }
+
+    private void OpenLightbox(string url, string caption)
+    {
+        activeLightboxUrl = url;
+        activeLightboxCaption = caption;
+        showLightboxModal = true;
+    }
+
+    private string GetFullMediaUrl(string? relativeOrFull)
+    {
+        if (string.IsNullOrWhiteSpace(relativeOrFull)) return "/images/sample-memories/picnic-day.svg";
+        if (relativeOrFull.StartsWith("http://") || relativeOrFull.StartsWith("https://")) return relativeOrFull;
+        return relativeOrFull;
+    }
+
+    private static string GetStickerEmoji(string? stickerType) => stickerType?.ToLowerInvariant() switch
+    {
+        "bow" => "🎀",
+        "bear" => "🧸",
+        "sparkle" => "✨",
+        "heart" => "💖",
+        _ => "🌸"
+    };
+}
