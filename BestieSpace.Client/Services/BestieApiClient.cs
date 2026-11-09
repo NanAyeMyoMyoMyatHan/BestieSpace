@@ -93,6 +93,18 @@ public interface IBestieApiClient
     Task<CircleChatMessageDto?> SendCircleStickerAsync(int circleId, int stickerId);
     Task<List<StickerCategoryDto>> GetStickerCategoriesAsync();
     string GetMediaUrl(int circleId, int mediaId, bool thumbnail = false);
+
+    // Offline Messaging, Read Receipts & Notifications (Phase 8)
+    Task<int> MarkCircleMessagesAsReadAsync(int circleId, List<int> messageIds);
+    Task<MessageReadDetailsDto?> GetCircleMessageReadReceiptsAsync(int circleId, int messageId);
+    Task<UnreadSummaryDto?> GetUnreadSummaryAsync();
+    Task<int> GetCircleUnreadCountAsync(int circleId);
+    Task<MessageSyncResponseDto?> SyncCircleMessagesAsync(int circleId, int afterMessageId, int pageSize = 50);
+    Task<int> AcknowledgeDeliveryAsync(int circleId, List<int> messageIds);
+    Task<NotificationListResponseDto?> GetNotificationsAsync(int pageNumber = 1, int pageSize = 20, bool? unreadOnly = null);
+    Task<int> GetUnreadNotificationCountAsync();
+    Task<bool> MarkNotificationAsReadAsync(int notificationId);
+    Task<int> MarkAllNotificationsAsReadAsync();
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -1398,6 +1410,186 @@ public class BestieApiClient : IBestieApiClient
         var suffix = thumbnail ? "/thumb" : "";
         var tokenParam = !string.IsNullOrEmpty(_bearerToken) ? $"?access_token={Uri.EscapeDataString(_bearerToken)}" : "";
         return $"{_baseUrl}/api/circles/{circleId}/media/{mediaId}{suffix}{tokenParam}";
+    }
+
+    // =========================================================================
+    // Phase 8: Offline Messaging, Read Receipts & Notifications
+    // =========================================================================
+
+    public async Task<int> MarkCircleMessagesAsReadAsync(int circleId, List<int> messageIds)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/messages/read", new MarkMessagesReadRequestDto
+            {
+                CircleId = circleId,
+                MessageIds = messageIds
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                if (body.TryGetProperty("markedCount", out var countProp))
+                {
+                    return countProp.GetInt32();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to mark messages read for circle {CircleId}", circleId);
+        }
+        return 0;
+    }
+
+    public async Task<MessageReadDetailsDto?> GetCircleMessageReadReceiptsAsync(int circleId, int messageId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<MessageReadDetailsDto>($"/api/circles/{circleId}/messages/{messageId}/read-receipts");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get read receipts for message {MessageId}", messageId);
+            return null;
+        }
+    }
+
+    public async Task<UnreadSummaryDto?> GetUnreadSummaryAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<UnreadSummaryDto>("/api/circles/unread-summary");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get unread message summary");
+            return null;
+        }
+    }
+
+    public async Task<int> GetCircleUnreadCountAsync(int circleId)
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<System.Text.Json.JsonElement>($"/api/circles/{circleId}/unread-count");
+            if (res.TryGetProperty("unreadCount", out var countProp))
+            {
+                return countProp.GetInt32();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get circle unread count for circle {CircleId}", circleId);
+        }
+        return 0;
+    }
+
+    public async Task<MessageSyncResponseDto?> SyncCircleMessagesAsync(int circleId, int afterMessageId, int pageSize = 50)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<MessageSyncResponseDto>($"/api/circles/{circleId}/messages/sync?afterMessageId={afterMessageId}&pageSize={pageSize}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync messages for circle {CircleId} after {AfterMessageId}", circleId, afterMessageId);
+            return null;
+        }
+    }
+
+    public async Task<int> AcknowledgeDeliveryAsync(int circleId, List<int> messageIds)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/messages/delivery", new AcknowledgeDeliveryRequestDto
+            {
+                CircleId = circleId,
+                MessageIds = messageIds
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                if (body.TryGetProperty("acknowledgedCount", out var countProp))
+                {
+                    return countProp.GetInt32();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to acknowledge delivery for circle {CircleId}", circleId);
+        }
+        return 0;
+    }
+
+    public async Task<NotificationListResponseDto?> GetNotificationsAsync(int pageNumber = 1, int pageSize = 20, bool? unreadOnly = null)
+    {
+        try
+        {
+            var url = $"/api/notifications?pageNumber={pageNumber}&pageSize={pageSize}";
+            if (unreadOnly.HasValue)
+            {
+                url += $"&unreadOnly={unreadOnly.Value.ToString().ToLower()}";
+            }
+            return await _http.GetFromJsonAsync<NotificationListResponseDto>(url);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get notifications");
+            return null;
+        }
+    }
+
+    public async Task<int> GetUnreadNotificationCountAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/notifications/unread-count");
+            if (res.TryGetProperty("unreadCount", out var countProp))
+            {
+                return countProp.GetInt32();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get unread notification count");
+        }
+        return 0;
+    }
+
+    public async Task<bool> MarkNotificationAsReadAsync(int notificationId)
+    {
+        try
+        {
+            var res = await _http.PutAsync($"/api/notifications/{notificationId}/read", null);
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to mark notification {NotificationId} as read", notificationId);
+            return false;
+        }
+    }
+
+    public async Task<int> MarkAllNotificationsAsReadAsync()
+    {
+        try
+        {
+            var res = await _http.PutAsync("/api/notifications/read-all", null);
+            if (res.IsSuccessStatusCode)
+            {
+                var body = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                if (body.TryGetProperty("markedCount", out var countProp))
+                {
+                    return countProp.GetInt32();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to mark all notifications as read");
+        }
+        return 0;
     }
 
     private static List<ChatMessageDto> CreateFallbackMessages()

@@ -1,0 +1,637 @@
+@using System.Security.Claims
+@using BestieSpace.Shared.DTOs
+@using BestieSpace.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IBestieApiClient ApiClient
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject ILogger<NotificationCenter> Logger
+@implements IAsyncDisposable
+
+<div class="notification-center-container">
+    <!-- Bell Button with Unread Badge -->
+    <button type="button" class="btn-notification-bell @(unreadCount > 0 ? "has-unread" : "")" 
+            title="Notifications (@unreadCount unread)" 
+            @onclick="ToggleDropdown">
+        <span class="bell-icon">🔔</span>
+        @if (unreadCount > 0)
+        {
+            <span class="bell-badge">@(unreadCount > 99 ? "99+" : unreadCount.ToString())</span>
+        }
+    </button>
+
+    <!-- Floating Dropdown / Drawer -->
+    @if (isOpen)
+    {
+        <div class="notification-dropdown-backdrop" @onclick="CloseDropdown"></div>
+        <div class="notification-dropdown">
+            <div class="dropdown-header">
+                <div class="header-title-row">
+                    <span class="header-icon">🌸</span>
+                    <h3>Bestie Alerts</h3>
+                    @if (unreadCount > 0)
+                    {
+                        <span class="badge-unread-count">@unreadCount new</span>
+                    }
+                </div>
+                <div class="header-actions">
+                    @if (unreadCount > 0)
+                    {
+                        <button class="btn-mark-all" @onclick="MarkAllAsReadAsync" disabled="@isMarkingAll">
+                            ✓ Mark all read
+                        </button>
+                    }
+                    <button class="btn-close-dropdown" @onclick="CloseDropdown">✕</button>
+                </div>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="dropdown-tabs">
+                <button class="tab-btn @(!unreadOnlyFilter ? "active" : "")" @onclick="@(() => SetFilter(false))">
+                    All
+                </button>
+                <button class="tab-btn @(unreadOnlyFilter ? "active" : "")" @onclick="@(() => SetFilter(true))">
+                    Unread @(unreadCount > 0 ? $"({unreadCount})" : "")
+                </button>
+            </div>
+
+            <!-- Notification Items List -->
+            <div class="dropdown-content">
+                @if (isLoading)
+                {
+                    <div class="loading-state">
+                        <span class="spinner">🌸</span>
+                        <p>Checking bestie updates...</p>
+                    </div>
+                }
+                else if (notifications.Count == 0)
+                {
+                    <div class="empty-state">
+                        <span class="empty-icon">🧸</span>
+                        <p>No notifications yet!</p>
+                        <span class="empty-sub">When your besties send love, friend requests, or circle invites, you'll see them here! 🌸</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="notification-list">
+                        @foreach (var n in notifications)
+                        {
+                            <div class="notification-card @(!n.IsRead ? "unread" : "")" @onclick="@(() => HandleNotificationClick(n))">
+                                <div class="notif-icon-col">
+                                    <span class="type-sticker">@GetTypeIcon(n.NotificationType)</span>
+                                </div>
+                                <div class="notif-body-col">
+                                    <div class="notif-meta-row">
+                                        <span class="notif-title">@n.Title</span>
+                                        <span class="notif-time">@FormatTimeAgo(n.CreatedAt)</span>
+                                    </div>
+                                    <p class="notif-msg">@n.Message</p>
+                                    @if (!n.IsRead)
+                                    {
+                                        <span class="unread-dot" title="Unread alert"></span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="dropdown-footer">
+                <button class="btn-refresh-sm" @onclick="LoadNotificationsAsync">🔄 Refresh</button>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .notification-center-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .btn-notification-bell {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 50%;
+        width: 38px;
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(255, 143, 171, 0.2);
+    }
+    .btn-notification-bell:hover {
+        transform: scale(1.08);
+        border-color: var(--btn-strawberry, #FF8FAB);
+        background: #FFF5F7;
+    }
+    .bell-icon {
+        font-size: 18px;
+    }
+    .btn-notification-bell.has-unread {
+        border-color: #F72585;
+        animation: bellShake 3s infinite ease-in-out;
+    }
+
+    @@keyframes bellShake {
+        0%, 90%, 100% { transform: rotate(0deg); }
+        92% { transform: rotate(-12deg); }
+        94% { transform: rotate(12deg); }
+        96% { transform: rotate(-8deg); }
+        98% { transform: rotate(8deg); }
+    }
+
+    .bell-badge {
+        position: absolute;
+        top: -4px;
+        right: -6px;
+        background: linear-gradient(135deg, #FF4D6D, #F72585);
+        color: #ffffff;
+        font-size: 0.68rem;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 10px;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(247, 37, 133, 0.4);
+        line-height: 1;
+    }
+
+    .notification-dropdown-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1050;
+        background: transparent;
+    }
+
+    .notification-dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 360px;
+        max-width: 90vw;
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 20px;
+        box-shadow: 0 14px 40px rgba(255, 143, 171, 0.35);
+        z-index: 1060;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        animation: dropSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @@keyframes dropSlide {
+        from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .dropdown-header {
+        background: linear-gradient(135deg, #FFF0F5 0%, #FFE5EC 100%);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #FFD6E0;
+    }
+    .header-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .header-title-row h3 {
+        margin: 0;
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: #4A3B3C;
+    }
+    .badge-unread-count {
+        background: #FF4D6D;
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+    .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-mark-all {
+        background: transparent;
+        border: none;
+        color: #C9184A;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 6px;
+    }
+    .btn-mark-all:hover {
+        text-decoration: underline;
+    }
+    .btn-close-dropdown {
+        background: #fff;
+        border: 1px solid #FFC2D1;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #7E6566;
+    }
+
+    .dropdown-tabs {
+        display: flex;
+        border-bottom: 1px solid #FFE5EC;
+        background: #FAF8F8;
+    }
+    .tab-btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: none;
+        background: transparent;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #7E6566;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+        color: #F72585;
+        border-bottom: 2px solid #F72585;
+        background: #fff;
+    }
+
+    .dropdown-content {
+        max-height: 380px;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .loading-state, .empty-state {
+        text-align: center;
+        padding: 30px 16px;
+        color: #7E6566;
+    }
+    .empty-icon {
+        font-size: 36px;
+        display: block;
+        margin-bottom: 8px;
+    }
+    .empty-state p {
+        margin: 0 0 4px 0;
+        font-weight: 700;
+        color: #4A3B3C;
+    }
+    .empty-sub {
+        font-size: 0.75rem;
+        color: #9E8586;
+        display: block;
+        line-height: 1.4;
+    }
+
+    .notification-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .notification-card {
+        display: flex;
+        gap: 10px;
+        padding: 10px 12px;
+        background: #ffffff;
+        border: 1px solid #F0E6E8;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        position: relative;
+    }
+    .notification-card:hover {
+        background: #FFF8FA;
+        border-color: #FFC2D1;
+        transform: translateY(-1px);
+    }
+    .notification-card.unread {
+        background: #FFF0F5;
+        border-color: #FFB3C6;
+    }
+
+    .notif-icon-col {
+        display: flex;
+        align-items: flex-start;
+        padding-top: 2px;
+    }
+    .type-sticker {
+        font-size: 20px;
+        background: #ffffff;
+        border: 1px solid #FFD6E0;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .notif-body-col {
+        flex: 1;
+        min-width: 0;
+    }
+    .notif-meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 3px;
+    }
+    .notif-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #4A3B3C;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .notif-time {
+        font-size: 0.68rem;
+        color: #9E8586;
+        margin-left: 6px;
+        white-space: nowrap;
+    }
+    .notif-msg {
+        margin: 0;
+        font-size: 0.77rem;
+        color: #615052;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+    .unread-dot {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 8px;
+        height: 8px;
+        background: #F72585;
+        border-radius: 50%;
+    }
+
+    .dropdown-footer {
+        padding: 8px 12px;
+        border-top: 1px solid #FFE5EC;
+        background: #FAF8F8;
+        display: flex;
+        justify-content: center;
+    }
+    .btn-refresh-sm {
+        background: transparent;
+        border: none;
+        color: #7E6566;
+        font-size: 0.75rem;
+        cursor: pointer;
+    }
+    .btn-refresh-sm:hover {
+        color: #F72585;
+    }
+</style>
+
+@code {
+    private int unreadCount = 0;
+    private bool isOpen = false;
+    private bool isLoading = false;
+    private bool isMarkingAll = false;
+    private bool unreadOnlyFilter = false;
+    private List<NotificationDto> notifications = new();
+    private HubConnection? hubConnection;
+    private int currentUserId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUserAsync();
+        await RefreshUnreadCountAsync();
+        await InitializeNotificationSignalRAsync();
+    }
+
+    private async Task LoadCurrentUserAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                              ?? user.FindFirst("sub")?.Value;
+                int.TryParse(idClaim, out currentUserId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not determine current user in NotificationCenter");
+        }
+    }
+
+    private async Task RefreshUnreadCountAsync()
+    {
+        try
+        {
+            unreadCount = await ApiClient.GetUnreadNotificationCountAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to refresh unread notification count");
+        }
+    }
+
+    private async Task InitializeNotificationSignalRAsync()
+    {
+        try
+        {
+            var bestieAuth = AuthStateProvider as BestieAuthenticationStateProvider;
+            var token = bestieAuth?.AccessToken;
+            if (string.IsNullOrEmpty(token)) return;
+
+            var hubUrl = $"{ApiClient.ApiBaseUrl.TrimEnd('/')}/chathub";
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options =>
+                {
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                })
+                .WithAutomaticReconnect()
+                .Build();
+
+            hubConnection.On<NotificationDto>("ReceiveNotification", (notif) =>
+            {
+                unreadCount++;
+                if (notifications.Any())
+                {
+                    notifications.Insert(0, notif);
+                }
+                InvokeAsync(StateHasChanged);
+            });
+
+            await hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "NotificationCenter SignalR optional connection: {Msg}", ex.Message);
+        }
+    }
+
+    private async Task ToggleDropdown()
+    {
+        isOpen = !isOpen;
+        if (isOpen)
+        {
+            await LoadNotificationsAsync();
+        }
+    }
+
+    private void CloseDropdown()
+    {
+        isOpen = false;
+    }
+
+    private async Task SetFilter(bool unreadOnly)
+    {
+        unreadOnlyFilter = unreadOnly;
+        await LoadNotificationsAsync();
+    }
+
+    private async Task LoadNotificationsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var res = await ApiClient.GetNotificationsAsync(pageNumber: 1, pageSize: 30, unreadOnly: unreadOnlyFilter ? true : null);
+            if (res != null)
+            {
+                notifications = res.Notifications;
+                unreadCount = res.UnreadCount;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load notifications");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleNotificationClick(NotificationDto notif)
+    {
+        if (!notif.IsRead)
+        {
+            notif.IsRead = true;
+            if (unreadCount > 0) unreadCount--;
+            await ApiClient.MarkNotificationAsReadAsync(notif.NotificationId);
+        }
+
+        isOpen = false;
+
+        // Smart routing based on notification type and related entity
+        if (notif.NotificationType.StartsWith("FriendRequest"))
+        {
+            Nav.NavigateTo("/friends");
+        }
+        else if (notif.NotificationType.StartsWith("CircleInvitation"))
+        {
+            Nav.NavigateTo("/circles");
+        }
+        else if (notif.NotificationType == "CircleMemberJoined" || notif.NotificationType == "CircleMemberLeft" || notif.NotificationType == "CircleOwnershipTransferred")
+        {
+            if (notif.RelatedEntityId.HasValue && notif.RelatedEntityType == "BestieCircle")
+            {
+                Nav.NavigateTo($"/circles/{notif.RelatedEntityId.Value}");
+            }
+            else
+            {
+                Nav.NavigateTo("/circles");
+            }
+        }
+        else if (notif.NotificationType == "NewChatMessage")
+        {
+            if (notif.RelatedEntityId.HasValue)
+            {
+                Nav.NavigateTo($"/circles/{notif.RelatedEntityId.Value}/chat");
+            }
+            else
+            {
+                Nav.NavigateTo("/circles");
+            }
+        }
+    }
+
+    private async Task MarkAllAsReadAsync()
+    {
+        isMarkingAll = true;
+        try
+        {
+            await ApiClient.MarkAllNotificationsAsReadAsync();
+            unreadCount = 0;
+            foreach (var n in notifications)
+            {
+                n.IsRead = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to mark all notifications as read");
+        }
+        finally
+        {
+            isMarkingAll = false;
+        }
+    }
+
+    private static string GetTypeIcon(string type) => type switch
+    {
+        "FriendRequestReceived" => "💌",
+        "FriendRequestAccepted" => "💖",
+        "CircleInvitationReceived" => "🌸",
+        "CircleMemberJoined" => "🎉",
+        "CircleMemberRemoved" => "⚠️",
+        "CircleMemberLeft" => "🚪",
+        "CircleOwnershipTransferred" => "👑",
+        "NewChatMessage" => "💬",
+        _ => "🌸"
+    };
+
+    private static string FormatTimeAgo(DateTime dt)
+    {
+        var span = DateTime.UtcNow - dt;
+        if (span.TotalMinutes < 1) return "Just now";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes}m ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours}h ago";
+        if (span.TotalDays < 7) return $"{(int)span.TotalDays}d ago";
+        return dt.ToLocalTime().ToString("MMM d");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            try
+            {
+                await hubConnection.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}

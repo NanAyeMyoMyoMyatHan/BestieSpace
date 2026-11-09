@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -26,13 +27,16 @@ public interface IFriendshipService
 public class FriendshipService : IFriendshipService
 {
     private readonly BestieDbContext _context;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<FriendshipService> _logger;
 
     public FriendshipService(
         BestieDbContext context,
+        INotificationService notificationService,
         ILogger<FriendshipService> logger)
     {
         _context = context;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -48,6 +52,7 @@ public class FriendshipService : IFriendshipService
             };
         }
 
+        var requester = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == requesterUserId);
         var addressee = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == addresseeUserId);
         if (addressee == null || !addressee.IsActive)
         {
@@ -95,6 +100,21 @@ public class FriendshipService : IFriendshipService
 
             _logger.LogInformation("Friend request sent from {RequesterId} to {AddresseeId} (ID: {FriendshipId})",
                 requesterUserId, addresseeUserId, newFriendship.FriendshipId);
+
+            try
+            {
+                await _notificationService.CreateNotificationAsync(
+                    addresseeUserId,
+                    "FriendRequestReceived",
+                    "New Bestie Request! 💌",
+                    $"{requester?.DisplayName ?? "A bestie"} sent you a friend request!",
+                    newFriendship.FriendshipId,
+                    "Friendship");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create notification for friend request from {RequesterId}", requesterUserId);
+            }
 
             return new SocialOperationResultDto
             {
@@ -210,6 +230,22 @@ public class FriendshipService : IFriendshipService
 
         _logger.LogInformation("User {UserId} accepted friend request {FriendshipId} from {RequesterId}",
             currentUserId, friendshipId, friendship.UserId);
+
+        try
+        {
+            var currentUser = await _context.Users.FindAsync(currentUserId);
+            await _notificationService.CreateNotificationAsync(
+                friendship.UserId,
+                "FriendRequestAccepted",
+                "Bestie Request Accepted! 💖",
+                $"{currentUser?.DisplayName ?? "Your bestie"} accepted your friend request!",
+                friendship.FriendshipId,
+                "Friendship");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create notification for accepted friendship {Id}", friendshipId);
+        }
 
         return new SocialOperationResultDto
         {

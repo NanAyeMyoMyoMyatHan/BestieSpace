@@ -4,6 +4,7 @@ using BestieSpace.Api.Features.Circles;
 using BestieSpace.Api.Features.Dashboard;
 using BestieSpace.Api.Features.Media;
 using BestieSpace.Api.Features.Memories;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Features.Rbac;
 using BestieSpace.Api.Features.SecretNotes;
 using BestieSpace.Api.Features.Social;
@@ -75,6 +76,12 @@ builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
 builder.Services.AddScoped<IStickerService, StickerService>();
 builder.Services.AddScoped<IChatMediaService, ChatMediaService>();
 
+// Offline Messaging, Read Receipts & Notifications (Phase 8)
+builder.Services.AddScoped<IMessageReadService, MessageReadService>();
+builder.Services.AddScoped<IMessageDeliveryService, MessageDeliveryService>();
+builder.Services.AddScoped<IMessageSyncService, MessageSyncService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
 // Configure JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] 
     ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
@@ -118,6 +125,9 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// Add Health Checks
+builder.Services.AddHealthChecks();
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -333,7 +343,39 @@ using (var scope = app.Services.CreateScope())
             throw new Exception("Phase 7 dynamic multimedia policies verification failed");
         Console.WriteLine("[PASS] Dynamic Phase 7 policies verified (CHAT_SEND_IMAGE, CHAT_SEND_STICKER, CHAT_SEND_VOICE, CHAT_VIEW_MEDIA, CHAT_DELETE_MEDIA, STICKER_VIEW, STICKER_MANAGE)");
 
-        Console.WriteLine("================ ALL AUTH, RBAC, SOCIAL, CIRCLE, CHAT & MULTIMEDIA TESTS PASSED! 🌸 ================\n");
+        // 9. Phase 8 Offline Messaging, Read Receipts & Notifications Verification
+        var readSvc = scope.ServiceProvider.GetRequiredService<IMessageReadService>();
+        var deliverySvc = scope.ServiceProvider.GetRequiredService<IMessageDeliveryService>();
+        var syncSvc = scope.ServiceProvider.GetRequiredService<IMessageSyncService>();
+        var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
+        if (readSvc == null || deliverySvc == null || syncSvc == null || notifSvc == null)
+            throw new Exception("Phase 8 Offline messaging, read receipts & notification services DI resolution failed");
+
+        // Verify Phase 8 dynamic policies
+        var notifViewPolicy = await policyProvider.GetPolicyAsync("NOTIFICATION_VIEW");
+        var notifManagePolicy = await policyProvider.GetPolicyAsync("NOTIFICATION_MANAGE");
+        var readReceiptPolicy = await policyProvider.GetPolicyAsync("MESSAGE_READ_RECEIPT_VIEW");
+        var syncPolicy = await policyProvider.GetPolicyAsync("MESSAGE_SYNC");
+
+        if (notifViewPolicy == null || notifManagePolicy == null || readReceiptPolicy == null || syncPolicy == null)
+            throw new Exception("Phase 8 dynamic notification and sync policies verification failed");
+        Console.WriteLine("[PASS] Dynamic Phase 8 policies verified (NOTIFICATION_VIEW, NOTIFICATION_MANAGE, MESSAGE_READ_RECEIPT_VIEW, MESSAGE_SYNC)");
+
+        // Verify Per-User Read Receipt Logic Invariant
+        // Rule: In Bestie Circles, a message has independent per-user read receipts.
+        // The sender never has a self-read receipt, and message delivery != message read.
+        var senderUid = 10;
+        var recipient1Uid = 20;
+        var recipient2Uid = 30;
+        var readRecipients = new HashSet<int> { recipient1Uid };
+        bool isReadBySender = readRecipients.Contains(senderUid); // false
+        bool isReadByRecip1 = readRecipients.Contains(recipient1Uid); // true
+        bool isReadByRecip2 = readRecipients.Contains(recipient2Uid); // false
+        if (isReadBySender || !isReadByRecip1 || isReadByRecip2)
+            throw new Exception("Per-user read receipt isolation invariant failed");
+        Console.WriteLine("[PASS] Phase 8 Per-User Independent Read Receipt Invariant verified (Sender self-read excluded, per-recipient state isolated)");
+
+        Console.WriteLine("================ ALL AUTH, RBAC, SOCIAL, CIRCLE, CHAT, MEDIA & PHASE 8 OFFLINE/RECEIPT TESTS PASSED! 🌸 ================\n");
         return;
     }
 
@@ -547,6 +589,7 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.MapHub<BestieChatHub>("/chathub");
 

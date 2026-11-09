@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BestieSpace.Api.Features.Circles;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -27,6 +28,7 @@ public class CircleChatService : ICircleChatService
     private readonly IHubContext<BestieChatHub> _hubContext;
     private readonly ICircleAuthorizationService _circleAuth;
     private readonly IChatPresenceService _presenceService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<CircleChatService> _logger;
 
     public CircleChatService(
@@ -34,12 +36,14 @@ public class CircleChatService : ICircleChatService
         IHubContext<BestieChatHub> hubContext,
         ICircleAuthorizationService circleAuth,
         IChatPresenceService presenceService,
+        INotificationService notificationService,
         ILogger<CircleChatService> logger)
     {
         _context = context;
         _hubContext = hubContext;
         _circleAuth = circleAuth;
         _presenceService = presenceService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -76,17 +80,25 @@ public class CircleChatService : ICircleChatService
         var totalCount = await baseQuery.CountAsync();
         var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
+        var totalMembers = await _context.BestieCircleMembers
+            .AsNoTracking()
+            .Where(cm => cm.CircleId == circleId && cm.IsActive)
+            .CountAsync();
+        var totalRecipients = Math.Max(0, totalMembers - 1);
+
         var rawMessages = await baseQuery
             .OrderByDescending(m => m.Timestamp)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Include(m => m.Sender)
+            .Include(m => m.ReadReceipts)
+            .Include(m => m.DeliveryReceipts)
             .ToListAsync();
 
         // Reverse to return in chronological order (oldest to newest)
         rawMessages.Reverse();
 
-        var messageDtos = rawMessages.Select(m => MapToDto(m, requestingUserId, isModerator)).ToList();
+        var messageDtos = rawMessages.Select(m => MapToDto(m, requestingUserId, isModerator, totalRecipients)).ToList();
 
         return new CircleChatPaginationDto
         {
@@ -164,7 +176,13 @@ public class CircleChatService : ICircleChatService
         var isOwner = await _circleAuth.IsCircleOwnerAsync(senderUserId, circleId);
         chatMessage.Sender = sender;
 
-        var dto = MapToDto(chatMessage, senderUserId, canModerate || isOwner);
+        var totalMembers = await _context.BestieCircleMembers
+            .AsNoTracking()
+            .Where(cm => cm.CircleId == circleId && cm.IsActive)
+            .CountAsync();
+        var totalRecipients = Math.Max(0, totalMembers - 1);
+
+        var dto = MapToDto(chatMessage, senderUserId, canModerate || isOwner, totalRecipients);
 
         try
         {
@@ -173,6 +191,31 @@ public class CircleChatService : ICircleChatService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to broadcast message {MessageId} to group circle_{CircleId}", chatMessage.Id, circleId);
+        }
+
+        // 7. Create offline notifications for other active circle members
+        try
+        {
+            var otherMemberUserIds = await _context.BestieCircleMembers
+                .Where(cm => cm.CircleId == circleId && cm.IsActive && cm.UserId != senderUserId)
+                .Select(cm => cm.UserId)
+                .ToListAsync();
+
+            var snippet = trimmed.Length > 80 ? trimmed[..77] + "..." : trimmed;
+            foreach (var recipientUid in otherMemberUserIds)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    recipientUid,
+                    "NewMessage",
+                    $"{circle.CircleName} 💬",
+                    $"{sender.DisplayName}: {snippet}",
+                    circleId,
+                    "Circle");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create message notifications for circle {CircleId}", circleId);
         }
 
         return dto;
@@ -337,9 +380,28 @@ public class CircleChatService : ICircleChatService
         return list;
     }
 
-    private static CircleChatMessageDto MapToDto(ChatMessage m, int requestingUserId, bool isModerator)
+    private static CircleChatMessageDto MapToDto(ChatMessage m, int requestingUserId, bool isModerator, int totalRecipients = 0)
     {
         var isOwn = m.SenderId == requestingUserId;
+        var readCount = m.ReadReceipts?.Count(r => r.UserId != m.SenderId) ?? 0;
+        var deliveredCount = m.DeliveryReceipts?.Count(d => d.UserId != m.SenderId) ?? 0;
+        var isReadByMe = m.ReadReceipts?.Any(r => r.UserId == requestingUserId) ?? false;
+        var isDeliveredToMe = m.DeliveryReceipts?.Any(d => d.UserId == requestingUserId) ?? false;
+
+        string deliveryStatus;
+        if (readCount > 0)
+        {
+            deliveryStatus = "read";
+        }
+        else if (deliveredCount > 0)
+        {
+            deliveryStatus = "delivered";
+        }
+        else
+        {
+            deliveryStatus = "sent";
+        }
+
         return new CircleChatMessageDto
         {
             Id = m.Id,
@@ -363,7 +425,13 @@ public class CircleChatService : ICircleChatService
             IsDeleted = m.IsDeleted,
             IsOwnMessage = isOwn,
             CanEdit = !m.IsDeleted && isOwn && (m.MessageType == "text"),
-            CanDelete = !m.IsDeleted && (isOwn || isModerator)
+            CanDelete = !m.IsDeleted && (isOwn || isModerator),
+            DeliveryStatus = deliveryStatus,
+            ReadCount = readCount,
+            DeliveredCount = deliveredCount,
+            TotalRecipients = totalRecipients,
+            IsReadByMe = isReadByMe,
+            IsDeliveredToMe = isDeliveredToMe
         };
     }
 }

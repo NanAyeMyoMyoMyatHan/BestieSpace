@@ -447,6 +447,47 @@ BEGIN
 END
 GO
 
+-- 15E. ChatMessageDeliveries (Phase 8: Independent delivery acknowledgment per recipient)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChatMessageDeliveries')
+BEGIN
+    CREATE TABLE [dbo].[ChatMessageDeliveries] (
+        [ChatMessageDeliveryId] INT IDENTITY(1,1) NOT NULL,
+        [ChatMessageId] INT NOT NULL,
+        [UserId] INT NOT NULL,
+        [DeliveredAt] DATETIME2 NOT NULL CONSTRAINT [DF_ChatMessageDeliveries_DeliveredAt] DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_ChatMessageDeliveries] PRIMARY KEY CLUSTERED ([ChatMessageDeliveryId] ASC),
+        CONSTRAINT [FK_ChatMessageDeliveries_Message] FOREIGN KEY ([ChatMessageId]) REFERENCES [dbo].[ChatMessages]([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_ChatMessageDeliveries_User] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_ChatMessageDeliveries_Message_User] ON [dbo].[ChatMessageDeliveries]([ChatMessageId] ASC, [UserId] ASC);
+    CREATE NONCLUSTERED INDEX [IX_ChatMessageDeliveries_User_DeliveredAt] ON [dbo].[ChatMessageDeliveries]([UserId] ASC, [DeliveredAt] ASC);
+END
+GO
+
+-- 15F. Notifications (Phase 8: Durable user notifications)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Notifications')
+BEGIN
+    CREATE TABLE [dbo].[Notifications] (
+        [NotificationId] INT IDENTITY(1,1) NOT NULL,
+        [UserId] INT NOT NULL,
+        [NotificationType] NVARCHAR(100) NOT NULL,
+        [Title] NVARCHAR(250) NOT NULL,
+        [Message] NVARCHAR(1000) NOT NULL,
+        [RelatedEntityId] INT NULL,
+        [RelatedEntityType] NVARCHAR(50) NULL,
+        [IsRead] BIT NOT NULL CONSTRAINT [DF_Notifications_IsRead] DEFAULT 0,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_Notifications_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [ReadAt] DATETIME2 NULL,
+        CONSTRAINT [PK_Notifications] PRIMARY KEY CLUSTERED ([NotificationId] ASC),
+        CONSTRAINT [FK_Notifications_User] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE CASCADE
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_Notifications_User_IsRead_CreatedAt] ON [dbo].[Notifications]([UserId] ASC, [IsRead] ASC, [CreatedAt] DESC);
+    CREATE NONCLUSTERED INDEX [IX_Notifications_User_CreatedAt] ON [dbo].[Notifications]([UserId] ASC, [CreatedAt] DESC);
+END
+GO
+
 -- ==============================================================================
 -- 16. Seed Initial System Roles & Permissions (Phase 3 RBAC)
 -- ==============================================================================
@@ -644,6 +685,19 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'STICK
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'STICKER_MANAGE')
     INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('STICKER_MANAGE', 'Create, update, and manage sticker categories and sticker collections');
+
+-- Phase 8 Permissions (Offline Messaging, Read Receipts & Notifications)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'NOTIFICATION_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('NOTIFICATION_VIEW', 'View user notifications and notification history');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'NOTIFICATION_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('NOTIFICATION_MANAGE', 'Mark notifications as read or dismiss notifications');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'MESSAGE_READ_RECEIPT_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('MESSAGE_READ_RECEIPT_VIEW', 'View per-user message read receipts in circle chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'MESSAGE_SYNC')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('MESSAGE_SYNC', 'Synchronize offline and missed circle messages');
 GO
 
 -- Seed Initial Sticker Categories
@@ -795,6 +849,7 @@ BEGIN
         'FRIEND_REMOVE', 'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE',
         'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW', 'STICKER_MANAGE',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
@@ -816,6 +871,7 @@ BEGIN
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
         'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
@@ -837,6 +893,7 @@ BEGIN
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
         'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
@@ -857,6 +914,7 @@ BEGIN
     WHERE p.[PermissionCode] IN (
         'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE'
     )
     AND NOT EXISTS (
@@ -876,6 +934,7 @@ BEGIN
     WHERE p.[PermissionCode] IN (
         'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE'
     )
     AND NOT EXISTS (
@@ -897,6 +956,7 @@ BEGIN
         'CIRCLE_MEMBER_VIEW', 'CIRCLE_MEMBER_REMOVE', 'CIRCLE_MEMBER_ROLE_UPDATE', 'CIRCLE_TRANSFER_OWNERSHIP',
         'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE'
     )
     AND NOT EXISTS (
@@ -917,6 +977,7 @@ BEGIN
         'CIRCLE_VIEW', 'CIRCLE_INVITE', 'CIRCLE_INVITATION_CANCEL', 'CIRCLE_MEMBER_VIEW',
         'CIRCLE_MEMBER_REMOVE', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE'
     )
     AND NOT EXISTS (
@@ -936,6 +997,7 @@ BEGIN
     WHERE p.[PermissionCode] IN (
         'CIRCLE_VIEW', 'CIRCLE_MEMBER_VIEW', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
         'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'NOTIFICATION_VIEW', 'NOTIFICATION_MANAGE', 'MESSAGE_READ_RECEIPT_VIEW', 'MESSAGE_SYNC',
         'MEMORY_CREATE'
     )
     AND NOT EXISTS (

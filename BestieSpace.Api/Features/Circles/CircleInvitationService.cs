@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -25,15 +26,18 @@ public class CircleInvitationService : ICircleInvitationService
 {
     private readonly BestieDbContext _context;
     private readonly ICircleAuthorizationService _circleAuthService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<CircleInvitationService> _logger;
 
     public CircleInvitationService(
         BestieDbContext context,
         ICircleAuthorizationService circleAuthService,
+        INotificationService notificationService,
         ILogger<CircleInvitationService> logger)
     {
         _context = context;
         _circleAuthService = circleAuthService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -136,6 +140,24 @@ public class CircleInvitationService : ICircleInvitationService
 
         _logger.LogInformation("Circle invitation {InvitationId} sent by user {InviterId} to {InviteeId} for Circle {CircleId}",
             invitation.InvitationId, inviterUserId, request.InviteeUserId, request.CircleId);
+
+        try
+        {
+            var inviter = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == inviterUserId);
+            var inviterName = inviter?.DisplayName ?? "A bestie";
+            await _notificationService.CreateNotificationAsync(
+                userId: request.InviteeUserId,
+                type: "CircleInvitationReceived",
+                title: "Circle Invitation! 🌸",
+                message: $"{inviterName} invited you to join '{circle.CircleName}'!",
+                relatedEntityId: invitation.InvitationId,
+                relatedEntityType: "CircleInvitation"
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create notification for circle invitation {InvitationId}", invitation.InvitationId);
+        }
 
         return new CircleOperationResultDto
         {
@@ -263,6 +285,27 @@ public class CircleInvitationService : ICircleInvitationService
 
             _logger.LogInformation("User {UserId} joined Circle {CircleId} via invitation {InvitationId}. New member count: {Count}",
                 inviteeUserId, invitation.CircleId, invitationId, activeMemberCount + 1);
+
+            try
+            {
+                var inviteeUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == inviteeUserId);
+                var inviteeName = inviteeUser?.DisplayName ?? "A bestie";
+                if (invitation.Circle.OwnerUserId != inviteeUserId)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        userId: invitation.Circle.OwnerUserId,
+                        type: "CircleMemberJoined",
+                        title: "New Circle Bestie! 🎉",
+                        message: $"{inviteeName} joined your circle '{invitation.Circle.CircleName}'!",
+                        relatedEntityId: invitation.CircleId,
+                        relatedEntityType: "BestieCircle"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send notification for accepted invitation {InvitationId}", invitationId);
+            }
 
             return new CircleOperationResultDto
             {

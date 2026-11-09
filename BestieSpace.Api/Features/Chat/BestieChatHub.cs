@@ -51,6 +51,9 @@ public class BestieChatHub : Hub
         var userId = GetCurrentUserId();
         if (userId.HasValue)
         {
+            // Join personal user group for targeted notifications and delivery updates
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId.Value}");
+
             var becameOnline = await _presenceService.UserConnectedAsync(userId.Value, Context.ConnectionId);
             if (becameOnline)
             {
@@ -74,6 +77,19 @@ public class BestieChatHub : Hub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         _logger.LogInformation("SignalR connection closing: {ConnectionId}", Context.ConnectionId);
+
+        var curUserId = GetCurrentUserId();
+        if (curUserId.HasValue)
+        {
+            try
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{curUserId.Value}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to remove connection {ConnectionId} from user group", Context.ConnectionId);
+            }
+        }
 
         // 1. Phase 6 multi-connection presence cleanup
         var (isOffline, userId, joinedCircles) = await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
@@ -227,6 +243,28 @@ public class BestieChatHub : Hub
         using var scope = _scopeFactory.CreateScope();
         var mediaService = scope.ServiceProvider.GetRequiredService<BestieSpace.Api.Features.Media.IChatMediaService>();
         return await mediaService.SendStickerMessageAsync(request.CircleId, request.StickerId, userId);
+    }
+
+    /// <summary>
+    /// Client-to-server MarkMessagesRead event for per-user read receipts.
+    /// </summary>
+    public async Task<int> MarkMessagesRead(MarkMessagesReadRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var readService = scope.ServiceProvider.GetRequiredService<IMessageReadService>();
+        return await readService.MarkMessagesAsReadAsync(request.CircleId, request.MessageIds, userId);
+    }
+
+    /// <summary>
+    /// Client-to-server AcknowledgeDelivery event for message delivery tracking.
+    /// </summary>
+    public async Task<int> AcknowledgeDelivery(AcknowledgeDeliveryRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var deliveryService = scope.ServiceProvider.GetRequiredService<IMessageDeliveryService>();
+        return await deliveryService.AcknowledgeDeliveryAsync(request.CircleId, request.MessageIds, userId);
     }
 
     // =========================================================================

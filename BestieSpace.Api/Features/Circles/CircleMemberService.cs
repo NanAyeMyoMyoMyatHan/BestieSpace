@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -23,15 +24,18 @@ public class CircleMemberService : ICircleMemberService
 {
     private readonly BestieDbContext _context;
     private readonly ICircleAuthorizationService _circleAuthService;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<CircleMemberService> _logger;
 
     public CircleMemberService(
         BestieDbContext context,
         ICircleAuthorizationService circleAuthService,
+        INotificationService notificationService,
         ILogger<CircleMemberService> logger)
     {
         _context = context;
         _circleAuthService = circleAuthService;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -128,6 +132,22 @@ public class CircleMemberService : ICircleMemberService
         _logger.LogInformation("Member {MemberId} removed from Circle {CircleId} by actor {ActorId}",
             memberUserIdToRemove, circleId, actingUserId);
 
+        try
+        {
+            await _notificationService.CreateNotificationAsync(
+                userId: memberUserIdToRemove,
+                type: "CircleMemberRemoved",
+                title: "Circle Update",
+                message: $"You were removed from circle '{circle.CircleName}'.",
+                relatedEntityId: circleId,
+                relatedEntityType: "BestieCircle"
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send notification for removed member {MemberId}", memberUserIdToRemove);
+        }
+
         return new CircleOperationResultDto
         {
             IsSuccess = true,
@@ -166,6 +186,24 @@ public class CircleMemberService : ICircleMemberService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("User {UserId} left Circle {CircleId}", actingUserId, circleId);
+
+        try
+        {
+            var leavingUser = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == actingUserId);
+            var leavingName = leavingUser?.DisplayName ?? "A member";
+            await _notificationService.CreateNotificationAsync(
+                userId: circle.OwnerUserId,
+                type: "CircleMemberLeft",
+                title: "Member Left Circle",
+                message: $"{leavingName} has left '{circle.CircleName}'.",
+                relatedEntityId: circleId,
+                relatedEntityType: "BestieCircle"
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send notification for leaving user {UserId}", actingUserId);
+        }
 
         return new CircleOperationResultDto
         {
@@ -315,6 +353,22 @@ public class CircleMemberService : ICircleMemberService
 
             _logger.LogInformation("Ownership of Circle {CircleId} transferred from user {OldOwnerId} to {NewOwnerId}",
                 circleId, actingUserId, request.NewOwnerUserId);
+
+            try
+            {
+                await _notificationService.CreateNotificationAsync(
+                    userId: request.NewOwnerUserId,
+                    type: "CircleOwnershipTransferred",
+                    title: "Circle Ownership 👑",
+                    message: $"You are now the owner of circle '{circle.CircleName}'!",
+                    relatedEntityId: circleId,
+                    relatedEntityType: "BestieCircle"
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send notification for ownership transfer to {NewOwnerId}", request.NewOwnerUserId);
+            }
 
             return new CircleOperationResultDto
             {

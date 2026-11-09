@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BestieSpace.Api.Features.Chat;
 using BestieSpace.Api.Features.Circles;
+using BestieSpace.Api.Features.Notifications;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -28,6 +29,7 @@ public class ChatMediaService : IChatMediaService
     private readonly IStickerService _stickerService;
     private readonly ICircleAuthorizationService _circleAuth;
     private readonly IHubContext<BestieChatHub> _hubContext;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<ChatMediaService> _logger;
 
     public ChatMediaService(
@@ -36,6 +38,7 @@ public class ChatMediaService : IChatMediaService
         IStickerService stickerService,
         ICircleAuthorizationService circleAuth,
         IHubContext<BestieChatHub> hubContext,
+        INotificationService notificationService,
         ILogger<ChatMediaService> logger)
     {
         _context = context;
@@ -43,6 +46,7 @@ public class ChatMediaService : IChatMediaService
         _stickerService = stickerService;
         _circleAuth = circleAuth;
         _hubContext = hubContext;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -119,6 +123,25 @@ public class ChatMediaService : IChatMediaService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to broadcast photo message {MessageId} in circle {CircleId}", chatMessage.Id, circleId);
+        }
+
+        // 6. Notify offline circle members
+        try
+        {
+            var otherMembers = await _context.BestieCircleMembers
+                .Where(cm => cm.CircleId == circleId && cm.IsActive && cm.UserId != senderUserId)
+                .Select(cm => cm.UserId)
+                .ToListAsync();
+
+            var cap = string.IsNullOrWhiteSpace(caption) ? "📸 Photo" : $"📸 {caption}";
+            foreach (var uid in otherMembers)
+            {
+                await _notificationService.CreateNotificationAsync(uid, "NewMessage", "New Photo Shared 📸", $"{dto.SenderDisplayName}: {cap}", circleId, "Circle");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify members of photo message in circle {CircleId}", circleId);
         }
 
         return dto;
@@ -206,6 +229,24 @@ public class ChatMediaService : IChatMediaService
             _logger.LogError(ex, "Failed to broadcast voice message {MessageId} in circle {CircleId}", chatMessage.Id, circleId);
         }
 
+        // 6. Notify offline circle members
+        try
+        {
+            var otherMembers = await _context.BestieCircleMembers
+                .Where(cm => cm.CircleId == circleId && cm.IsActive && cm.UserId != senderUserId)
+                .Select(cm => cm.UserId)
+                .ToListAsync();
+
+            foreach (var uid in otherMembers)
+            {
+                await _notificationService.CreateNotificationAsync(uid, "NewMessage", "New Voice Note 🎤", $"{dto.SenderDisplayName} sent a voice message ({durationSeconds:0}s)", circleId, "Circle");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify members of voice message in circle {CircleId}", circleId);
+        }
+
         return dto;
     }
 
@@ -259,6 +300,24 @@ public class ChatMediaService : IChatMediaService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to broadcast sticker message {MessageId} in circle {CircleId}", chatMessage.Id, circleId);
+        }
+
+        // 5. Notify offline circle members
+        try
+        {
+            var otherMembers = await _context.BestieCircleMembers
+                .Where(cm => cm.CircleId == circleId && cm.IsActive && cm.UserId != senderUserId)
+                .Select(cm => cm.UserId)
+                .ToListAsync();
+
+            foreach (var uid in otherMembers)
+            {
+                await _notificationService.CreateNotificationAsync(uid, "NewMessage", "New Sticker 🌸", $"{dto.SenderDisplayName} sent a sticker ({sticker.StickerName})", circleId, "Circle");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to notify members of sticker message in circle {CircleId}", circleId);
         }
 
         return dto;
@@ -351,7 +410,13 @@ public class ChatMediaService : IChatMediaService
             IsDeleted = m.IsDeleted,
             IsOwnMessage = isOwn,
             CanEdit = !m.IsDeleted && isOwn && (m.MessageType == "text"),
-            CanDelete = !m.IsDeleted && (isOwn || isModerator)
+            CanDelete = !m.IsDeleted && (isOwn || isModerator),
+            DeliveryStatus = "sent",
+            ReadCount = 0,
+            DeliveredCount = 0,
+            TotalRecipients = 0,
+            IsReadByMe = false,
+            IsDeliveredToMe = false
         };
     }
 }

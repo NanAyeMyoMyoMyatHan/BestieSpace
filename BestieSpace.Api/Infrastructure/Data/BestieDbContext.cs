@@ -44,6 +44,10 @@ public partial class BestieDbContext : DbContext
     public virtual DbSet<StickerCategory> StickerCategories { get; set; } = null!;
     public virtual DbSet<Sticker> Stickers { get; set; } = null!;
 
+    // Offline Messaging, Delivery Receipts & Notifications (Phase 8)
+    public virtual DbSet<ChatMessageDelivery> ChatMessageDeliveries { get; set; } = null!;
+    public virtual DbSet<Notification> Notifications { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -520,6 +524,53 @@ public partial class BestieDbContext : DbContext
             entity.HasOne(e => e.Category)
                 .WithMany(c => c.Stickers)
                 .HasForeignKey(e => e.CategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 17. ChatMessageDeliveries (Phase 8: Independent delivery acknowledgment per recipient)
+        modelBuilder.Entity<ChatMessageDelivery>(entity =>
+        {
+            entity.ToTable("ChatMessageDeliveries");
+
+            entity.HasKey(e => e.ChatMessageDeliveryId);
+            entity.Property(e => e.ChatMessageDeliveryId).ValueGeneratedOnAdd();
+            entity.Property(e => e.DeliveredAt).IsRequired();
+
+            entity.HasIndex(e => new { e.ChatMessageId, e.UserId }).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.DeliveredAt });
+
+            entity.HasOne(e => e.ChatMessage)
+                .WithMany(m => m.DeliveryReceipts)
+                .HasForeignKey(e => e.ChatMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.ChatMessageDeliveries)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // 18. Notifications (Phase 8: Durable user notifications)
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("Notifications");
+
+            entity.HasKey(e => e.NotificationId);
+            entity.Property(e => e.NotificationId).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.NotificationType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(250);
+            entity.Property(e => e.Message).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.RelatedEntityType).HasMaxLength(50);
+            entity.Property(e => e.IsRead).HasDefaultValue(false);
+            entity.Property(e => e.CreatedAt).IsRequired();
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt });
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Notifications)
+                .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

@@ -66,6 +66,7 @@
                 </div>
 
                 <div class="header-right">
+                    <NotificationCenter />
                     <button class="btn-header-action" title="View Circle Details & Roster" @onclick="OpenCircleRoster">
                         <span>👑 Roster (@members.Count/9)</span>
                     </button>
@@ -264,6 +265,28 @@
                                         <div class="bubble-footer">
                                             <span class="msg-time">@msg.CreatedAt.ToLocalTime().ToString("h:mm tt")</span>
 
+                                            @if (!msg.IsDeleted && isMe)
+                                            {
+                                                <button type="button" class="btn-receipt-status @msg.DeliveryStatus.ToLowerInvariant()" 
+                                                        title="Read by @(msg.ReadCount)/@(msg.TotalRecipients) • Click for receipt details" 
+                                                        @onclick="@(() => OpenReadReceiptDetails(msg))">
+                                                    @if (msg.DeliveryStatus == "Read")
+                                                    {
+                                                        <span class="status-ticks read" title="Read by @msg.ReadCount besties">✓✓</span>
+                                                        <span class="receipt-count">@msg.ReadCount/@msg.TotalRecipients</span>
+                                                    }
+                                                    else if (msg.DeliveryStatus == "Delivered")
+                                                    {
+                                                        <span class="status-ticks delivered" title="Delivered to @msg.DeliveredCount besties">✓✓</span>
+                                                        <span class="receipt-count">@msg.DeliveredCount/@msg.TotalRecipients</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="status-ticks sent" title="Sent to BestieSpace">✓</span>
+                                                    }
+                                                </button>
+                                            }
+
                                             @if (!msg.IsDeleted && (msg.CanEdit || msg.CanDelete))
                                             {
                                                 <div class="msg-actions-dropdown">
@@ -426,6 +449,154 @@
                         {
                             <p class="zoom-caption-text">@zoomCaption</p>
                         }
+                    </div>
+                </div>
+            }
+
+            <!-- READ RECEIPT DETAILS MODAL -->
+            @if (showReadReceiptModal && selectedReceiptMessage != null)
+            {
+                <div class="receipt-modal-backdrop" @onclick="CloseReadReceiptModal">
+                    <div class="receipt-modal-card" @onclick:stopPropagation>
+                        <div class="receipt-modal-header">
+                            <div class="receipt-title-group">
+                                <span class="receipt-header-icon">👁️</span>
+                                <div>
+                                    <h3>Message Info & Read Receipts</h3>
+                                    <span class="receipt-sub">Circle: @(circle?.CircleName ?? "Bestie Circle")</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-receipt-close" @onclick="CloseReadReceiptModal">✕</button>
+                        </div>
+
+                        <div class="receipt-modal-body">
+                            <!-- Message Preview -->
+                            <div class="receipt-msg-preview">
+                                <div class="preview-bubble @selectedReceiptMessage.MessageType">
+                                    @if (selectedReceiptMessage.MessageType == "photo")
+                                    {
+                                        <span class="preview-type-tag">📸 Photo Message</span>
+                                    }
+                                    else if (selectedReceiptMessage.MessageType == "voice")
+                                    {
+                                        <span class="preview-type-tag">🎙️ Voice Note (@FormatDuration(selectedReceiptMessage.DurationSeconds ?? 0))</span>
+                                    }
+                                    else if (selectedReceiptMessage.MessageType == "sticker")
+                                    {
+                                        <span class="preview-type-tag">🌸 Bestie Sticker</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(selectedReceiptMessage.Content))
+                                    {
+                                        <p class="preview-text">@selectedReceiptMessage.Content</p>
+                                    }
+                                    <span class="preview-time">Sent @selectedReceiptMessage.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")</span>
+                                </div>
+                            </div>
+
+                            @if (isLoadingReceiptDetails)
+                            {
+                                <div class="receipt-loading-state">
+                                    <span class="kawaii-spinner">🌸</span>
+                                    <p>Loading bestie receipts...</p>
+                                </div>
+                            }
+                            else if (activeReadDetails != null)
+                            {
+                                var readers = activeReadDetails.Members.Where(m => m.HasRead).ToList();
+                                var deliveredUnread = activeReadDetails.Members.Where(m => !m.HasRead && m.HasDelivered).ToList();
+                                var pendingOffline = activeReadDetails.Members.Where(m => !m.HasRead && !m.HasDelivered).ToList();
+                                var totalDelivered = activeReadDetails.Members.Count(m => m.HasDelivered);
+
+                                <!-- Stats Summary Pills -->
+                                <div class="receipt-stats-row">
+                                    <div class="stat-pill read">
+                                        <span class="stat-count">@activeReadDetails.ReadCount</span>
+                                        <span class="stat-label">Read</span>
+                                    </div>
+                                    <div class="stat-pill delivered">
+                                        <span class="stat-count">@totalDelivered</span>
+                                        <span class="stat-label">Delivered</span>
+                                    </div>
+                                    <div class="stat-pill total">
+                                        <span class="stat-count">@activeReadDetails.TotalMembers</span>
+                                        <span class="stat-label">Total Besties</span>
+                                    </div>
+                                </div>
+
+                                <!-- Readers Section -->
+                                <div class="receipt-section">
+                                    <h4>🌸 Read by (@readers.Count)</h4>
+                                    @if (readers.Count == 0)
+                                    {
+                                        <p class="empty-receipt-note">No besties have opened this message yet 💌</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="recipient-avatar-list">
+                                            @foreach (var reader in readers)
+                                            {
+                                                <div class="recipient-row">
+                                                    <div class="recipient-avatar">
+                                                        <span>@(reader.AvatarSticker ?? "🌸")</span>
+                                                    </div>
+                                                    <div class="recipient-info">
+                                                        <div class="recipient-name-row">
+                                                            <strong>@reader.DisplayName</strong>
+                                                            <span class="recipient-uname">@@@reader.Username</span>
+                                                        </div>
+                                                        <span class="receipt-time">Read @(reader.ReadAt.HasValue ? FormatReadTime(reader.ReadAt.Value) : "Recently")</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Delivered (Unread) Section -->
+                                @if (deliveredUnread.Count > 0)
+                                {
+                                    <div class="receipt-section">
+                                        <h4>📬 Delivered to devices (@deliveredUnread.Count)</h4>
+                                        <div class="recipient-avatar-list">
+                                            @foreach (var d in deliveredUnread)
+                                            {
+                                                <div class="recipient-row">
+                                                    <div class="recipient-avatar">
+                                                        <span>@(d.AvatarSticker ?? "🌸")</span>
+                                                    </div>
+                                                    <div class="recipient-info">
+                                                        <strong>@d.DisplayName</strong>
+                                                        <span class="recipient-status-tag">Delivered • Not yet opened</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <!-- Pending / Offline Section -->
+                                @if (pendingOffline.Count > 0)
+                                {
+                                    <div class="receipt-section">
+                                        <h4>💤 Offline / Waiting for delivery (@pendingOffline.Count)</h4>
+                                        <div class="recipient-avatar-list">
+                                            @foreach (var p in pendingOffline)
+                                            {
+                                                <div class="recipient-row pending">
+                                                    <div class="recipient-avatar">
+                                                        <span>@(p.AvatarSticker ?? "🌸")</span>
+                                                    </div>
+                                                    <div class="recipient-info">
+                                                        <strong>@p.DisplayName</strong>
+                                                        <span class="recipient-status-tag offline">Offline • Will sync when online</span>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
                     </div>
                 </div>
             }
@@ -1536,6 +1707,238 @@
         font-weight: 700;
         cursor: pointer;
     }
+    /* Read Receipts and Delivery Status */
+    .btn-receipt-status {
+        background: transparent;
+        border: none;
+        padding: 0 4px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+    }
+    .btn-receipt-status:hover {
+        background: rgba(255, 143, 171, 0.2);
+    }
+    .status-ticks {
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: -2px;
+        display: inline-block;
+    }
+    .status-ticks.sent {
+        color: #A09899;
+    }
+    .status-ticks.delivered {
+        color: #7E6566;
+    }
+    .status-ticks.read {
+        color: #F72585;
+    }
+    .receipt-count {
+        font-size: 0.65rem;
+        color: #7E6566;
+        font-weight: 600;
+        margin-left: 1px;
+    }
+
+    /* Receipt Details Modal */
+    .receipt-modal-backdrop {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.45);
+        backdrop-filter: blur(4px);
+        z-index: 1100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .receipt-modal-card {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 24px;
+        width: 480px;
+        max-width: 95vw;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(255, 143, 171, 0.35);
+        animation: dropSlide 0.25s ease;
+    }
+    .receipt-modal-header {
+        background: linear-gradient(135deg, #FFF0F5 0%, #FFE5EC 100%);
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 2px solid #FFC2D1;
+    }
+    .receipt-title-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .receipt-header-icon {
+        font-size: 22px;
+    }
+    .receipt-title-group h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #4A3B3C;
+    }
+    .receipt-sub {
+        font-size: 0.72rem;
+        color: #7E6566;
+    }
+    .btn-receipt-close {
+        background: #fff;
+        border: 1px solid #FFC2D1;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #7E6566;
+    }
+    .receipt-modal-body {
+        padding: 16px 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .receipt-msg-preview {
+        background: #FAF8F8;
+        border-radius: 14px;
+        padding: 10px 14px;
+        border-left: 3px solid #FF8FAB;
+    }
+    .preview-type-tag {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #F72585;
+        display: block;
+        margin-bottom: 3px;
+    }
+    .preview-text {
+        margin: 0 0 4px 0;
+        font-size: 0.85rem;
+        color: #4A3B3C;
+        word-break: break-word;
+    }
+    .preview-time {
+        font-size: 0.68rem;
+        color: #9E8586;
+    }
+    .receipt-stats-row {
+        display: flex;
+        gap: 10px;
+    }
+    .stat-pill {
+        flex: 1;
+        padding: 8px;
+        border-radius: 12px;
+        text-align: center;
+        background: #FAF8F8;
+        border: 1px solid #FFE5EC;
+    }
+    .stat-pill.read {
+        background: #FFF0F5;
+        border-color: #FFB3C6;
+    }
+    .stat-pill.read .stat-count {
+        color: #F72585;
+    }
+    .stat-count {
+        display: block;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #4A3B3C;
+    }
+    .stat-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #7E6566;
+    }
+    .receipt-section h4 {
+        margin: 0 0 8px 0;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #4A3B3C;
+    }
+    .recipient-avatar-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .recipient-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #FAF8F8;
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid #F0E6E8;
+    }
+    .recipient-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #fff;
+        border: 1px solid #FFC2D1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .recipient-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .recipient-name-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .recipient-name-row strong {
+        font-size: 0.84rem;
+        color: #4A3B3C;
+    }
+    .recipient-uname {
+        font-size: 0.72rem;
+        color: #9E8586;
+    }
+    .receipt-time {
+        font-size: 0.72rem;
+        color: #F72585;
+        font-weight: 600;
+    }
+    .recipient-status-tag {
+        font-size: 0.72rem;
+        color: #7E6566;
+    }
+    .recipient-status-tag.offline {
+        color: #9E8586;
+    }
+    .empty-receipt-note {
+        font-size: 0.8rem;
+        color: #9E8586;
+        font-style: italic;
+        margin: 4px 0;
+    }
+    .receipt-loading-state {
+        text-align: center;
+        padding: 24px;
+        color: #7E6566;
+    }
 </style>
 
 @code {
@@ -1568,6 +1971,12 @@
     private int? editingMessageId;
     private string editingContent = string.Empty;
     private bool isSubmittingEdit = false;
+
+    // Phase 8: Offline sync & Read Receipts state
+    private bool showReadReceiptModal = false;
+    private CircleChatMessageDto? selectedReceiptMessage;
+    private MessageReadDetailsDto? activeReadDetails;
+    private bool isLoadingReceiptDetails = false;
 
     // Phase 7: Multimedia state
     private List<StickerCategoryDto> stickerCategories = new();
@@ -1686,6 +2095,8 @@
                     messages = result.Messages;
                     await ScrollToBottomAsync();
                 }
+
+                _ = ProcessIncomingReceiptsAndAcksAsync(result.Messages);
             }
         }
         catch (Exception ex)
@@ -1748,6 +2159,63 @@
                         messages.Add(msg);
                         InvokeAsync(StateHasChanged);
                         _ = ScrollToBottomAsync();
+
+                        if (msg.SenderId != currentUserId)
+                        {
+                            _ = ProcessIncomingReceiptsAndAcksAsync(new[] { msg });
+                        }
+                    }
+                }
+            });
+
+            hubConnection.On<MessageReadEventDto>("MessagesRead", (readEvt) =>
+            {
+                if (readEvt.CircleId == CircleId)
+                {
+                    var idSet = new HashSet<int>(readEvt.MessageIds);
+                    bool changed = false;
+                    foreach (var m in messages.Where(m => idSet.Contains(m.Id)))
+                    {
+                        if (readEvt.UserId == currentUserId)
+                        {
+                            m.IsReadByMe = true;
+                        }
+                        m.ReadCount = Math.Max(m.ReadCount, m.ReadCount + 1);
+                        if (m.ReadCount >= m.TotalRecipients && m.TotalRecipients > 0)
+                        {
+                            m.DeliveryStatus = "Read";
+                        }
+                        changed = true;
+                    }
+                    if (changed)
+                    {
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+            });
+
+            hubConnection.On<MessageDeliveredEventDto>("MessagesDelivered", (delEvt) =>
+            {
+                if (delEvt.CircleId == CircleId)
+                {
+                    var idSet = new HashSet<int>(delEvt.MessageIds);
+                    bool changed = false;
+                    foreach (var m in messages.Where(m => idSet.Contains(m.Id)))
+                    {
+                        if (delEvt.UserId == currentUserId)
+                        {
+                            m.IsDeliveredToMe = true;
+                        }
+                        m.DeliveredCount = Math.Max(m.DeliveredCount, m.DeliveredCount + 1);
+                        if (m.DeliveryStatus != "Read" && m.DeliveredCount > 0)
+                        {
+                            m.DeliveryStatus = "Delivered";
+                        }
+                        changed = true;
+                    }
+                    if (changed)
+                    {
+                        InvokeAsync(StateHasChanged);
                     }
                 }
             });
@@ -1815,7 +2283,22 @@
                 isHubConnected = true;
                 Logger.LogInformation("SignalR Reconnected: {ConnectionId}. Rejoining circle group {CircleId}", connectionId, CircleId);
                 await hubConnection.InvokeAsync("JoinCircle", CircleId);
-                await LoadMessagesAsync(1, appendOlder: false);
+
+                // Offline message sync cursor
+                var lastId = messages.Any() ? messages.Max(m => m.Id) : 0;
+                var syncRes = await ApiClient.SyncCircleMessagesAsync(CircleId, lastId, 50);
+                if (syncRes != null && syncRes.Messages.Any())
+                {
+                    foreach (var newMsg in syncRes.Messages)
+                    {
+                        if (!messages.Any(m => m.Id == newMsg.Id))
+                        {
+                            messages.Add(newMsg);
+                        }
+                    }
+                    _ = ProcessIncomingReceiptsAndAcksAsync(syncRes.Messages);
+                    await ScrollToBottomAsync();
+                }
                 await InvokeAsync(StateHasChanged);
             };
 
@@ -2253,6 +2736,85 @@
         if (dt.Date == today) return "Today";
         if (dt.Date == today.AddDays(-1)) return "Yesterday";
         return dt.ToString("MMMM d, yyyy");
+    }
+
+    private async Task ProcessIncomingReceiptsAndAcksAsync(IEnumerable<CircleChatMessageDto> incoming)
+    {
+        if (incoming == null || !incoming.Any()) return;
+
+        var unDelivered = incoming
+            .Where(m => m.SenderId != currentUserId && !m.IsDeliveredToMe)
+            .Select(m => m.Id)
+            .Distinct()
+            .ToList();
+
+        if (unDelivered.Any())
+        {
+            foreach (var m in incoming.Where(x => unDelivered.Contains(x.Id)))
+            {
+                m.IsDeliveredToMe = true;
+            }
+            _ = ApiClient.AcknowledgeDeliveryAsync(CircleId, unDelivered);
+        }
+
+        var unRead = incoming
+            .Where(m => m.SenderId != currentUserId && !m.IsReadByMe)
+            .Select(m => m.Id)
+            .Distinct()
+            .ToList();
+
+        if (unRead.Any())
+        {
+            foreach (var m in incoming.Where(x => unRead.Contains(x.Id)))
+            {
+                m.IsReadByMe = true;
+            }
+            _ = ApiClient.MarkCircleMessagesAsReadAsync(CircleId, unRead);
+        }
+    }
+
+    private async Task OpenReadReceiptDetails(CircleChatMessageDto msg)
+    {
+        selectedReceiptMessage = msg;
+        showReadReceiptModal = true;
+        isLoadingReceiptDetails = true;
+        activeReadDetails = null;
+
+        try
+        {
+            activeReadDetails = await ApiClient.GetCircleMessageReadReceiptsAsync(CircleId, msg.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load read receipt details for message {MessageId}", msg.Id);
+        }
+        finally
+        {
+            isLoadingReceiptDetails = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void CloseReadReceiptModal()
+    {
+        showReadReceiptModal = false;
+        selectedReceiptMessage = null;
+        activeReadDetails = null;
+    }
+
+    private static string FormatReadTime(DateTime dt)
+    {
+        var local = dt.ToLocalTime();
+        var today = DateTime.Today;
+        if (local.Date == today)
+        {
+            return $"Today at {local:h:mm tt}";
+        }
+        if (local.Date == today.AddDays(-1))
+        {
+            return $"Yesterday at {local:h:mm tt}";
+        }
+        return local.ToString("MMM d, h:mm tt");
     }
 
     private void GoBackToCircles() => Nav.NavigateTo("/circles");

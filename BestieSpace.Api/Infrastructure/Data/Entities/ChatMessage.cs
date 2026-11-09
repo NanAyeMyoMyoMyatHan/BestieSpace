@@ -78,4 +78,5 @@ public partial class ChatMessage
     public virtual User? Sender { get; set; }
     public virtual MediaFile? MediaFile { get; set; }
     public virtual ICollection<ChatMessageRead> ReadReceipts { get; set; } = new List<ChatMessageRead>();
+    public virtual ICollection<ChatMessageDelivery> DeliveryReceipts { get; set; } = new List<ChatMessageDelivery>();
 }

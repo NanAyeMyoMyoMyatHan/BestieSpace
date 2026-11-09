@@ -32,6 +32,14 @@ public class CircleChatMessageDto
     public bool IsOwnMessage { get; set; }
     public bool CanEdit { get; set; }
     public bool CanDelete { get; set; }
+
+    // Phase 8: Offline Messaging, Delivery Receipts & Read Receipts
+    public string DeliveryStatus { get; set; } = "sent"; // "sent", "delivered", "read"
+    public int ReadCount { get; set; }
+    public int DeliveredCount { get; set; }
+    public int TotalRecipients { get; set; }
+    public bool IsReadByMe { get; set; }
+    public bool IsDeliveredToMe { get; set; }
 }
 
 /// <summary>

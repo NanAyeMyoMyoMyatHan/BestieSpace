@@ -460,7 +460,11 @@ public static class DatabaseBootstrapper
             new() { PermissionCode = "CHAT_VIEW_MEDIA", Description = "View and play multimedia photos and voice messages" },
             new() { PermissionCode = "CHAT_DELETE_MEDIA", Description = "Delete multimedia messages in circle chat" },
             new() { PermissionCode = "STICKER_VIEW", Description = "Browse and view available sticker packs and categories" },
-            new() { PermissionCode = "STICKER_MANAGE", Description = "Create, update, and manage sticker categories and sticker collections" }
+            new() { PermissionCode = "STICKER_MANAGE", Description = "Create, update, and manage sticker categories and sticker collections" },
+            new() { PermissionCode = "NOTIFICATION_VIEW", Description = "View user notifications and notification history" },
+            new() { PermissionCode = "NOTIFICATION_MANAGE", Description = "Mark notifications as read or dismiss notifications" },
+            new() { PermissionCode = "MESSAGE_READ_RECEIPT_VIEW", Description = "View per-user message read receipts in circle chat" },
+            new() { PermissionCode = "MESSAGE_SYNC", Description = "Synchronize offline and missed circle messages" }
         };
 
         foreach (var p in permsToSeed)
@@ -502,6 +506,7 @@ public static class DatabaseBootstrapper
                 "FRIEND_REMOVE", "CIRCLE_CREATE", "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_MEMBER_MANAGE",
                 "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
                 "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW", "STICKER_MANAGE",
+                "NOTIFICATION_VIEW", "NOTIFICATION_MANAGE", "MESSAGE_READ_RECEIPT_VIEW", "MESSAGE_SYNC",
                 "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
@@ -529,6 +534,7 @@ public static class DatabaseBootstrapper
                 "USER_VIEW", "USER_UPDATE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT", "FRIEND_REMOVE",
                 "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY",
                 "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "STICKER_VIEW",
+                "NOTIFICATION_VIEW", "NOTIFICATION_MANAGE", "MESSAGE_READ_RECEIPT_VIEW", "MESSAGE_SYNC",
                 "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
@@ -557,6 +563,7 @@ public static class DatabaseBootstrapper
                 "CIRCLE_MEMBER_VIEW", "CIRCLE_MEMBER_REMOVE", "CIRCLE_MEMBER_ROLE_UPDATE", "CIRCLE_TRANSFER_OWNERSHIP",
                 "CIRCLE_MEMBER_MANAGE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
                 "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW",
+                "NOTIFICATION_VIEW", "NOTIFICATION_MANAGE", "MESSAGE_READ_RECEIPT_VIEW", "MESSAGE_SYNC",
                 "MEMORY_CREATE"
             };
 
@@ -583,6 +590,7 @@ public static class DatabaseBootstrapper
                 "CIRCLE_VIEW", "CIRCLE_INVITE", "CIRCLE_INVITATION_CANCEL", "CIRCLE_MEMBER_VIEW",
                 "CIRCLE_MEMBER_REMOVE", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
                 "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW",
+                "NOTIFICATION_VIEW", "NOTIFICATION_MANAGE", "MESSAGE_READ_RECEIPT_VIEW", "MESSAGE_SYNC",
                 "MEMORY_CREATE"
             };
 
@@ -608,6 +616,7 @@ public static class DatabaseBootstrapper
             {
                 "CIRCLE_VIEW", "CIRCLE_MEMBER_VIEW", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY",
                 "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "STICKER_VIEW",
+                "NOTIFICATION_VIEW", "NOTIFICATION_MANAGE", "MESSAGE_READ_RECEIPT_VIEW", "MESSAGE_SYNC",
                 "MEMORY_CREATE"
             };
 

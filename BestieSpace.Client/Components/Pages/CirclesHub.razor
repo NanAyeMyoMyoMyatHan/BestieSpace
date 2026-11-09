@@ -23,6 +23,7 @@
             Gather your closest besties into private circles of up to 9 members! Share exclusive memories, roster updates, and real-time private group chats.
         </p>
         <div class="header-actions">
+            <NotificationCenter />
             <button class="btn-create-circle" @onclick="OpenCreateCircleModal">
                 <span>➕</span> Create New Circle
             </button>
@@ -153,6 +154,10 @@
                             <div class="circle-card-footer">
                                 <button class="btn-card-chat" @onclick="@(() => OpenCircleChat(c.CircleId))">
                                     💬 Open Chat
+                                    @if (circleUnreadCounts.TryGetValue(c.CircleId, out var unread) && unread > 0)
+                                    {
+                                        <span class="circle-unread-pill">@unread new</span>
+                                    }
                                 </button>
                                 <button class="btn-card-manage" @onclick="@(() => OpenCircleDetailsModal(c.CircleId))">
                                     ⚙️ Manage
@@ -635,6 +640,20 @@
         cursor: pointer;
         font-size: 0.9rem;
         box-shadow: 0 4px 12px rgba(251, 111, 146, 0.25);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .circle-unread-pill {
+        background: #F72585;
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
     }
     .btn-card-manage {
         flex: 1;
@@ -1110,6 +1129,7 @@
     private List<CircleEligibleFriend> eligibleFriends = new();
     private HashSet<int> pendingInviteFriendIds = new();
     private bool isSendingInvite = false;
+    private Dictionary<int, int> circleUnreadCounts = new();
 
     public class CircleEligibleFriend
     {
@@ -1148,6 +1168,11 @@
         try
         {
             myCircles = await ApiClient.GetMyCirclesAsync();
+            var summary = await ApiClient.GetUnreadSummaryAsync();
+            if (summary != null)
+            {
+                circleUnreadCounts = summary.Circles.ToDictionary(x => x.CircleId, x => x.UnreadCount);
+            }
         }
         catch (Exception ex)
         {
