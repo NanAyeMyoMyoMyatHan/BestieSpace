@@ -1,59 +1,591 @@
--- BestieSpace Initial Database Schema (Database-First)
+-- ==============================================================================
+-- BestieSpace Phase 1: Microsoft SQL Server Initial Schema & Seed Script
+-- Platform: Microsoft SQL Server 2019 / 2022 / LocalDB / Azure SQL Database
+-- Requirements: Idempotent, safe to run multiple times, preserves existing records.
+-- ==============================================================================
 
-CREATE TABLE IF NOT EXISTS AppStats (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    MissYouCount INTEGER NOT NULL DEFAULT 1000,
-    MainLetterTitle TEXT NOT NULL,
-    MainLetterContent TEXT NOT NULL,
-    SenderNickname TEXT NOT NULL,
-    RecipientNickname TEXT NOT NULL,
-    LastUpdated TEXT NOT NULL
-);
+-- 1. AppStats (Global miss-you meter & heartfelt letter)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AppStats')
+BEGIN
+    CREATE TABLE [dbo].[AppStats] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [MissYouCount] INT NOT NULL CONSTRAINT [DF_AppStats_MissYouCount] DEFAULT 1000,
+        [MainLetterTitle] NVARCHAR(250) NOT NULL,
+        [MainLetterContent] NVARCHAR(MAX) NOT NULL,
+        [SenderNickname] NVARCHAR(100) NOT NULL,
+        [RecipientNickname] NVARCHAR(100) NOT NULL,
+        [LastUpdated] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_AppStats] PRIMARY KEY CLUSTERED ([Id] ASC)
+    );
+END
+GO
 
-CREATE TABLE IF NOT EXISTS Memories (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Caption TEXT NOT NULL,
-    ImageUrl TEXT NOT NULL,
-    MemoryDate TEXT NOT NULL,
-    StickerType TEXT NOT NULL,
-    RotationAngle REAL NOT NULL DEFAULT 0,
-    DisplayOrder INTEGER NOT NULL DEFAULT 0,
-    CreatedAt TEXT NOT NULL
-);
+-- 2. Memories (Polaroid gallery memories)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Memories')
+BEGIN
+    CREATE TABLE [dbo].[Memories] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [Caption] NVARCHAR(500) NOT NULL,
+        [ImageUrl] NVARCHAR(1000) NOT NULL,
+        [MemoryDate] DATETIME2 NOT NULL,
+        [StickerType] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Memories_StickerType] DEFAULT 'heart',
+        [RotationAngle] FLOAT NOT NULL CONSTRAINT [DF_Memories_RotationAngle] DEFAULT 0.0,
+        [DisplayOrder] INT NOT NULL CONSTRAINT [DF_Memories_DisplayOrder] DEFAULT 0,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_Memories] PRIMARY KEY CLUSTERED ([Id] ASC)
+    );
+END
+GO
 
-CREATE TABLE IF NOT EXISTS SecretNotes (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Title TEXT NOT NULL,
-    PreviewHint TEXT NOT NULL,
-    Content TEXT NOT NULL,
-    StickerIcon TEXT NOT NULL,
-    IsUnlocked INTEGER NOT NULL DEFAULT 0,
-    UnlockedAt TEXT NULL
-);
+-- 3. SecretNotes (Mystery envelope notes)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SecretNotes')
+BEGIN
+    CREATE TABLE [dbo].[SecretNotes] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [Title] NVARCHAR(200) NOT NULL,
+        [PreviewHint] NVARCHAR(300) NOT NULL,
+        [Content] NVARCHAR(MAX) NOT NULL,
+        [StickerIcon] NVARCHAR(50) NOT NULL CONSTRAINT [DF_SecretNotes_StickerIcon] DEFAULT '💌',
+        [IsUnlocked] BIT NOT NULL CONSTRAINT [DF_SecretNotes_IsUnlocked] DEFAULT 0,
+        [UnlockedAt] DATETIME2 NULL,
+        CONSTRAINT [PK_SecretNotes] PRIMARY KEY CLUSTERED ([Id] ASC)
+    );
+END
+GO
 
-CREATE TABLE IF NOT EXISTS ChatMessages (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    SenderName TEXT NOT NULL,
-    MessageType TEXT NOT NULL,
-    Content TEXT NULL,
-    MediaUrl TEXT NULL,
-    VoiceDurationSeconds REAL NULL,
-    Timestamp TEXT NOT NULL,
-    IsRead INTEGER NOT NULL DEFAULT 0,
-    ReadAt TEXT NULL
-);
+-- 4. Users (Upgraded with UserId PK, normalized fields, while preserving existing login/auth credentials)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Users')
+BEGIN
+    CREATE TABLE [dbo].[Users] (
+        [UserId] INT IDENTITY(1,1) NOT NULL,
+        [Username] NVARCHAR(50) NOT NULL,
+        [NormalizedUsername] NVARCHAR(50) NOT NULL,
+        [Email] NVARCHAR(255) NULL,
+        [NormalizedEmail] NVARCHAR(255) NULL,
+        [PasswordHash] NVARCHAR(255) NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_Users_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [UpdatedAt] DATETIME2 NULL,
+        [IsActive] BIT NOT NULL CONSTRAINT [DF_Users_IsActive] DEFAULT 1,
+        
+        -- Preserved fields from initial Kawaii clubhouse implementation
+        [Password] NVARCHAR(100) NOT NULL CONSTRAINT [DF_Users_Password] DEFAULT '',
+        [DisplayName] NVARCHAR(100) NOT NULL CONSTRAINT [DF_Users_DisplayName] DEFAULT '',
+        [RoleKey] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Users_RoleKey] DEFAULT 'User',
+        [AvatarSticker] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Users_AvatarSticker] DEFAULT '🌸',
+        [PasswordHint] NVARCHAR(255) NULL,
+        [QuickPin] NVARCHAR(10) NOT NULL CONSTRAINT [DF_Users_QuickPin] DEFAULT '3000',
+        [IsOnline] BIT NOT NULL CONSTRAINT [DF_Users_IsOnline] DEFAULT 0,
+        [LastSeenAt] DATETIME2 NULL,
+        [LastLoginAt] DATETIME2 NULL,
+        CONSTRAINT [PK_Users] PRIMARY KEY CLUSTERED ([UserId] ASC)
+    );
 
-CREATE TABLE IF NOT EXISTS Users (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Username TEXT NOT NULL UNIQUE,
-    Password TEXT NOT NULL,
-    DisplayName TEXT NOT NULL,
-    RoleKey TEXT NOT NULL,
-    AvatarSticker TEXT NOT NULL,
-    PasswordHint TEXT NULL,
-    QuickPin TEXT NOT NULL DEFAULT '3000',
-    IsOnline INTEGER NOT NULL DEFAULT 0,
-    LastSeenAt TEXT NULL,
-    CreatedAt TEXT NOT NULL,
-    LastLoginAt TEXT NULL
-);
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_Users_Username] ON [dbo].[Users]([Username] ASC);
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_Users_NormalizedUsername] ON [dbo].[Users]([NormalizedUsername] ASC);
+    CREATE NONCLUSTERED INDEX [IX_Users_NormalizedEmail] ON [dbo].[Users]([NormalizedEmail] ASC) WHERE [NormalizedEmail] IS NOT NULL;
+END
+GO
+
+-- 5. Roles (System and Circle RBAC roles)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Roles')
+BEGIN
+    CREATE TABLE [dbo].[Roles] (
+        [RoleId] INT IDENTITY(1,1) NOT NULL,
+        [RoleName] NVARCHAR(50) NOT NULL,
+        [Description] NVARCHAR(255) NULL,
+        [IsSystemRole] BIT NOT NULL CONSTRAINT [DF_Roles_IsSystemRole] DEFAULT 0,
+        CONSTRAINT [PK_Roles] PRIMARY KEY CLUSTERED ([RoleId] ASC)
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_Roles_RoleName] ON [dbo].[Roles]([RoleName] ASC);
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[Roles]') AND name = 'IsSystemRole')
+    BEGIN
+        ALTER TABLE [dbo].[Roles] ADD [IsSystemRole] BIT NOT NULL CONSTRAINT [DF_Roles_IsSystemRole] DEFAULT 0;
+    END
+END
+GO
+
+-- 6. Permissions (Granular capability codes)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Permissions')
+BEGIN
+    CREATE TABLE [dbo].[Permissions] (
+        [PermissionId] INT IDENTITY(1,1) NOT NULL,
+        [PermissionCode] NVARCHAR(100) NOT NULL,
+        [Description] NVARCHAR(255) NULL,
+        CONSTRAINT [PK_Permissions] PRIMARY KEY CLUSTERED ([PermissionId] ASC)
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_Permissions_PermissionCode] ON [dbo].[Permissions]([PermissionCode] ASC);
+END
+GO
+
+-- 7. UserRoles (Associative entity for users and roles)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserRoles')
+BEGIN
+    CREATE TABLE [dbo].[UserRoles] (
+        [UserRoleId] INT IDENTITY(1,1) NOT NULL,
+        [UserId] INT NOT NULL,
+        [RoleId] INT NOT NULL,
+        CONSTRAINT [PK_UserRoles] PRIMARY KEY CLUSTERED ([UserRoleId] ASC),
+        CONSTRAINT [FK_UserRoles_Users] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_UserRoles_Roles] FOREIGN KEY ([RoleId]) REFERENCES [dbo].[Roles]([RoleId]) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_UserRoles_UserId_RoleId] ON [dbo].[UserRoles]([UserId] ASC, [RoleId] ASC);
+END
+GO
+
+-- 8. RolePermissions (Associative entity for roles and permissions)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RolePermissions')
+BEGIN
+    CREATE TABLE [dbo].[RolePermissions] (
+        [RolePermissionId] INT IDENTITY(1,1) NOT NULL,
+        [RoleId] INT NOT NULL,
+        [PermissionId] INT NOT NULL,
+        CONSTRAINT [PK_RolePermissions] PRIMARY KEY CLUSTERED ([RolePermissionId] ASC),
+        CONSTRAINT [FK_RolePermissions_Roles] FOREIGN KEY ([RoleId]) REFERENCES [dbo].[Roles]([RoleId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_RolePermissions_Permissions] FOREIGN KEY ([PermissionId]) REFERENCES [dbo].[Permissions]([PermissionId]) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_RolePermissions_RoleId_PermissionId] ON [dbo].[RolePermissions]([RoleId] ASC, [PermissionId] ASC);
+END
+GO
+
+-- 9. Friendships (Consistent canonical pair storage preventing duplicates & self-friendship)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Friendships')
+BEGIN
+    CREATE TABLE [dbo].[Friendships] (
+        [FriendshipId] INT IDENTITY(1,1) NOT NULL,
+        [UserId] INT NOT NULL,
+        [FriendUserId] INT NOT NULL,
+        [Status] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Friendships_Status] DEFAULT 'Pending',
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_Friendships_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [UpdatedAt] DATETIME2 NULL,
+
+        -- Canonical user pairing computed columns: guaranteed duplicate prevention in any order
+        [UserA] AS (CASE WHEN [UserId] < [FriendUserId] THEN [UserId] ELSE [FriendUserId] END) PERSISTED,
+        [UserB] AS (CASE WHEN [UserId] < [FriendUserId] THEN [FriendUserId] ELSE [UserId] END) PERSISTED,
+
+        CONSTRAINT [PK_Friendships] PRIMARY KEY CLUSTERED ([FriendshipId] ASC),
+        CONSTRAINT [CK_Friendships_NoSelfFriendship] CHECK ([UserId] <> [FriendUserId]),
+        CONSTRAINT [CK_Friendships_ValidStatus] CHECK ([Status] IN ('Pending', 'Accepted', 'Rejected')),
+        CONSTRAINT [FK_Friendships_Users] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]),
+        CONSTRAINT [FK_Friendships_FriendUsers] FOREIGN KEY ([FriendUserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_Friendships_CanonicalPair] ON [dbo].[Friendships]([UserA] ASC, [UserB] ASC);
+    CREATE NONCLUSTERED INDEX [IX_Friendships_UserId_Status] ON [dbo].[Friendships]([UserId] ASC, [Status] ASC);
+    CREATE NONCLUSTERED INDEX [IX_Friendships_FriendUserId_Status] ON [dbo].[Friendships]([FriendUserId] ASC, [Status] ASC);
+END
+GO
+
+-- 10. UserBlocks (User blocking mechanism)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'UserBlocks')
+BEGIN
+    CREATE TABLE [dbo].[UserBlocks] (
+        [UserBlockId] INT IDENTITY(1,1) NOT NULL,
+        [BlockerUserId] INT NOT NULL,
+        [BlockedUserId] INT NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_UserBlocks_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_UserBlocks] PRIMARY KEY CLUSTERED ([UserBlockId] ASC),
+        CONSTRAINT [CK_UserBlocks_NoSelfBlock] CHECK ([BlockerUserId] <> [BlockedUserId]),
+        CONSTRAINT [FK_UserBlocks_Blocker] FOREIGN KEY ([BlockerUserId]) REFERENCES [dbo].[Users]([UserId]),
+        CONSTRAINT [FK_UserBlocks_Blocked] FOREIGN KEY ([BlockedUserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_UserBlocks_Blocker_Blocked] ON [dbo].[UserBlocks]([BlockerUserId] ASC, [BlockedUserId] ASC);
+END
+GO
+
+-- 11. BestieCircles (Private circles, max 9 members including owner enforced transactionally in service layer)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'BestieCircles')
+BEGIN
+    CREATE TABLE [dbo].[BestieCircles] (
+        [CircleId] INT IDENTITY(1,1) NOT NULL,
+        [CircleName] NVARCHAR(100) NOT NULL,
+        [Description] NVARCHAR(500) NULL,
+        [OwnerUserId] INT NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_BestieCircles_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [UpdatedAt] DATETIME2 NULL,
+        [IsActive] BIT NOT NULL CONSTRAINT [DF_BestieCircles_IsActive] DEFAULT 1,
+        CONSTRAINT [PK_BestieCircles] PRIMARY KEY CLUSTERED ([CircleId] ASC),
+        CONSTRAINT [FK_BestieCircles_Owner] FOREIGN KEY ([OwnerUserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_BestieCircles_OwnerUserId] ON [dbo].[BestieCircles]([OwnerUserId] ASC);
+    CREATE NONCLUSTERED INDEX [IX_BestieCircles_IsActive] ON [dbo].[BestieCircles]([IsActive] ASC);
+END
+GO
+
+-- 12. BestieCircleMembers (Circle membership & roles)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'BestieCircleMembers')
+BEGIN
+    CREATE TABLE [dbo].[BestieCircleMembers] (
+        [CircleMemberId] INT IDENTITY(1,1) NOT NULL,
+        [CircleId] INT NOT NULL,
+        [UserId] INT NOT NULL,
+        [RoleId] INT NOT NULL,
+        [JoinedAt] DATETIME2 NOT NULL CONSTRAINT [DF_BestieCircleMembers_JoinedAt] DEFAULT SYSUTCDATETIME(),
+        [IsActive] BIT NOT NULL CONSTRAINT [DF_BestieCircleMembers_IsActive] DEFAULT 1,
+        CONSTRAINT [PK_BestieCircleMembers] PRIMARY KEY CLUSTERED ([CircleMemberId] ASC),
+        CONSTRAINT [FK_BestieCircleMembers_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_BestieCircleMembers_User] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]),
+        CONSTRAINT [FK_BestieCircleMembers_Role] FOREIGN KEY ([RoleId]) REFERENCES [dbo].[Roles]([RoleId])
+    );
+
+    -- Prevents user from joining the same circle twice
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_BestieCircleMembers_CircleId_UserId] ON [dbo].[BestieCircleMembers]([CircleId] ASC, [UserId] ASC);
+    CREATE NONCLUSTERED INDEX [IX_BestieCircleMembers_CircleId_IsActive] ON [dbo].[BestieCircleMembers]([CircleId] ASC, [IsActive] ASC);
+    CREATE NONCLUSTERED INDEX [IX_BestieCircleMembers_UserId_IsActive] ON [dbo].[BestieCircleMembers]([UserId] ASC, [IsActive] ASC);
+END
+GO
+
+-- 13. CircleInvitations (Invitations to join circles)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CircleInvitations')
+BEGIN
+    CREATE TABLE [dbo].[CircleInvitations] (
+        [InvitationId] INT IDENTITY(1,1) NOT NULL,
+        [CircleId] INT NOT NULL,
+        [InviterUserId] INT NOT NULL,
+        [InviteeUserId] INT NOT NULL,
+        [Status] NVARCHAR(50) NOT NULL CONSTRAINT [DF_CircleInvitations_Status] DEFAULT 'Pending',
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_CircleInvitations_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [RespondedAt] DATETIME2 NULL,
+        CONSTRAINT [PK_CircleInvitations] PRIMARY KEY CLUSTERED ([InvitationId] ASC),
+        CONSTRAINT [CK_CircleInvitations_NoSelfInvite] CHECK ([InviterUserId] <> [InviteeUserId]),
+        CONSTRAINT [CK_CircleInvitations_ValidStatus] CHECK ([Status] IN ('Pending', 'Accepted', 'Declined', 'Cancelled')),
+        CONSTRAINT [FK_CircleInvitations_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_CircleInvitations_Inviter] FOREIGN KEY ([InviterUserId]) REFERENCES [dbo].[Users]([UserId]),
+        CONSTRAINT [FK_CircleInvitations_Invitee] FOREIGN KEY ([InviteeUserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_CircleInvitations_Circle_Invitee_Status] ON [dbo].[CircleInvitations]([CircleId] ASC, [InviteeUserId] ASC, [Status] ASC);
+END
+GO
+
+-- 14. ChatMessages (Upgraded with optional CircleId and SenderId, preserving existing 1-on-1 private clubhouse messages)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChatMessages')
+BEGIN
+    CREATE TABLE [dbo].[ChatMessages] (
+        [Id] INT IDENTITY(1,1) NOT NULL,
+        [CircleId] INT NULL,
+        [SenderId] INT NULL,
+        [SenderName] NVARCHAR(100) NOT NULL,
+        [MessageType] NVARCHAR(20) NOT NULL,
+        [Content] NVARCHAR(MAX) NULL,
+        [MediaUrl] NVARCHAR(1000) NULL,
+        [VoiceDurationSeconds] FLOAT NULL,
+        [Timestamp] DATETIME2 NOT NULL,
+        [IsRead] BIT NOT NULL CONSTRAINT [DF_ChatMessages_IsRead] DEFAULT 0,
+        [ReadAt] DATETIME2 NULL,
+        CONSTRAINT [PK_ChatMessages] PRIMARY KEY CLUSTERED ([Id] ASC),
+        CONSTRAINT [FK_ChatMessages_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE SET NULL,
+        CONSTRAINT [FK_ChatMessages_Sender] FOREIGN KEY ([SenderId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE SET NULL
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_ChatMessages_Circle_Timestamp] ON [dbo].[ChatMessages]([CircleId] ASC, [Timestamp] ASC);
+    CREATE NONCLUSTERED INDEX [IX_ChatMessages_Sender_Timestamp] ON [dbo].[ChatMessages]([SenderId] ASC, [Timestamp] ASC);
+    CREATE NONCLUSTERED INDEX [IX_ChatMessages_Timestamp] ON [dbo].[ChatMessages]([Timestamp] ASC);
+END
+ELSE
+BEGIN
+    -- Safe schema migration if ChatMessages already exists
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'CircleId')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [CircleId] INT NULL;
+        ALTER TABLE [dbo].[ChatMessages] ADD CONSTRAINT [FK_ChatMessages_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE SET NULL;
+        CREATE NONCLUSTERED INDEX [IX_ChatMessages_Circle_Timestamp] ON [dbo].[ChatMessages]([CircleId] ASC, [Timestamp] ASC);
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'SenderId')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [SenderId] INT NULL;
+        ALTER TABLE [dbo].[ChatMessages] ADD CONSTRAINT [FK_ChatMessages_Sender] FOREIGN KEY ([SenderId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE SET NULL;
+        CREATE NONCLUSTERED INDEX [IX_ChatMessages_Sender_Timestamp] ON [dbo].[ChatMessages]([SenderId] ASC, [Timestamp] ASC);
+    END
+END
+GO
+
+-- 15. ChatMessageReads (Read receipts unique per message and user)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChatMessageReads')
+BEGIN
+    CREATE TABLE [dbo].[ChatMessageReads] (
+        [ChatMessageReadId] INT IDENTITY(1,1) NOT NULL,
+        [ChatMessageId] INT NOT NULL,
+        [UserId] INT NOT NULL,
+        [ReadAt] DATETIME2 NOT NULL CONSTRAINT [DF_ChatMessageReads_ReadAt] DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_ChatMessageReads] PRIMARY KEY CLUSTERED ([ChatMessageReadId] ASC),
+        CONSTRAINT [FK_ChatMessageReads_Message] FOREIGN KEY ([ChatMessageId]) REFERENCES [dbo].[ChatMessages]([Id]) ON DELETE CASCADE,
+        CONSTRAINT [FK_ChatMessageReads_User] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_ChatMessageReads_Message_User] ON [dbo].[ChatMessageReads]([ChatMessageId] ASC, [UserId] ASC);
+END
+GO
+
+-- ==============================================================================
+-- 16. Seed Initial System Roles & Permissions (Phase 3 RBAC)
+-- ==============================================================================
+
+-- Seed Protected System Roles
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'SuperAdmin')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('SuperAdmin', 'Supreme administrator with full control over all system operations, roles, and staff', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Admin')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('Admin', 'System administrator capable of managing users, roles, and permissions', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'User')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('User', 'Default registered platform user with personal profile and social features', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Bestie')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('Bestie', 'VIP Bestie role with full access to private clubhouse features', 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Owner')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('Owner', 'Owner and creator of a Bestie Circle with circle administration rights', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Member')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('Member', 'Regular member of a Bestie Circle with chat and memory sharing rights', 0);
+GO
+
+-- Seed Standard Dynamic Permissions Catalog
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_VIEW', 'View user profiles and list platform members');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_CREATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_CREATE', 'Register or create new user accounts');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_UPDATE', 'Update user profiles and account details');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_DELETE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_DELETE', 'Delete or permanently remove user accounts');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_MANAGE', 'Full user administration, status activation, and account management');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'ROLE_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('ROLE_VIEW', 'View system and custom security roles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'ROLE_CREATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('ROLE_CREATE', 'Create new security and circle roles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'ROLE_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('ROLE_UPDATE', 'Modify role descriptions and names');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'ROLE_DELETE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('ROLE_DELETE', 'Delete custom non-system roles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'PERMISSION_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('PERMISSION_VIEW', 'View the global permission catalog and matrix');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'PERMISSION_ASSIGN')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('PERMISSION_ASSIGN', 'Assign or revoke permissions from security roles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_ROLE_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_ROLE_MANAGE', 'Assign or revoke roles from user accounts');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'FRIEND_REQUEST_SEND')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('FRIEND_REQUEST_SEND', 'Send friend requests to other users');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'FRIEND_REQUEST_ACCEPT')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('FRIEND_REQUEST_ACCEPT', 'Accept or decline received friend requests');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'FRIEND_REMOVE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('FRIEND_REMOVE', 'Remove friends or block users');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_CREATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_CREATE', 'Create new Bestie Circles (clubs)');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_VIEW', 'View circle details, member roster, and activities');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_UPDATE', 'Update circle name, description, and settings');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_DELETE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_DELETE', 'Disband or delete a Bestie Circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_MEMBER_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_MEMBER_MANAGE', 'Invite friends and manage circle member roles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_SEND')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_SEND', 'Send text, photo, voice notes, and stickers in chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_READ')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_READ', 'Read chat messages and send read receipts');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'MEMORY_CREATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('MEMORY_CREATE', 'Post new Polaroid memories to the gallery');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'MEMORY_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('MEMORY_UPDATE', 'Edit Polaroid memory captions and stickers');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'MEMORY_DELETE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('MEMORY_DELETE', 'Delete Polaroid memories from the gallery');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'SECRET_NOTE_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('SECRET_NOTE_MANAGE', 'Read, unlock, and manage secret envelope notes');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'SYSTEM_INFO_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('SYSTEM_INFO_VIEW', 'View system statistics, metrics, and audit logs');
+GO
+
+-- Seed RolePermissions (Grant ALL permissions to SuperAdmin role)
+DECLARE @SuperAdminRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'SuperAdmin');
+IF @SuperAdminRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @SuperAdminRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @SuperAdminRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant Admin permissions to Admin role)
+DECLARE @AdminRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'Admin');
+IF @AdminRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @AdminRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'USER_VIEW', 'USER_UPDATE', 'USER_MANAGE', 'ROLE_VIEW', 'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE',
+        'PERMISSION_VIEW', 'PERMISSION_ASSIGN', 'USER_ROLE_MANAGE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT',
+        'FRIEND_REMOVE', 'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE',
+        'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @AdminRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to User role)
+DECLARE @UserRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'User');
+IF @UserRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @UserRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @UserRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to Bestie VIP role)
+DECLARE @BestieRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'Bestie');
+IF @BestieRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @BestieRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @BestieRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to Owner role)
+DECLARE @OwnerRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'Owner');
+IF @OwnerRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @OwnerRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @OwnerRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to Member role)
+DECLARE @MemberRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'Member');
+IF @MemberRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @MemberRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN ('CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE')
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @MemberRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- ==============================================================================
+-- 17. RefreshTokens (Phase 2 JWT token rotation & revocation)
+-- ==============================================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'RefreshTokens')
+BEGIN
+    CREATE TABLE [dbo].[RefreshTokens] (
+        [RefreshTokenId] INT IDENTITY(1,1) NOT NULL,
+        [UserId] INT NOT NULL,
+        [TokenHash] NVARCHAR(256) NOT NULL,
+        [ExpiresAt] DATETIME2 NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_RefreshTokens_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [RevokedAt] DATETIME2 NULL,
+        [ReplacedByTokenHash] NVARCHAR(256) NULL,
+        CONSTRAINT [PK_RefreshTokens] PRIMARY KEY CLUSTERED ([RefreshTokenId] ASC),
+        CONSTRAINT [FK_RefreshTokens_Users] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE CASCADE
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_RefreshTokens_TokenHash] ON [dbo].[RefreshTokens]([TokenHash] ASC);
+    CREATE NONCLUSTERED INDEX [IX_RefreshTokens_UserId] ON [dbo].[RefreshTokens]([UserId] ASC);
+    CREATE NONCLUSTERED INDEX [IX_RefreshTokens_ExpiresAt] ON [dbo].[RefreshTokens]([ExpiresAt] ASC);
+END
+GO
+
+-- ==============================================================================
+-- 18. Assign Default 'User' Role to Any Unassigned Users
+-- ==============================================================================
+DECLARE @DefaultUserRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'User');
+IF @DefaultUserRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[UserRoles] ([UserId], [RoleId])
+    SELECT u.[UserId], @DefaultUserRoleId
+    FROM [dbo].[Users] u
+    WHERE NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserRoles] ur WHERE ur.[UserId] = u.[UserId]
+    );
+END
+GO
+
+-- ==============================================================================
+-- 19. Ensure Initial SuperAdmin Account
+-- ==============================================================================
+DECLARE @SuperAdminRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'SuperAdmin');
+IF @SuperAdminRoleId IS NOT NULL
+BEGIN
+    DECLARE @AdminTargetUserId INT = (SELECT TOP 1 [UserId] FROM [dbo].[Users] WHERE [RoleKey] = 'Me' OR [Username] = 'mochi_maker');
+    IF @AdminTargetUserId IS NULL
+        SET @AdminTargetUserId = (SELECT TOP 1 [UserId] FROM [dbo].[Users] ORDER BY [UserId] ASC);
+
+    IF @AdminTargetUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[UserRoles] WHERE [UserId] = @AdminTargetUserId AND [RoleId] = @SuperAdminRoleId)
+    BEGIN
+        INSERT INTO [dbo].[UserRoles] ([UserId], [RoleId]) VALUES (@AdminTargetUserId, @SuperAdminRoleId);
+    END
+END
+GO

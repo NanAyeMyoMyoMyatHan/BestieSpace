@@ -6,6 +6,9 @@ namespace BestieSpace.Client.Services;
 public interface IBestieApiClient
 {
     string ApiBaseUrl { get; }
+    string? CurrentBearerToken { get; }
+    void SetBearerToken(string? token);
+
     Task<DashboardDto> GetDashboardAsync();
     Task<MissYouResponse?> IncrementMissYouAsync();
     Task<MemoryDto?> AddMemoryAsync(MultipartFormDataContent content);
@@ -14,10 +17,28 @@ public interface IBestieApiClient
     Task<ChatMessageDto?> SendTextOrStickerAsync(SendTextOrStickerRequest request);
     Task<ChatMessageDto?> UploadPhotoAsync(MultipartFormDataContent content);
     Task<bool> MarkMessagesReadAsync(MarkMessagesReadRequest request);
+    Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request);
     Task<AuthResponseDto> LoginAsync(LoginRequestDto request);
+    Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request);
+    Task<AuthResponseDto> RevokeTokenAsync(RevokeTokenRequestDto? request = null);
     Task<AuthResponseDto> PinLoginAsync(PinLoginRequestDto request);
     Task<PasswordHintDto> GetPasswordHintAsync(string? username = null);
     Task<UserPresenceDto?> GetPresenceAsync(string roleKey);
+
+    // Dynamic RBAC APIs (Phase 3)
+    Task<List<string>> GetMyPermissionsAsync();
+    Task<List<RoleDto>> GetRolesAsync();
+    Task<RoleDetailDto?> GetRoleByIdAsync(int roleId);
+    Task<RoleDetailDto?> CreateRoleAsync(CreateRoleRequestDto request);
+    Task<RoleDetailDto?> UpdateRoleAsync(int roleId, UpdateRoleRequestDto request);
+    Task<RbacOperationResultDto> DeleteRoleAsync(int roleId);
+    Task<RoleDetailDto?> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequestDto request);
+    Task<List<PermissionDto>> GetPermissionsAsync();
+    Task<List<PermissionDto>> GetRolePermissionsAsync(int roleId);
+    Task<List<UserRoleDto>> GetUsersWithRolesAsync();
+    Task<UserRoleDto?> GetUserRolesDetailAsync(int userId);
+    Task<RbacOperationResultDto> AssignRoleToUserAsync(int userId, int roleId);
+    Task<RbacOperationResultDto> RemoveRoleFromUserAsync(int userId, int roleId);
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -26,8 +47,23 @@ public class BestieApiClient : IBestieApiClient
     private readonly IConfiguration _config;
     private readonly ILogger<BestieApiClient> _logger;
     private readonly string _baseUrl;
+    private string? _bearerToken;
 
     public string ApiBaseUrl => _baseUrl;
+    public string? CurrentBearerToken => _bearerToken;
+
+    public void SetBearerToken(string? token)
+    {
+        _bearerToken = token;
+        if (!string.IsNullOrWhiteSpace(token))
+        {
+            _http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            _http.DefaultRequestHeaders.Authorization = null;
+        }
+    }
 
     public BestieApiClient(HttpClient http, IConfiguration config, ILogger<BestieApiClient> logger)
     {
@@ -169,6 +205,33 @@ public class BestieApiClient : IBestieApiClient
         }
     }
 
+    public async Task<AuthResponseDto> RegisterAsync(RegisterRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/auth/register", request);
+            var content = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
+            if (content != null)
+            {
+                if (content.IsSuccess && !string.IsNullOrWhiteSpace(content.AccessToken))
+                {
+                    SetBearerToken(content.AccessToken);
+                }
+                return content;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Registration request failed.");
+        }
+
+        return new AuthResponseDto
+        {
+            IsSuccess = false,
+            Message = "Unable to connect to the BestieSpace server. Please ensure the API is running."
+        };
+    }
+
     public async Task<AuthResponseDto> LoginAsync(LoginRequestDto request)
     {
         try
@@ -177,53 +240,71 @@ public class BestieApiClient : IBestieApiClient
             var content = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
             if (content != null)
             {
+                if (content.IsSuccess && !string.IsNullOrWhiteSpace(content.AccessToken))
+                {
+                    SetBearerToken(content.AccessToken);
+                }
                 return content;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Auth API request failed, evaluating offline fallback credentials.");
-        }
-
-        // Offline client fallback
-        var clean = request.Username?.Trim().ToLowerInvariant();
-        if (clean == "strawberry_bestie" && request.Password?.Trim() == "missyou3000!")
-        {
-            return new AuthResponseDto
-            {
-                IsSuccess = true,
-                Message = "Welcome back, Sweet Bestie! 💖",
-                User = new UserSessionDto
-                {
-                    Id = 1,
-                    Username = "strawberry_bestie",
-                    DisplayName = "Sweet Bestie 🌸",
-                    RoleKey = "Bestie",
-                    AvatarSticker = "🌸"
-                }
-            };
-        }
-        if (clean == "mochi_maker" && request.Password?.Trim() == "bestie4ever!")
-        {
-            return new AuthResponseDto
-            {
-                IsSuccess = true,
-                Message = "Welcome back, Bestie Creator! 🎀",
-                User = new UserSessionDto
-                {
-                    Id = 2,
-                    Username = "mochi_maker",
-                    DisplayName = "Your Bestie 🎀",
-                    RoleKey = "Me",
-                    AvatarSticker = "🎀"
-                }
-            };
+            _logger.LogError(ex, "Login API request failed.");
         }
 
         return new AuthResponseDto
         {
             IsSuccess = false,
-            Message = "Oopsie! Wrong secret code 🥺 Try again!"
+            Message = "Unable to connect to the BestieSpace server. Please check your connection."
+        };
+    }
+
+    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/auth/refresh-token", request);
+            var content = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
+            if (content != null)
+            {
+                if (content.IsSuccess && !string.IsNullOrWhiteSpace(content.AccessToken))
+                {
+                    SetBearerToken(content.AccessToken);
+                }
+                return content;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Refresh token request failed.");
+        }
+
+        return new AuthResponseDto
+        {
+            IsSuccess = false,
+            Message = "Failed to refresh token."
+        };
+    }
+
+    public async Task<AuthResponseDto> RevokeTokenAsync(RevokeTokenRequestDto? request = null)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/auth/revoke-token", request ?? new RevokeTokenRequestDto());
+            var content = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
+            SetBearerToken(null);
+            if (content != null) return content;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Revoke token request failed.");
+        }
+
+        SetBearerToken(null);
+        return new AuthResponseDto
+        {
+            IsSuccess = true,
+            Message = "Logged out successfully."
         };
     }
 
@@ -265,53 +346,24 @@ public class BestieApiClient : IBestieApiClient
         {
             var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/auth/pin-login", request);
             var content = await res.Content.ReadFromJsonAsync<AuthResponseDto>();
-            if (content != null) return content;
+            if (content != null)
+            {
+                if (content.IsSuccess && !string.IsNullOrWhiteSpace(content.AccessToken))
+                {
+                    SetBearerToken(content.AccessToken);
+                }
+                return content;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "PIN Login API request failed, testing offline PIN fallback.");
-        }
-
-        var cleanPin = request.PinCode?.Trim();
-        if (cleanPin == "3000")
-        {
-            return new AuthResponseDto
-            {
-                IsSuccess = true,
-                Message = "Strawberry PIN accepted! Welcome, Sweet Bestie! 🍓💖",
-                User = new UserSessionDto
-                {
-                    Id = 1,
-                    Username = "strawberry_bestie",
-                    DisplayName = "Sweet Bestie 🌸",
-                    RoleKey = "Bestie",
-                    AvatarSticker = "🌸",
-                    QuickPin = "3000"
-                }
-            };
-        }
-        if (cleanPin == "4040")
-        {
-            return new AuthResponseDto
-            {
-                IsSuccess = true,
-                Message = "Strawberry PIN accepted! Welcome, Creator Bestie! 🍓🎀",
-                User = new UserSessionDto
-                {
-                    Id = 2,
-                    Username = "mochi_maker",
-                    DisplayName = "Your Bestie 🎀",
-                    RoleKey = "Me",
-                    AvatarSticker = "🎀",
-                    QuickPin = "4040"
-                }
-            };
+            _logger.LogError(ex, "PIN Login API request failed.");
         }
 
         return new AuthResponseDto
         {
             IsSuccess = false,
-            Message = "Oopsie! Wrong strawberry PIN 🍓🥺 Try again!"
+            Message = "Unable to connect to the BestieSpace server. Please check your connection."
         };
     }
 
@@ -336,6 +388,226 @@ public class BestieApiClient : IBestieApiClient
             IsOnline = false,
             LastSeenAt = DateTime.UtcNow.AddMinutes(-10)
         };
+    }
+
+    // =========================================================================
+    // DYNAMIC RBAC API CLIENT IMPLEMENTATIONS (PHASE 3)
+    // =========================================================================
+
+    public async Task<List<string>> GetMyPermissionsAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<string>>("/api/rbac/my-permissions");
+            return res ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get current user permissions.");
+            return new List<string>();
+        }
+    }
+
+    public async Task<List<RoleDto>> GetRolesAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<RoleDto>>("/api/rbac/roles");
+            return res ?? new List<RoleDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load roles from API.");
+            return new List<RoleDto>();
+        }
+    }
+
+    public async Task<RoleDetailDto?> GetRoleByIdAsync(int roleId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<RoleDetailDto>($"/api/rbac/roles/{roleId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get role details for ID {RoleId}", roleId);
+            return null;
+        }
+    }
+
+    public async Task<RoleDetailDto?> CreateRoleAsync(CreateRoleRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("/api/rbac/roles", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<RoleDetailDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to create role: {Error}", err);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating role {RoleName}", request.RoleName);
+            return null;
+        }
+    }
+
+    public async Task<RoleDetailDto?> UpdateRoleAsync(int roleId, UpdateRoleRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"/api/rbac/roles/{roleId}", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<RoleDetailDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to update role: {Error}", err);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating role ID {RoleId}", roleId);
+            return null;
+        }
+    }
+
+    public async Task<RbacOperationResultDto> DeleteRoleAsync(int roleId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/rbac/roles/{roleId}");
+            if (res.IsSuccessStatusCode)
+            {
+                var ok = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+                return ok ?? new RbacOperationResultDto { IsSuccess = true, Message = "Role deleted successfully." };
+            }
+            var err = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+            return err ?? new RbacOperationResultDto { IsSuccess = false, Message = "Failed to delete role." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting role {RoleId}", roleId);
+            return new RbacOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<RoleDetailDto?> UpdateRolePermissionsAsync(int roleId, UpdateRolePermissionsRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"/api/rbac/roles/{roleId}/permissions", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<RoleDetailDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to update role permissions: {Error}", err);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating permissions for role {RoleId}", roleId);
+            return null;
+        }
+    }
+
+    public async Task<List<PermissionDto>> GetPermissionsAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<PermissionDto>>("/api/rbac/permissions");
+            return res ?? new List<PermissionDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load permissions from API.");
+            return new List<PermissionDto>();
+        }
+    }
+
+    public async Task<List<PermissionDto>> GetRolePermissionsAsync(int roleId)
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<PermissionDto>>($"/api/rbac/roles/{roleId}/permissions");
+            return res ?? new List<PermissionDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load permissions for role {RoleId}", roleId);
+            return new List<PermissionDto>();
+        }
+    }
+
+    public async Task<List<UserRoleDto>> GetUsersWithRolesAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<UserRoleDto>>("/api/rbac/users");
+            return res ?? new List<UserRoleDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load users with roles.");
+            return new List<UserRoleDto>();
+        }
+    }
+
+    public async Task<UserRoleDto?> GetUserRolesDetailAsync(int userId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<UserRoleDto>($"/api/rbac/users/{userId}/roles");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user role details for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    public async Task<RbacOperationResultDto> AssignRoleToUserAsync(int userId, int roleId)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/rbac/users/{userId}/roles", new AssignUserRoleRequestDto { RoleId = roleId });
+            if (res.IsSuccessStatusCode)
+            {
+                var ok = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+                return ok ?? new RbacOperationResultDto { IsSuccess = true, Message = "Role assigned successfully." };
+            }
+            var err = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+            return err ?? new RbacOperationResultDto { IsSuccess = false, Message = "Failed to assign role." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning role {RoleId} to user {UserId}", roleId, userId);
+            return new RbacOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<RbacOperationResultDto> RemoveRoleFromUserAsync(int userId, int roleId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/rbac/users/{userId}/roles/{roleId}");
+            if (res.IsSuccessStatusCode)
+            {
+                var ok = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+                return ok ?? new RbacOperationResultDto { IsSuccess = true, Message = "Role removed successfully." };
+            }
+            var err = await res.Content.ReadFromJsonAsync<RbacOperationResultDto>();
+            return err ?? new RbacOperationResultDto { IsSuccess = false, Message = "Failed to remove role." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing role {RoleId} from user {UserId}", roleId, userId);
+            return new RbacOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
     }
 
     private static List<ChatMessageDto> CreateFallbackMessages()

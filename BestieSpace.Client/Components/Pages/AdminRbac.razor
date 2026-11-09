@@ -1,0 +1,1624 @@
+@page "/admin/rbac"
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
+@inject NavigationManager Navigation
+@inject BestieAuthenticationStateProvider AuthProvider
+@inject IBestieApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Admin RBAC Console 👑 | BestieSpace</PageTitle>
+
+<div class="rbac-container">
+    <div class="rbac-header-card">
+        <div class="header-content">
+            <div class="header-icon">👑</div>
+            <div class="header-titles">
+                <h1 class="header-title">BestieSpace Access & Permissions Console</h1>
+                <p class="header-subtitle">Dynamic Database-Driven Role & Permission Management 🌸</p>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <button class="kawaii-btn btn-secondary" @onclick="GoBackToClubhouse">
+                🏠 Back to Clubhouse
+            </button>
+            <button class="kawaii-btn btn-primary" @onclick="LoadAllDataAsync">
+                🔄 Refresh Data
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(globalSuccessMessage))
+    {
+        <div class="rbac-alert alert-success">
+            <span class="alert-icon">✨</span>
+            <span>@globalSuccessMessage</span>
+            <button class="alert-close-btn" @onclick='() => globalSuccessMessage = null'>✕</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(globalErrorMessage))
+    {
+        <div class="rbac-alert alert-error">
+            <span class="alert-icon">🥺</span>
+            <span>@globalErrorMessage</span>
+            <button class="alert-close-btn" @onclick='() => globalErrorMessage = null'>✕</button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="rbac-loading-box">
+            <div class="loading-spinner">🎀</div>
+            <p>Loading security roles & permissions...</p>
+        </div>
+    }
+    else if (!isAuthorizedToView)
+    {
+        <div class="access-denied-card">
+            <div class="denied-icon">🧸🔒</div>
+            <h2>Clubhouse Restricted Area</h2>
+            <p>You need administrative permissions (<code>ROLE_VIEW</code> or <code>USER_MANAGE</code>) to access the RBAC Console.</p>
+            <button class="kawaii-btn btn-primary" @onclick="GoBackToClubhouse">Back to Safety 🌸</button>
+        </div>
+    }
+    else
+    {
+        <!-- Tab Navigation -->
+        <div class="rbac-tab-bar">
+            <button class="rbac-tab-btn @(activeTab == "roles" ? "active" : "")" @onclick='() => SetTab("roles")'>
+                👑 Roles (@roles.Count)
+            </button>
+            <button class="rbac-tab-btn @(activeTab == "matrix" ? "active" : "")" @onclick='() => SetTab("matrix")'>
+                🧩 Role Permissions Matrix
+            </button>
+            <button class="rbac-tab-btn @(activeTab == "users" ? "active" : "")" @onclick='() => SetTab("users")'>
+                👥 User Assignments (@usersWithRoles.Count)
+            </button>
+            <button class="rbac-tab-btn @(activeTab == "catalog" ? "active" : "")" @onclick='() => SetTab("catalog")'>
+                📜 Permission Catalog (@allPermissions.Count)
+            </button>
+        </div>
+
+        <!-- TAB 1: ROLES MANAGEMENT -->
+        @if (activeTab == "roles")
+        {
+            <div class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2 class="pane-title">System & Custom Roles</h2>
+                        <p class="pane-sub">Manage system roles and custom community roles</p>
+                    </div>
+                    @if (canCreateRole)
+                    {
+                        <button class="kawaii-btn btn-add" @onclick="OpenCreateRoleModal">
+                            ➕ Create New Role
+                        </button>
+                    }
+                </div>
+
+                <div class="roles-grid">
+                    @foreach (var role in roles)
+                    {
+                        <div class="role-card @(role.IsSystemRole ? "system-role" : "")">
+                            <div class="role-card-header">
+                                <div class="role-badge-row">
+                                    <span class="role-icon">@(role.RoleName == "SuperAdmin" ? "👑" : role.RoleName == "Admin" ? "⭐" : "🌸")</span>
+                                    <h3 class="role-name">@role.RoleName</h3>
+                                    @if (role.IsSystemRole)
+                                    {
+                                        <span class="pill-system">🔒 System Role</span>
+                                    }
+                                </div>
+                                <span class="member-count-pill">👥 @role.UserCount active users</span>
+                            </div>
+
+                            <p class="role-desc">@(string.IsNullOrWhiteSpace(role.Description) ? "No description provided." : role.Description)</p>
+
+                            <div class="role-perms-summary">
+                                <strong>Active Permissions (@role.Permissions.Count):</strong>
+                                <div class="perm-pill-list">
+                                    @foreach (var p in role.Permissions.Take(6))
+                                    {
+                                        <span class="perm-pill">@p</span>
+                                    }
+                                    @if (role.Permissions.Count > 6)
+                                    {
+                                        <span class="perm-pill-more">+@(role.Permissions.Count - 6) more</span>
+                                    }
+                                    @if (!role.Permissions.Any())
+                                    {
+                                        <span class="no-perms-text">No permissions currently mapped</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="role-card-footer">
+                                <button class="kawaii-btn btn-outline" @onclick="() => SelectRoleForMatrix(role.RoleId)">
+                                    🧩 Edit Permissions
+                                </button>
+                                @if (canUpdateRole)
+                                {
+                                    <button class="kawaii-btn btn-outline" @onclick="() => OpenEditRoleModal(role)">
+                                        ✏️ Edit
+                                    </button>
+                                }
+                                @if (canDeleteRole && !role.IsSystemRole)
+                                {
+                                    <button class="kawaii-btn btn-delete" @onclick="() => ConfirmDeleteRole(role)">
+                                        🗑️ Delete
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- TAB 2: ROLE PERMISSION MATRIX -->
+        @if (activeTab == "matrix")
+        {
+            <div class="tab-pane">
+                <div class="matrix-role-selector">
+                    <label class="selector-label">Select Target Role to Configure:</label>
+                    <div class="role-pill-select-group">
+                        @foreach (var r in roles)
+                        {
+                            <button type="button" 
+                                    class="role-select-pill @(selectedRoleId == r.RoleId ? "selected" : "")" 
+                                    @onclick="() => OnMatrixRoleChanged(r.RoleId)">
+                                @(r.RoleName == "SuperAdmin" ? "👑" : r.RoleName == "Admin" ? "⭐" : "🌸") @r.RoleName
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                @if (selectedRoleDetail != null)
+                {
+                    <div class="matrix-card">
+                        <div class="matrix-header">
+                            <div>
+                                <h3 class="matrix-title">Permissions for <strong>@selectedRoleDetail.RoleName</strong></h3>
+                                <p class="matrix-sub">Check or uncheck permissions to grant or revoke dynamically in real-time.</p>
+                            </div>
+
+                            <div class="matrix-actions">
+                                <button class="kawaii-btn btn-secondary btn-sm" @onclick="SelectAllMatrixPermissions">
+                                    ✅ Select All
+                                </button>
+                                <button class="kawaii-btn btn-secondary btn-sm" @onclick="DeselectAllMatrixPermissions">
+                                    ❌ Deselect All
+                                </button>
+                                @if (canAssignPermissions)
+                                {
+                                    <button class="kawaii-btn btn-primary" @onclick="SaveMatrixPermissionsAsync" disabled="@isSavingMatrix">
+                                        @(isSavingMatrix ? "Saving..." : "💾 Save Role Permissions")
+                                    </button>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Categorized Permissions Grid -->
+                        <div class="permission-categories">
+                            @foreach (var group in allPermissions.GroupBy(p => p.Category).OrderBy(g => g.Key))
+                            {
+                                <div class="perm-category-card">
+                                    <div class="category-header">
+                                        <span class="category-badge">🏷️ @group.Key</span>
+                                        <span class="category-count">@group.Count() permissions</span>
+                                    </div>
+
+                                    <div class="permission-checkboxes-grid">
+                                        @foreach (var perm in group)
+                                        {
+                                            var isChecked = matrixSelectedCodes.Contains(perm.PermissionCode);
+                                            <label class="checkbox-row @(isChecked ? "checked" : "")">
+                                                <input type="checkbox" 
+                                                       checked="@isChecked" 
+                                                       @onchange="(e) => TogglePermissionCheckbox(perm.PermissionCode, e.Value)" />
+                                                <div class="perm-info">
+                                                    <div class="code-title"><code>@perm.PermissionCode</code></div>
+                                                    <div class="code-desc">@perm.Description</div>
+                                                </div>
+                                            </label>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- TAB 3: USER ROLES ASSIGNMENT -->
+        @if (activeTab == "users")
+        {
+            <div class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2 class="pane-title">User Account Roles</h2>
+                        <p class="pane-sub">Assign or remove roles for clubhouse members</p>
+                    </div>
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Search members by username or email..." @bind="userSearchFilter" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <div class="users-table-container">
+                    <table class="kawaii-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Assigned Roles</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in FilteredUsers)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="user-cell">
+                                            <span class="user-avatar">@(string.IsNullOrWhiteSpace(u.AvatarSticker) ? "🌸" : u.AvatarSticker)</span>
+                                            <div>
+                                                <div class="user-name">@u.DisplayName</div>
+                                                <div class="user-handle">@@@u.Username (ID: @u.UserId)</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>@(string.IsNullOrWhiteSpace(u.Email) ? "—" : u.Email)</td>
+                                    <td>
+                                        <span class="status-pill @(u.IsActive ? "active" : "inactive")">
+                                            @(u.IsActive ? "Active ✨" : "Deactivated 💤")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="user-roles-list">
+                                            @foreach (var r in u.Roles)
+                                            {
+                                                <span class="user-role-pill">
+                                                    @(r.RoleName == "SuperAdmin" ? "👑" : r.RoleName == "Admin" ? "⭐" : "🌸") @r.RoleName
+                                                    @if (canManageUserRoles)
+                                                    {
+                                                        <button class="pill-remove-btn" 
+                                                                title="Remove role" 
+                                                                @onclick="() => RemoveRoleFromUser(u.UserId, r.RoleId, r.RoleName)">✕</button>
+                                                    }
+                                                </span>
+                                            }
+                                            @if (!u.Roles.Any())
+                                            {
+                                                <span class="no-roles-warning">⚠️ No roles assigned</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if (canManageUserRoles)
+                                        {
+                                            <button class="kawaii-btn btn-sm btn-outline" @onclick="() => OpenAssignRoleModal(u)">
+                                                ➕ Add Role
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- TAB 4: PERMISSION CATALOG -->
+        @if (activeTab == "catalog")
+        {
+            <div class="tab-pane">
+                <div class="pane-header">
+                    <div>
+                        <h2 class="pane-title">Permissions Catalog</h2>
+                        <p class="pane-sub">Standardized uppercase authorization permissions catalog</p>
+                    </div>
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" placeholder="Filter permission codes..." @bind="permSearchFilter" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <div class="perm-catalog-grid">
+                    @foreach (var perm in FilteredCatalog)
+                    {
+                        <div class="catalog-card">
+                            <div class="catalog-card-header">
+                                <code class="perm-code-badge">@perm.PermissionCode</code>
+                                <span class="category-tag">@perm.Category</span>
+                            </div>
+                            <p class="catalog-desc">@perm.Description</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: CREATE NEW ROLE -->
+<!-- ========================================================================= -->
+@if (showCreateRoleModal)
+{
+    <div class="kawaii-modal-backdrop" @onclick="CloseCreateRoleModal">
+        <div class="kawaii-modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>🎀 Create New Role</h3>
+                <button class="modal-close-btn" @onclick="CloseCreateRoleModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Role Name *</label>
+                    <input type="text" placeholder="e.g. Moderator, EventHost" @bind="newRoleName" />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea rows="3" placeholder="Briefly describe what this role can do..." @bind="newRoleDescription"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="kawaii-btn btn-secondary" @onclick="CloseCreateRoleModal">Cancel</button>
+                <button class="kawaii-btn btn-primary" @onclick="SubmitCreateRoleAsync" disabled="@isSubmittingModal">
+                    @(isSubmittingModal ? "Creating..." : "✨ Create Role")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT ROLE -->
+<!-- ========================================================================= -->
+@if (showEditRoleModal && editingRole != null)
+{
+    <div class="kawaii-modal-backdrop" @onclick="CloseEditRoleModal">
+        <div class="kawaii-modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>✏️ Edit Role: @editingRole.RoleName</h3>
+                <button class="modal-close-btn" @onclick="CloseEditRoleModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Role Name *</label>
+                    <input type="text" @bind="editRoleName" disabled="@editingRole.IsSystemRole" />
+                    @if (editingRole.IsSystemRole)
+                    {
+                        <span class="input-hint">🔒 System role names cannot be renamed.</span>
+                    }
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea rows="3" @bind="editRoleDescription"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="kawaii-btn btn-secondary" @onclick="CloseEditRoleModal">Cancel</button>
+                <button class="kawaii-btn btn-primary" @onclick="SubmitEditRoleAsync" disabled="@isSubmittingModal">
+                    @(isSubmittingModal ? "Saving..." : "💾 Save Changes")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- MODAL: ASSIGN ROLE TO USER -->
+<!-- ========================================================================= -->
+@if (showAssignRoleModal && targetUser != null)
+{
+    <div class="kawaii-modal-backdrop" @onclick="CloseAssignRoleModal">
+        <div class="kawaii-modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>👑 Assign Role to @targetUser.DisplayName</h3>
+                <button class="modal-close-btn" @onclick="CloseAssignRoleModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>Select a role to assign to <strong>@@@targetUser.Username</strong>:</p>
+                <div class="form-group">
+                    <label>Select Role:</label>
+                    <select @bind="selectedRoleToAssign">
+                        <option value="0">-- Choose Role --</option>
+                        @foreach (var r in roles)
+                        {
+                            var alreadyAssigned = targetUser.Roles.Any(ur => ur.RoleId == r.RoleId);
+                            <option value="@r.RoleId" disabled="@alreadyAssigned">
+                                @r.RoleName @(alreadyAssigned ? "(Already Assigned)" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="kawaii-btn btn-secondary" @onclick="CloseAssignRoleModal">Cancel</button>
+                <button class="kawaii-btn btn-primary" @onclick="SubmitAssignRoleAsync" disabled="@(selectedRoleToAssign <= 0 || isSubmittingModal)">
+                    @(isSubmittingModal ? "Assigning..." : "✨ Assign Role")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string activeTab = "roles";
+    private bool isLoading = true;
+    private bool isAuthorizedToView = false;
+    private string? globalSuccessMessage;
+    private string? globalErrorMessage;
+
+    // RBAC Permissions for current user
+    private bool canCreateRole = false;
+    private bool canUpdateRole = false;
+    private bool canDeleteRole = false;
+    private bool canAssignPermissions = false;
+    private bool canManageUserRoles = false;
+
+    // Data lists
+    private List<RoleDto> roles = new();
+    private List<PermissionDto> allPermissions = new();
+    private List<UserRoleDto> usersWithRoles = new();
+
+    // Search filters
+    private string userSearchFilter = string.Empty;
+    private string permSearchFilter = string.Empty;
+
+    // Matrix tab state
+    private int selectedRoleId = 0;
+    private RoleDetailDto? selectedRoleDetail;
+    private HashSet<string> matrixSelectedCodes = new(StringComparer.OrdinalIgnoreCase);
+    private bool isSavingMatrix = false;
+
+    // Modals state
+    private bool showCreateRoleModal = false;
+    private string newRoleName = string.Empty;
+    private string newRoleDescription = string.Empty;
+
+    private bool showEditRoleModal = false;
+    private RoleDto? editingRole;
+    private string editRoleName = string.Empty;
+    private string editRoleDescription = string.Empty;
+
+    private bool showAssignRoleModal = false;
+    private UserRoleDto? targetUser;
+    private int selectedRoleToAssign = 0;
+
+    private bool isSubmittingModal = false;
+
+    private IEnumerable<UserRoleDto> FilteredUsers =>
+        string.IsNullOrWhiteSpace(userSearchFilter)
+            ? usersWithRoles
+            : usersWithRoles.Where(u =>
+                (u.Username?.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (u.DisplayName?.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (u.Email?.Contains(userSearchFilter, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private IEnumerable<PermissionDto> FilteredCatalog =>
+        string.IsNullOrWhiteSpace(permSearchFilter)
+            ? allPermissions
+            : allPermissions.Where(p =>
+                p.PermissionCode.Contains(permSearchFilter, StringComparison.OrdinalIgnoreCase) ||
+                (p.Description?.Contains(permSearchFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                p.Category.Contains(permSearchFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAccessAndLoadDataAsync();
+    }
+
+    private async Task CheckAccessAndLoadDataAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user?.Identity?.IsAuthenticated != true)
+            {
+                Navigation.NavigateTo("/login");
+                return;
+            }
+
+            // Sync latest permissions directly from API
+            await AuthProvider.RefreshUserPermissionsAsync();
+
+            canCreateRole = AuthProvider.HasPermission("ROLE_CREATE");
+            canUpdateRole = AuthProvider.HasPermission("ROLE_UPDATE");
+            canDeleteRole = AuthProvider.HasPermission("ROLE_DELETE");
+            canAssignPermissions = AuthProvider.HasPermission("PERMISSION_ASSIGN");
+            canManageUserRoles = AuthProvider.HasPermission("USER_ROLE_MANAGE");
+
+            var hasRoleView = AuthProvider.HasPermission("ROLE_VIEW");
+            var hasUserView = AuthProvider.HasPermission("USER_VIEW");
+            var isSuperAdmin = AuthProvider.HasRole("SuperAdmin");
+
+            isAuthorizedToView = hasRoleView || hasUserView || isSuperAdmin;
+
+            if (isAuthorizedToView)
+            {
+                await LoadAllDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error initializing permissions console: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAllDataAsync()
+    {
+        isLoading = true;
+        globalErrorMessage = null;
+        try
+        {
+            var rolesTask = ApiClient.GetRolesAsync();
+            var permsTask = ApiClient.GetPermissionsAsync();
+            var usersTask = ApiClient.GetUsersWithRolesAsync();
+
+            await Task.WhenAll(rolesTask, permsTask, usersTask);
+
+            roles = await rolesTask;
+            allPermissions = await permsTask;
+            usersWithRoles = await usersTask;
+
+            if (selectedRoleId == 0 && roles.Any())
+            {
+                selectedRoleId = roles.First().RoleId;
+            }
+
+            if (selectedRoleId > 0)
+            {
+                await LoadRoleMatrixDetailsAsync(selectedRoleId);
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Failed to load RBAC data: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        globalSuccessMessage = null;
+        globalErrorMessage = null;
+    }
+
+    private void GoBackToClubhouse()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    // =========================================================================
+    // MATRIX TAB LOGIC
+    // =========================================================================
+
+    private async Task SelectRoleForMatrix(int roleId)
+    {
+        selectedRoleId = roleId;
+        await LoadRoleMatrixDetailsAsync(roleId);
+        SetTab("matrix");
+    }
+
+    private async Task OnMatrixRoleChanged(int roleId)
+    {
+        selectedRoleId = roleId;
+        await LoadRoleMatrixDetailsAsync(roleId);
+    }
+
+    private async Task LoadRoleMatrixDetailsAsync(int roleId)
+    {
+        selectedRoleDetail = await ApiClient.GetRoleByIdAsync(roleId);
+        matrixSelectedCodes.Clear();
+
+        if (selectedRoleDetail != null)
+        {
+            foreach (var p in selectedRoleDetail.Permissions)
+            {
+                matrixSelectedCodes.Add(p.PermissionCode);
+            }
+        }
+    }
+
+    private void TogglePermissionCheckbox(string code, object? checkedValue)
+    {
+        var isChecked = checkedValue is bool b && b;
+        if (isChecked)
+        {
+            matrixSelectedCodes.Add(code);
+        }
+        else
+        {
+            matrixSelectedCodes.Remove(code);
+        }
+    }
+
+    private void SelectAllMatrixPermissions()
+    {
+        foreach (var p in allPermissions)
+        {
+            matrixSelectedCodes.Add(p.PermissionCode);
+        }
+    }
+
+    private void DeselectAllMatrixPermissions()
+    {
+        matrixSelectedCodes.Clear();
+    }
+
+    private async Task SaveMatrixPermissionsAsync()
+    {
+        if (selectedRoleId <= 0) return;
+
+        isSavingMatrix = true;
+        globalErrorMessage = null;
+        globalSuccessMessage = null;
+
+        try
+        {
+            var req = new UpdateRolePermissionsRequestDto
+            {
+                PermissionCodes = matrixSelectedCodes.ToList()
+            };
+
+            var updated = await ApiClient.UpdateRolePermissionsAsync(selectedRoleId, req);
+            if (updated != null)
+            {
+                globalSuccessMessage = $"✨ Permissions successfully updated for role '{updated.RoleName}'!";
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = "Failed to update role permissions. Check server logs.";
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error updating role permissions: {ex.Message}";
+        }
+        finally
+        {
+            isSavingMatrix = false;
+        }
+    }
+
+    // =========================================================================
+    // CREATE ROLE MODAL
+    // =========================================================================
+
+    private void OpenCreateRoleModal()
+    {
+        newRoleName = string.Empty;
+        newRoleDescription = string.Empty;
+        showCreateRoleModal = true;
+    }
+
+    private void CloseCreateRoleModal()
+    {
+        showCreateRoleModal = false;
+    }
+
+    private async Task SubmitCreateRoleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newRoleName))
+        {
+            globalErrorMessage = "Please provide a role name.";
+            return;
+        }
+
+        isSubmittingModal = true;
+        try
+        {
+            var created = await ApiClient.CreateRoleAsync(new CreateRoleRequestDto
+            {
+                RoleName = newRoleName.Trim(),
+                Description = newRoleDescription?.Trim()
+            });
+
+            if (created != null)
+            {
+                globalSuccessMessage = $"✨ Role '{created.RoleName}' created successfully!";
+                CloseCreateRoleModal();
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = "Failed to create role. It may already exist or role name is invalid.";
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error creating role: {ex.Message}";
+        }
+        finally
+        {
+            isSubmittingModal = false;
+        }
+    }
+
+    // =========================================================================
+    // EDIT ROLE MODAL
+    // =========================================================================
+
+    private void OpenEditRoleModal(RoleDto role)
+    {
+        editingRole = role;
+        editRoleName = role.RoleName;
+        editRoleDescription = role.Description ?? string.Empty;
+        showEditRoleModal = true;
+    }
+
+    private void CloseEditRoleModal()
+    {
+        showEditRoleModal = false;
+        editingRole = null;
+    }
+
+    private async Task SubmitEditRoleAsync()
+    {
+        if (editingRole == null) return;
+
+        isSubmittingModal = true;
+        try
+        {
+            var updated = await ApiClient.UpdateRoleAsync(editingRole.RoleId, new UpdateRoleRequestDto
+            {
+                RoleName = editRoleName.Trim(),
+                Description = editRoleDescription?.Trim()
+            });
+
+            if (updated != null)
+            {
+                globalSuccessMessage = $"✨ Role '{updated.RoleName}' updated successfully!";
+                CloseEditRoleModal();
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = "Failed to update role. Please verify your inputs.";
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error updating role: {ex.Message}";
+        }
+        finally
+        {
+            isSubmittingModal = false;
+        }
+    }
+
+    private async Task ConfirmDeleteRole(RoleDto role)
+    {
+        if (role.IsSystemRole)
+        {
+            globalErrorMessage = "System roles cannot be deleted.";
+            return;
+        }
+
+        if (role.UserCount > 0)
+        {
+            globalErrorMessage = $"Cannot delete '{role.RoleName}' because {role.UserCount} user(s) are assigned to it.";
+            return;
+        }
+
+        try
+        {
+            var res = await ApiClient.DeleteRoleAsync(role.RoleId);
+            if (res.IsSuccess)
+            {
+                globalSuccessMessage = $"🗑️ Role '{role.RoleName}' deleted successfully.";
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = res.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error deleting role: {ex.Message}";
+        }
+    }
+
+    // =========================================================================
+    // USER ROLE ASSIGNMENT
+    // =========================================================================
+
+    private void OpenAssignRoleModal(UserRoleDto user)
+    {
+        targetUser = user;
+        selectedRoleToAssign = 0;
+        showAssignRoleModal = true;
+    }
+
+    private void CloseAssignRoleModal()
+    {
+        showAssignRoleModal = false;
+        targetUser = null;
+    }
+
+    private async Task SubmitAssignRoleAsync()
+    {
+        if (targetUser == null || selectedRoleToAssign <= 0) return;
+
+        isSubmittingModal = true;
+        try
+        {
+            var res = await ApiClient.AssignRoleToUserAsync(targetUser.UserId, selectedRoleToAssign);
+            if (res.IsSuccess)
+            {
+                globalSuccessMessage = $"✨ Role successfully assigned to @{targetUser.Username}!";
+                CloseAssignRoleModal();
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = res.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error assigning role: {ex.Message}";
+        }
+        finally
+        {
+            isSubmittingModal = false;
+        }
+    }
+
+    private async Task RemoveRoleFromUser(int userId, int roleId, string roleName)
+    {
+        try
+        {
+            var res = await ApiClient.RemoveRoleFromUserAsync(userId, roleId);
+            if (res.IsSuccess)
+            {
+                globalSuccessMessage = $"Removed role '{roleName}' from user.";
+                await LoadAllDataAsync();
+            }
+            else
+            {
+                globalErrorMessage = res.Message;
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error removing role: {ex.Message}";
+        }
+    }
+}
+
+<style>
+.rbac-container {
+    max-width: 1200px;
+    margin: 20px auto 60px;
+    padding: 0 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.rbac-header-card {
+    background: linear-gradient(135deg, #fff5f8 0%, #fff 100%);
+    border: 2px solid #ffd1dc;
+    border-radius: 24px;
+    padding: 24px 32px;
+    box-shadow: 0 8px 24px rgba(255, 140, 160, 0.12);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.header-icon {
+    font-size: 42px;
+    background: #ffe5ec;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(255, 133, 161, 0.2);
+}
+
+.header-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.header-subtitle {
+    font-size: 14px;
+    color: #8c6a78;
+    margin: 4px 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.kawaii-btn {
+    padding: 10px 20px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kawaii-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #ff85a1 0%, #ff5c8a 100%);
+    color: white;
+}
+
+.btn-secondary {
+    background: #f7e8ee;
+    color: #633b4e;
+}
+
+.btn-add {
+    background: linear-gradient(135deg, #a0c4ff 0%, #70a6ff 100%);
+    color: white;
+}
+
+.btn-outline {
+    background: white;
+    border: 1.5px solid #ff85a1;
+    color: #ff5c8a;
+}
+
+.btn-delete {
+    background: #ffe5ec;
+    border: 1.5px solid #ff4d6d;
+    color: #ff4d6d;
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 10px;
+}
+
+.rbac-alert {
+    padding: 14px 20px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.alert-success {
+    background: #e8f9ee;
+    border: 1.5px solid #a3e6b5;
+    color: #1e6b36;
+}
+
+.alert-error {
+    background: #ffe5ec;
+    border: 1.5px solid #ff85a1;
+    color: #a82441;
+}
+
+.alert-close-btn {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.rbac-tab-bar {
+    display: flex;
+    gap: 12px;
+    border-bottom: 2px solid #ffd1dc;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.rbac-tab-btn {
+    padding: 10px 22px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+    background: white;
+    color: #7a5464;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rbac-tab-btn.active {
+    background: #ff85a1;
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 133, 161, 0.35);
+}
+
+.tab-pane {
+    animation: fadeIn 0.3s ease;
+}
+
+@@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.pane-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.pane-sub {
+    font-size: 13px;
+    color: #8c6a78;
+    margin: 4px 0 0;
+}
+
+/* Roles Grid */
+.roles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.role-card {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.role-card.system-role {
+    border-color: #ffd166;
+    background: linear-gradient(180deg, #fffdf8 0%, white 100%);
+}
+
+.role-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.role-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.role-icon {
+    font-size: 22px;
+}
+
+.role-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.pill-system {
+    background: #fff3cd;
+    color: #856404;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.member-count-pill {
+    background: #f0f3ff;
+    color: #3b5bdb;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.role-desc {
+    font-size: 13px;
+    color: #6c757d;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.perm-pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.perm-pill {
+    background: #fff0f5;
+    color: #d63384;
+    border: 1px solid #ffccd5;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.perm-pill-more {
+    background: #e9ecef;
+    color: #495057;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.role-card-footer {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-top: 1px solid #f8f9fa;
+    padding-top: 12px;
+}
+
+/* Matrix */
+.matrix-role-selector {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 20px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+
+.selector-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a2d3c;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.role-pill-select-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.role-select-pill {
+    padding: 8px 18px;
+    border-radius: 14px;
+    border: 1.5px solid #ffccd5;
+    background: #fffafb;
+    color: #5a3848;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.role-select-pill.selected {
+    background: #ff85a1;
+    color: white;
+    border-color: #ff85a1;
+}
+
+.matrix-card {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 24px;
+    padding: 24px;
+}
+
+.matrix-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #f8f9fa;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.matrix-title {
+    font-size: 20px;
+    margin: 0;
+    color: #4a2d3c;
+}
+
+.matrix-sub {
+    font-size: 13px;
+    color: #8c6a78;
+    margin: 4px 0 0;
+}
+
+.matrix-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.permission-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.perm-category-card {
+    border: 1.5px solid #f1f3f5;
+    border-radius: 18px;
+    padding: 16px;
+    background: #fffcfd;
+}
+
+.category-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.category-badge {
+    font-weight: 800;
+    font-size: 14px;
+    color: #ff5c8a;
+}
+
+.category-count {
+    font-size: 12px;
+    color: #868e96;
+}
+
+.permission-checkboxes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: white;
+    border: 1.5px solid #edf2f7;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.checkbox-row.checked {
+    border-color: #ff85a1;
+    background: #fff5f8;
+}
+
+.perm-info .code-title code {
+    font-weight: 700;
+    font-size: 12px;
+    color: #c92a2a;
+}
+
+.perm-info .code-desc {
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 2px;
+}
+
+/* User Table */
+.users-table-container {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 20px;
+    overflow-x: auto;
+}
+
+.kawaii-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.kawaii-table th {
+    background: #fff0f5;
+    color: #5c3b4a;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: left;
+    padding: 14px 18px;
+}
+
+.kawaii-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid #f8f9fa;
+    font-size: 14px;
+}
+
+.user-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-avatar {
+    font-size: 24px;
+    background: #ffe5ec;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.user-name {
+    font-weight: 700;
+    color: #4a2d3c;
+}
+
+.user-handle {
+    font-size: 12px;
+    color: #8c6a78;
+}
+
+.status-pill {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 10px;
+}
+
+.status-pill.active {
+    background: #e8f9ee;
+    color: #2b8a3e;
+}
+
+.status-pill.inactive {
+    background: #f1f3f5;
+    color: #868e96;
+}
+
+.user-roles-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.user-role-pill {
+    background: #e7f5ff;
+    color: #1c7ed6;
+    border: 1px solid #a5d8ff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pill-remove-btn {
+    border: none;
+    background: transparent;
+    color: #e03131;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* Modals */
+.kawaii-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.kawaii-modal {
+    background: white;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    border: 2px solid #ffd1dc;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #4a2d3c;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.modal-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a2d3c;
+    margin-bottom: 6px;
+}
+
+.form-group input, .form-group textarea, .form-group select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1.5px solid #ffd1dc;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    outline: none;
+    border-color: #ff85a1;
+    box-shadow: 0 0 0 3px rgba(255, 133, 161, 0.2);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1.5px solid #ffd1dc;
+    border-radius: 14px;
+    padding: 6px 14px;
+    gap: 8px;
+    width: 300px;
+}
+
+.search-box input {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    width: 100%;
+}
+
+.perm-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.catalog-card {
+    background: white;
+    border: 1.5px solid #ffe5ec;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.catalog-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.perm-code-badge {
+    background: #fff0f5;
+    color: #d63384;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #ffccd5;
+}
+
+.category-tag {
+    font-size: 11px;
+    color: #868e96;
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.catalog-desc {
+    font-size: 13px;
+    color: #495057;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.access-denied-card {
+    background: white;
+    border: 2px solid #ffd1dc;
+    border-radius: 24px;
+    padding: 40px;
+    text-align: center;
+    max-width: 500px;
+    margin: 40px auto;
+}
+
+.denied-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.rbac-loading-box {
+    text-align: center;
+    padding: 60px 0;
+    font-size: 16px;
+    color: #8c6a78;
+}
+
+.loading-spinner {
+    font-size: 36px;
+    animation: spin 1s infinite linear;
+    margin-bottom: 12px;
+}
+
+@@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>

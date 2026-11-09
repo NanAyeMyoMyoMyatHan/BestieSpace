@@ -30,3 +30,6 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+## Archives & Deliverables
+*.zip

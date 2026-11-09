@@ -1,0 +1,557 @@
+@page "/login"
+@inject NavigationManager Navigation
+@inject BestieAuthenticationStateProvider AuthProvider
+@inject IBestieApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Login 🌸 | BestieSpace</PageTitle>
+
+<div class="auth-page-container">
+    <div class="auth-card @(isWiggling ? "kawaii-wiggle" : "")">
+        <!-- Floating decorative pastel stickers -->
+        <div class="auth-deco deco-tl">🌸</div>
+        <div class="auth-deco deco-tr">✨</div>
+        <div class="auth-deco deco-bl">🎀</div>
+        <div class="auth-deco deco-br">🧸</div>
+
+        <div class="auth-header">
+            <div class="auth-logo-badge">🍓</div>
+            <h1 class="auth-title">Welcome to BestieSpace</h1>
+            <p class="auth-subtitle">Enter your secret code or PIN to open our cozy clubhouse 💖</p>
+        </div>
+
+        <!-- Mode Tabs: Password vs PIN -->
+        <div class="auth-tab-bar">
+            <button type="button" 
+                    class="auth-tab-btn @(activeTab == "password" ? "active" : "")" 
+                    @onclick='() => SetTab("password")'>
+                🔒 Password
+            </button>
+            <button type="button" 
+                    class="auth-tab-btn @(activeTab == "pin" ? "active" : "")" 
+                    @onclick='() => SetTab("pin")'>
+                🍓 Strawberry PIN
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="auth-error-banner">
+                <span class="auth-error-icon">🥺</span>
+                <span>@errorMessage</span>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="auth-success-banner">
+                <span class="auth-success-icon">✨</span>
+                <span>@successMessage</span>
+            </div>
+        }
+
+        @if (activeTab == "password")
+        {
+            <EditForm Model="loginModel" OnValidSubmit="HandlePasswordLogin">
+                <div class="auth-form-group">
+                    <label class="auth-label">Nickname or Email</label>
+                    <div class="auth-input-wrapper">
+                        <span class="auth-input-icon">👤</span>
+                        <input type="text" 
+                               class="auth-input" 
+                               placeholder="e.g. strawberry_bestie or bestie@mail.com" 
+                               @bind="loginModel.Username" 
+                               required />
+                    </div>
+                </div>
+
+                <div class="auth-form-group">
+                    <label class="auth-label">Secret Password</label>
+                    <div class="auth-input-wrapper">
+                        <span class="auth-input-icon">🔑</span>
+                        <input type="@(showPassword ? "text" : "password")" 
+                               class="auth-input" 
+                               placeholder="Enter your secret password" 
+                               @bind="loginModel.Password" 
+                               required />
+                        <button type="button" class="auth-eye-btn" @onclick="() => showPassword = !showPassword">
+                            @(showPassword ? "🙈" : "👁️")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="auth-actions">
+                    <button type="submit" class="auth-submit-btn" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="auth-spinner">🌸</span>
+                            <span>Unlocking clubhouse...</span>
+                        }
+                        else
+                        {
+                            <span>Open Clubhouse Door! 🚪💖</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        }
+        else
+        {
+            <!-- PIN Login Pad -->
+            <div class="auth-pin-section">
+                <div class="auth-pin-display">
+                    @for (int i = 0; i < 4; i++)
+                    {
+                        var isFilled = i < enteredPin.Length;
+                        <span class="auth-pin-dot @(isFilled ? "filled" : "")">
+                            @(isFilled ? "🍓" : "○")
+                        </span>
+                    }
+                </div>
+
+                <div class="auth-pin-keypad">
+                    @for (int n = 1; n <= 9; n++)
+                    {
+                        var digit = n.ToString();
+                        <button type="button" class="auth-pin-key" @onclick="() => AppendPin(digit)" disabled="@isLoading">
+                            @digit
+                        </button>
+                    }
+                    <button type="button" class="auth-pin-key key-clear" @onclick="ClearPin" disabled="@isLoading">
+                        C
+                    </button>
+                    <button type="button" class="auth-pin-key" @onclick='() => AppendPin("0")' disabled="@isLoading">
+                        0
+                    </button>
+                    <button type="button" class="auth-pin-key key-back" @onclick="BackspacePin" disabled="@isLoading">
+                        ⌫
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- Footer / Registration link -->
+        <div class="auth-footer">
+            <p>Don't have an account yet?</p>
+            <a href="/register" class="auth-link">
+                ✨ Click here to register a new bestie account! 🌸
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.auth-page-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #FFF0F5 0%, #FFE4E8 50%, #F3E5F5 100%);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Quicksand', sans-serif;
+}
+
+.auth-card {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 28px;
+    padding: 2.2rem 2rem;
+    box-shadow: 0 16px 40px rgba(255, 143, 171, 0.2), 0 0 0 1px rgba(255, 182, 193, 0.4);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+}
+
+.auth-deco {
+    position: absolute;
+    font-size: 1.6rem;
+    pointer-events: none;
+    opacity: 0.6;
+}
+.deco-tl { top: 12px; left: 16px; }
+.deco-tr { top: 12px; right: 16px; }
+.deco-bl { bottom: 12px; left: 16px; }
+.deco-br { bottom: 12px; right: 16px; }
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+.auth-logo-badge {
+    font-size: 3rem;
+    margin-bottom: 0.4rem;
+    filter: drop-shadow(0 4px 8px rgba(255, 107, 139, 0.3));
+    animation: bounce 2s infinite;
+}
+.auth-title {
+    font-family: 'Fredoka', cursive;
+    font-size: 1.8rem;
+    color: #4A3B3C;
+    margin-bottom: 0.3rem;
+}
+.auth-subtitle {
+    font-size: 0.95rem;
+    color: #8C7576;
+    margin-bottom: 0;
+}
+
+.auth-tab-bar {
+    display: flex;
+    gap: 0.5rem;
+    background: #FFF0F5;
+    padding: 0.35rem;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+}
+.auth-tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.6rem 0.8rem;
+    border-radius: 12px;
+    font-weight: 600;
+    color: #8C7576;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+.auth-tab-btn.active {
+    background: #FFFFFF;
+    color: #FB6F92;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.15);
+}
+
+.auth-error-banner {
+    background: #FFE5E9;
+    color: #D6336C;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    margin-bottom: 1.2rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid #FFCCD5;
+}
+.auth-success-banner {
+    background: #E8F5E9;
+    color: #2E7D32;
+    padding: 0.75rem 1rem;
+    border-radius: 14px;
+    margin-bottom: 1.2rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid #C8E6C9;
+}
+
+.auth-form-group {
+    margin-bottom: 1.2rem;
+}
+.auth-label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #5A4A4B;
+    margin-bottom: 0.35rem;
+}
+.auth-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.auth-input-icon {
+    position: absolute;
+    left: 1rem;
+    font-size: 1.1rem;
+    color: #A38F90;
+    pointer-events: none;
+}
+.auth-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.8rem;
+    border: 2px solid #FFE5EC;
+    border-radius: 16px;
+    font-size: 0.95rem;
+    color: #4A3B3C;
+    background: #FFFDFD;
+    transition: all 0.2s ease;
+    outline: none;
+}
+.auth-input:focus {
+    border-color: #FF8FAB;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.15);
+}
+.auth-eye-btn {
+    position: absolute;
+    right: 0.8rem;
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: #8C7576;
+}
+
+.auth-submit-btn {
+    width: 100%;
+    padding: 0.85rem;
+    border: none;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: white;
+    font-family: 'Fredoka', cursive;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(251, 111, 146, 0.35);
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+.auth-submit-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(251, 111, 146, 0.45);
+}
+.auth-submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* PIN section */
+.auth-pin-display {
+    display: flex;
+    justify-content: center;
+    gap: 1.2rem;
+    margin: 1rem 0 1.5rem;
+}
+.auth-pin-dot {
+    font-size: 1.6rem;
+    color: #FFB3C6;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.auth-pin-dot.filled {
+    transform: scale(1.3);
+    color: #FB6F92;
+}
+
+.auth-pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.8rem;
+    max-width: 280px;
+    margin: 0 auto 1.5rem;
+}
+.auth-pin-key {
+    background: #FFF0F5;
+    border: 2px solid #FFE5EC;
+    color: #4A3B3C;
+    font-family: 'Fredoka', cursive;
+    font-size: 1.3rem;
+    height: 52px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.auth-pin-key:hover:not(:disabled) {
+    background: #FFE4E8;
+    border-color: #FF8FAB;
+    transform: scale(1.05);
+}
+.auth-pin-key.key-clear, .auth-pin-key.key-back {
+    font-size: 1.1rem;
+    color: #8C7576;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 1.8rem;
+    padding-top: 1.2rem;
+    border-top: 1px dashed #FFE5EC;
+    font-size: 0.9rem;
+    color: #8C7576;
+}
+.auth-footer p {
+    margin-bottom: 0.3rem;
+}
+.auth-link {
+    color: #FB6F92;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+.auth-link:hover {
+    color: #D6336C;
+    text-decoration: underline;
+}
+
+.kawaii-wiggle {
+    animation: wiggle 0.5s ease;
+}
+
+@@keyframes wiggle {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-8px) rotate(-1deg); }
+    40%, 80% { transform: translateX(8px) rotate(1deg); }
+}
+
+@@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+</style>
+
+@code {
+    private LoginRequestDto loginModel = new();
+    private string activeTab = "password";
+    private string enteredPin = "";
+    private string? errorMessage;
+    private string? successMessage;
+    private bool isLoading = false;
+    private bool isWiggling = false;
+    private bool showPassword = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // If user is already authenticated, go to home
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        errorMessage = null;
+        successMessage = null;
+    }
+
+    private async Task HandlePasswordLogin()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var res = await AuthProvider.LoginAsync(loginModel.Username, loginModel.Password);
+            if (res.IsSuccess)
+            {
+                successMessage = res.Message;
+                await PlaySuccessEffects();
+                await Task.Delay(400);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = res.Message ?? "Oopsie! Wrong secret code 🥺 Try again!";
+                TriggerWiggle();
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Could not reach the BestieSpace server. Please ensure the API is running.";
+            TriggerWiggle();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AppendPin(string digit)
+    {
+        if (enteredPin.Length < 4)
+        {
+            enteredPin += digit;
+            errorMessage = null;
+
+            if (enteredPin.Length == 4)
+            {
+                await SubmitPinAsync();
+            }
+        }
+    }
+
+    private void ClearPin()
+    {
+        enteredPin = "";
+        errorMessage = null;
+    }
+
+    private void BackspacePin()
+    {
+        if (enteredPin.Length > 0)
+        {
+            enteredPin = enteredPin.Substring(0, enteredPin.Length - 1);
+            errorMessage = null;
+        }
+    }
+
+    private async Task SubmitPinAsync()
+    {
+        if (isLoading) return;
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var res = await AuthProvider.PinLoginAsync(enteredPin);
+            if (res.IsSuccess)
+            {
+                successMessage = res.Message;
+                await PlaySuccessEffects();
+                await Task.Delay(400);
+                Navigation.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = res.Message ?? "Oopsie! Wrong strawberry PIN 🍓🥺 Try again!";
+                TriggerWiggle();
+                enteredPin = "";
+            }
+        }
+        catch
+        {
+            errorMessage = "Could not connect to the BestieSpace server.";
+            TriggerWiggle();
+            enteredPin = "";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void TriggerWiggle()
+    {
+        isWiggling = true;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(550);
+            isWiggling = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private async Task PlaySuccessEffects()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
+            await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
+        }
+        catch { }
+    }
+}

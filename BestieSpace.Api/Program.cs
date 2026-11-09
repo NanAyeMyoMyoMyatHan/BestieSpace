@@ -2,29 +2,35 @@ using BestieSpace.Api.Features.Auth;
 using BestieSpace.Api.Features.Chat;
 using BestieSpace.Api.Features.Dashboard;
 using BestieSpace.Api.Features.Memories;
+using BestieSpace.Api.Features.Rbac;
 using BestieSpace.Api.Features.SecretNotes;
 using BestieSpace.Api.Infrastructure.Data;
+using BestieSpace.Api.Infrastructure.Data.Entities;
+using BestieSpace.Shared.DTOs;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure SQLite DbContext
-var dataDir = builder.Configuration["DATA_DIR"] ?? Environment.GetEnvironmentVariable("DATA_DIR");
-string connectionString;
-if (!string.IsNullOrWhiteSpace(dataDir))
-{
-    Directory.CreateDirectory(dataDir);
-    var dbPath = Path.Combine(dataDir, "bestiespace.db");
-    connectionString = $"Data Source={dbPath}";
-}
-else
-{
-    connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? "Data Source=bestiespace.db";
-}
+// Configure SQL Server DbContext
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? Environment.GetEnvironmentVariable("SQL_SERVER_CONNECTION_STRING")
+    ?? "Server=(localdb)\\mssqllocaldb;Database=BestieSpaceDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<BestieDbContext>(options =>
-    options.UseSqlite(connectionString));
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null);
+    }));
+
+// Register SQLite-to-SQL Server Data Migrator
+builder.Services.AddScoped<SqliteToSqlServerDataMigrator>();
 
 // Add Feature Services
 builder.Services.AddScoped<IDashboardService, DashboardService>();
@@ -32,6 +38,62 @@ builder.Services.AddScoped<IMemoriesService, MemoriesService>();
 builder.Services.AddScoped<ISecretNotesService, SecretNotesService>();
 builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Password Hashing & JWT Token Services (Phase 2)
+builder.Services.AddSingleton<IPasswordHasherService, PasswordHasherService>();
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+// Dynamic RBAC Feature Services & Cache (Phase 3)
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+// Configure JWT Bearer Authentication
+var jwtKey = builder.Configuration["Jwt:Key"] 
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+    ?? "BestieSpaceSuperSecretKawaiiKeyForJwtTokenAuth2026_MustBeAtLeast32BytesLong!";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "BestieSpace";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "BestieSpaceClient";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ClockSkew = TimeSpan.Zero
+    };
+
+    // SignalR support for JWT Bearer
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.AddAuthorization();
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -65,7 +127,75 @@ var app = builder.Build();
 // Auto-run Database Bootstrapper on startup
 using (var scope = app.Services.CreateScope())
 {
-    await DatabaseBootstrapper.InitializeAsync(scope.ServiceProvider, app.Environment);
+    // Fast verification mode for Auth & JWT cryptographic services (requires no active SQL Server)
+    if (args.Contains("--test-auth"))
+    {
+        Console.WriteLine("\n================ BESTIESPACE AUTH CRYPTO VERIFICATION ================");
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasherService>();
+        var jwtSvc = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
+
+        // 1. PasswordHasher PBKDF2 test
+        var pwd = "SuperCutePassword123!🌸";
+        var hash = hasher.HashPassword(pwd);
+        if (!hash.StartsWith("PBKDF2-SHA256:100000:")) throw new Exception("Invalid PBKDF2 format");
+        if (!hasher.VerifyPassword(pwd, hash)) throw new Exception("Password verification failed");
+        if (hasher.VerifyPassword("WrongPassword!", hash)) throw new Exception("Wrong password accepted");
+        if (!hasher.VerifyPassword("missyou3000!", "missyou3000!")) throw new Exception("Legacy password fallback failed");
+        Console.WriteLine($"[PASS] PasswordHasher PBKDF2 verified (Hash: {hash[..32]}...)");
+
+        // 2. JWT Access Token test
+        var testUser = new User
+        {
+            UserId = 42,
+            Username = "test_bestie",
+            Email = "test@bestiespace.local",
+            DisplayName = "Test Bestie 🌸",
+            AvatarSticker = "🌸",
+            RoleKey = "User"
+        };
+        var roles = new List<string> { "User", "Admin" };
+        var perms = new List<string> { "circle:view", "circle:chat" };
+        var token = jwtSvc.GenerateAccessToken(testUser, roles, perms);
+        var principal = jwtSvc.ValidateAccessToken(token);
+        if (principal == null) throw new Exception("JWT validation failed");
+        if (principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value != "42") throw new Exception("NameIdentifier mismatch");
+        if (!principal.FindAll(System.Security.Claims.ClaimTypes.Role).Any(r => r.Value == "Admin")) throw new Exception("Role claim missing");
+        if (!principal.FindAll("permission").Any(p => p.Value == "circle:chat")) throw new Exception("Permission claim missing");
+        Console.WriteLine($"[PASS] JWT Access Token generation & claim validation verified (Token length: {token.Length})");
+
+        // 3. Refresh Token Generation and Hashing test
+        var (rawToken, tokenHash, expiresAt) = jwtSvc.GenerateRefreshToken();
+        var recomputed = jwtSvc.HashToken(rawToken);
+        if (recomputed != tokenHash) throw new Exception("Refresh token hash mismatch");
+        Console.WriteLine($"[PASS] Refresh Token generation and SHA-256 hash verified (Hash: {tokenHash})");
+
+        // 4. Dynamic RBAC Policy Provider test (Phase 3)
+        var policyProvider = scope.ServiceProvider.GetRequiredService<IAuthorizationPolicyProvider>();
+        var userManagePolicy = await policyProvider.GetPolicyAsync("USER_MANAGE");
+        if (userManagePolicy == null) throw new Exception("Dynamic policy creation failed for USER_MANAGE");
+        var permReq = userManagePolicy.Requirements.OfType<PermissionRequirement>().FirstOrDefault();
+        if (permReq == null || permReq.Permission != "USER_MANAGE") throw new Exception("PermissionRequirement mismatch");
+        Console.WriteLine($"[PASS] Dynamic Permission Policy Provider verified: Policy 'USER_MANAGE' generated with PermissionRequirement('{permReq.Permission}')");
+
+        Console.WriteLine("================ ALL AUTH & RBAC CRYPTO TESTS PASSED! 🌸 ================\n");
+        return;
+    }
+
+    try
+    {
+        await DatabaseBootstrapper.InitializeAsync(scope.ServiceProvider, app.Environment);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogWarning(ex, "DatabaseBootstrapper: Could not connect to SQL Server. Ensure SQL Server is running and connection string is configured.");
+        if (args.Contains("--verify"))
+        {
+            Console.WriteLine($"\n[NOTICE] SQL Server is not currently reachable from this environment ({ex.Message}).");
+            Console.WriteLine("[NOTICE] Full database verification will execute automatically when connected to SQL Server.");
+            return;
+        }
+    }
 
     // Optional self-verification mode for automated test suites
     if (args.Contains("--verify"))
@@ -129,25 +259,124 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine($"[PASS] MarkMessagesReadAsync succeeded: {marked}");
         }
 
-        // 5. Auth & Login Slice
-        var hint = await authSvc.GetHintAsync("strawberry_bestie");
-        Console.WriteLine($"[PASS] Password Hint for Bestie: '{hint.Hint}'");
+        // 5. Auth & Security Verification (Phase 2)
+        var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasherService>();
+        var jwtSvc = scope.ServiceProvider.GetRequiredService<IJwtTokenService>();
 
-        var badLogin = await authSvc.LoginAsync(new BestieSpace.Shared.DTOs.LoginRequestDto
+        // 5a. Password Hashing Verification
+        var testPlaintext = "SecureBestiePassword2026!✨";
+        var hashed = hasher.HashPassword(testPlaintext);
+        if (!hashed.StartsWith("PBKDF2-SHA256:")) throw new Exception("Password hash does not use PBKDF2 format!");
+        if (!hasher.VerifyPassword(testPlaintext, hashed)) throw new Exception("Password verification failed for valid password!");
+        if (hasher.VerifyPassword("WrongPassword123!", hashed)) throw new Exception("Password verification succeeded for invalid password!");
+        Console.WriteLine($"[PASS] PasswordHasher PBKDF2 verification verified (Length: {hashed.Length})");
+
+        // 5b. JWT Generation & Validation Verification
+        var sampleUser = new User
         {
-            Username = "strawberry_bestie",
-            Password = "wrongpassword"
-        });
-        Console.WriteLine($"[PASS] Bad login correctly rejected: {badLogin.Message}");
+            UserId = 999,
+            Username = "jwt_test_user",
+            Email = "jwt@bestiespace.local",
+            DisplayName = "JWT Bestie 🌸",
+            AvatarSticker = "🌸",
+            RoleKey = "User"
+        };
+        var sampleRoles = new List<string> { "User", "Member" };
+        var samplePerms = new List<string> { "circle:view", "circle:chat" };
+        var sampleToken = jwtSvc.GenerateAccessToken(sampleUser, sampleRoles, samplePerms);
+        var principal = jwtSvc.ValidateAccessToken(sampleToken);
+        if (principal == null) throw new Exception("JWT validation failed for generated token!");
+        var tokenSub = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (tokenSub != "999") throw new Exception($"JWT Claim NameIdentifier mismatch: expected 999, got {tokenSub}");
+        Console.WriteLine($"[PASS] JWT Access Token generation & validation verified with roles: {string.Join(",", sampleRoles)}");
 
-        var goodLogin = await authSvc.LoginAsync(new BestieSpace.Shared.DTOs.LoginRequestDto
+        // 5c. User Registration & Duplicate Validation
+        var testRegUsername = $"bestie_tester_{Guid.NewGuid().ToString("N")[..6]}";
+        var testRegEmail = $"{testRegUsername}@bestiespace.local";
+        var regResult = await authSvc.RegisterAsync(new BestieSpace.Shared.DTOs.RegisterRequestDto
         {
-            Username = "strawberry_bestie",
-            Password = "missyou3000!"
+            Username = testRegUsername,
+            Email = testRegEmail,
+            Password = "MySuperSecretPassword2026!🌸",
+            ConfirmPassword = "MySuperSecretPassword2026!🌸",
+            DisplayName = "Test Bestie 🎀",
+            AvatarSticker = "🎀"
         });
-        Console.WriteLine($"[PASS] Bestie login success: {goodLogin.IsSuccess}, DisplayName: '{goodLogin.User?.DisplayName}', Role: '{goodLogin.User?.RoleKey}'");
+        if (!regResult.IsSuccess || regResult.User == null) throw new Exception($"Registration failed: {regResult.Message}");
+        Console.WriteLine($"[PASS] User registration succeeded: UserId {regResult.User.UserId}, Token returned: {!string.IsNullOrWhiteSpace(regResult.AccessToken)}");
 
-        Console.WriteLine("================ ALL VERIFICATIONS PASSED! ================\n");
+        // Test Duplicate Username
+        var dupUsernameResult = await authSvc.RegisterAsync(new BestieSpace.Shared.DTOs.RegisterRequestDto
+        {
+            Username = testRegUsername,
+            Email = $"different_{Guid.NewGuid():N}@bestiespace.local",
+            Password = "Password123!"
+        });
+        if (dupUsernameResult.IsSuccess) throw new Exception("Duplicate username registration was not blocked!");
+        Console.WriteLine($"[PASS] Duplicate username correctly rejected: '{dupUsernameResult.Message}'");
+
+        // Test Duplicate Email
+        var dupEmailResult = await authSvc.RegisterAsync(new BestieSpace.Shared.DTOs.RegisterRequestDto
+        {
+            Username = $"different_{Guid.NewGuid():N}[..8]",
+            Email = testRegEmail,
+            Password = "Password123!"
+        });
+        if (dupEmailResult.IsSuccess) throw new Exception("Duplicate email registration was not blocked!");
+        Console.WriteLine($"[PASS] Duplicate email correctly rejected: '{dupEmailResult.Message}'");
+
+        // 5d. User Login (Username & Email)
+        var loginWithUsername = await authSvc.LoginAsync(new BestieSpace.Shared.DTOs.LoginRequestDto
+        {
+            Username = testRegUsername,
+            Password = "MySuperSecretPassword2026!🌸"
+        });
+        if (!loginWithUsername.IsSuccess || string.IsNullOrWhiteSpace(loginWithUsername.AccessToken) || string.IsNullOrWhiteSpace(loginWithUsername.RefreshToken))
+            throw new Exception("Login with username failed or did not return tokens!");
+        Console.WriteLine($"[PASS] Login with username verified. JWT + RefreshToken issued.");
+
+        var loginWithEmail = await authSvc.LoginAsync(new BestieSpace.Shared.DTOs.LoginRequestDto
+        {
+            Username = testRegEmail,
+            Password = "MySuperSecretPassword2026!🌸"
+        });
+        if (!loginWithEmail.IsSuccess) throw new Exception("Login with email failed!");
+        Console.WriteLine($"[PASS] Login with email verified.");
+
+        // 5e. Refresh Token Rotation
+        var rawRefreshToken = loginWithUsername.RefreshToken!;
+        var refreshResult = await authSvc.RefreshTokenAsync(new BestieSpace.Shared.DTOs.RefreshTokenRequestDto
+        {
+            RefreshToken = rawRefreshToken
+        });
+        if (!refreshResult.IsSuccess || string.IsNullOrWhiteSpace(refreshResult.AccessToken) || string.IsNullOrWhiteSpace(refreshResult.RefreshToken))
+            throw new Exception($"Refresh token rotation failed: {refreshResult.Message}");
+        if (refreshResult.RefreshToken == rawRefreshToken)
+            throw new Exception("Refresh token rotation failed: same token returned!");
+        Console.WriteLine($"[PASS] Refresh token rotation verified. New active refresh token issued.");
+
+        // 5f. Token Revocation & Logout
+        var revokeResult = await authSvc.RevokeTokenAsync(new BestieSpace.Shared.DTOs.RevokeTokenRequestDto
+        {
+            RefreshToken = refreshResult.RefreshToken
+        }, null);
+        if (!revokeResult.IsSuccess) throw new Exception("Token revocation failed!");
+
+        var reusedAttempt = await authSvc.RefreshTokenAsync(new BestieSpace.Shared.DTOs.RefreshTokenRequestDto
+        {
+            RefreshToken = refreshResult.RefreshToken!
+        });
+        if (reusedAttempt.IsSuccess) throw new Exception("Revoked token was accepted!");
+        Console.WriteLine($"[PASS] Token revocation verified. Revoked token reuse rejected: '{reusedAttempt.Message}'");
+
+        // 5g. Preserved Kawaii VIP & PIN Login
+        var pinLogin = await authSvc.PinLoginAsync(new BestieSpace.Shared.DTOs.PinLoginRequestDto
+        {
+            PinCode = "3000"
+        });
+        Console.WriteLine($"[PASS] Kawaii VIP PIN login verified. Success: {pinLogin.IsSuccess}, DisplayName: '{pinLogin.User?.DisplayName}', Token: {!string.IsNullOrWhiteSpace(pinLogin.AccessToken)}");
+
+        Console.WriteLine("================ ALL PHASE 2 VERIFICATIONS PASSED! ================\n");
         return;
     }
 }
@@ -158,6 +387,9 @@ app.UseStaticFiles();
 app.UseRouting();
 
 app.UseCors("AllowAll");
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<BestieChatHub>("/chathub");

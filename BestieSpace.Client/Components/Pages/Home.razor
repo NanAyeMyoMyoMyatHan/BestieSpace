@@ -4,6 +4,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 @inject ILogger<Home> Logger
+@inject BestieAuthenticationStateProvider AuthProvider
 @implements IAsyncDisposable
 
 <PageTitle>BestieSpace 🌸 | Our Secret Cozy Space</PageTitle>
@@ -180,6 +181,12 @@
                         </div>
                     </div>
                 }
+
+                <div style="text-align: center; margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255, 143, 171, 0.4);">
+                    <a href="/register" style="color: #FB6F92; font-weight: 600; text-decoration: none; font-size: 0.92rem;">
+                        ✨ New bestie? Click here to register your account! 🌸
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -227,6 +234,12 @@
                 <span>Hi, <strong>@(currentUserSession.DisplayName)</strong>!</span>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
+                @if (canAccessAdminConsole)
+                {
+                    <a href="/admin/rbac" class="btn-admin-shortcut" title="Security & Permissions Console">
+                        <span>👑 Admin Console</span>
+                    </a>
+                }
                 <button type="button" class="btn-vip-ticket-shortcut" @onclick="() => showVipModal = true" title="View Printable VIP Pass">
                     <span>🎟️ Bestie VIP Card</span>
                 </button>
@@ -936,6 +949,13 @@
     
     // Auth Session & Cute Secret Login State
     private UserSessionDto? currentUserSession;
+    private bool canAccessAdminConsole =>
+        currentUserSession != null &&
+        (AuthProvider.HasRole("SuperAdmin") ||
+         AuthProvider.HasRole("Admin") ||
+         AuthProvider.HasPermission("ROLE_VIEW") ||
+         AuthProvider.HasPermission("USER_MANAGE") ||
+         (currentUserSession.Roles != null && (currentUserSession.Roles.Contains("SuperAdmin") || currentUserSession.Roles.Contains("Admin"))));
     private string activeLoginTab = "pin"; // "pin" or "password"
     private string enteredPin = "";
     private bool isPinLoggingIn = false;
@@ -996,6 +1016,13 @@
     protected override async Task OnInitializedAsync()
     {
         dotNetHelper = DotNetObjectReference.Create(this);
+
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        if (AuthProvider.CurrentUser != null)
+        {
+            ApplyUserSession(AuthProvider.CurrentUser);
+        }
+
         await LoadDashboardAsync();
         await LoadChatMessagesAsync();
         await InitializeSignalRAsync();
@@ -1003,28 +1030,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && currentUserSession == null)
         {
-            try
+            var authState = await AuthProvider.GetAuthenticationStateAsync();
+            if (AuthProvider.CurrentUser != null)
             {
-                var sessionJson = await JSRuntime.InvokeAsync<string?>("bestieAuth.getSession");
-                if (!string.IsNullOrWhiteSpace(sessionJson))
-                {
-                    var session = System.Text.Json.JsonSerializer.Deserialize<UserSessionDto>(sessionJson, new System.Text.Json.JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    });
-
-                    if (session != null)
-                    {
-                        ApplyUserSession(session);
-                        await InvokeAsync(StateHasChanged);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Failed to restore user session from localStorage");
+                ApplyUserSession(AuthProvider.CurrentUser);
+                await InvokeAsync(StateHasChanged);
             }
         }
     }
@@ -1084,21 +1096,11 @@
 
         try
         {
-            var res = await ApiClient.PinLoginAsync(new PinLoginRequestDto
-            {
-                PinCode = pinToVerify
-            });
+            var res = await AuthProvider.PinLoginAsync(pinToVerify);
 
             if (res.IsSuccess && res.User != null)
             {
                 currentUserSession = res.User;
-                try
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(currentUserSession);
-                    await JSRuntime.InvokeVoidAsync("bestieAuth.setSession", json);
-                }
-                catch { }
-
                 ApplyUserSession(currentUserSession);
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
@@ -1192,22 +1194,11 @@
 
         try
         {
-            var response = await ApiClient.LoginAsync(new LoginRequestDto
-            {
-                Username = loginUsername.Trim(),
-                Password = loginPassword.Trim()
-            });
+            var response = await AuthProvider.LoginAsync(loginUsername.Trim(), loginPassword.Trim());
 
             if (response.IsSuccess && response.User != null)
             {
                 currentUserSession = response.User;
-                try
-                {
-                    var json = System.Text.Json.JsonSerializer.Serialize(currentUserSession);
-                    await JSRuntime.InvokeVoidAsync("bestieAuth.setSession", json);
-                }
-                catch { }
-
                 ApplyUserSession(currentUserSession);
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
@@ -1237,6 +1228,7 @@
 
     private async Task LogoutAsync()
     {
+        await AuthProvider.LogoutAsync();
         currentUserSession = null;
         loginErrorMessage = null;
         loginUsername = "";
@@ -1917,18 +1909,6 @@
     {
         if (string.IsNullOrWhiteSpace(url)) return "/images/sample-memories/photobooth.svg";
         if (url.StartsWith("http://") || url.StartsWith("https://") || url.StartsWith("data:")) return url;
-        if (url.StartsWith("/uploads/"))
-        {
-            var baseApi = ApiClient.ApiBaseUrl?.TrimEnd('/');
-            if (string.IsNullOrWhiteSpace(baseApi)) return url;
-
-            var isLocalDev = Navigation.BaseUri.Contains("localhost:51") || Navigation.BaseUri.Contains("127.0.0.1:51");
-            if (!isLocalDev && (baseApi.Contains("127.0.0.1") || baseApi.Contains("localhost")))
-            {
-                return url; // Running behind reverse proxy on cloud (e.g. Render)
-            }
-            return $"{baseApi}{url}";
-        }
         return url;
     }
 

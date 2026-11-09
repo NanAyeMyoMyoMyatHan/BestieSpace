@@ -1968,6 +1968,30 @@ body {
     box-shadow: 0 4px 12px rgba(251, 111, 146, 0.3);
 }
 
+.btn-admin-shortcut {
+    background: linear-gradient(135deg, #FFF3BF, #FFE066);
+    border: 1.5px solid #FAB005;
+    border-radius: var(--radius-pill);
+    padding: 5px 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #855b00;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    transition: var(--transition-bounce);
+}
+
+.btn-admin-shortcut:hover {
+    background: #FAB005;
+    color: #FFFFFF;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(250, 176, 5, 0.4);
+    text-decoration: none;
+}
+
 .vip-ticket-modal-card {
     background: #FFFDF9;
     border-radius: 32px;

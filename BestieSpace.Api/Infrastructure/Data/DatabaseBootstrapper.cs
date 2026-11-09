@@ -29,96 +29,74 @@ public static class DatabaseBootstrapper
         // Ensure sample voice note audio exists
         EnsureSampleVoiceAudio(chatVoicesDir);
 
-        // 1. Create database and tables using init.sql if needed or EF Core
-        var initSqlPath = Path.Combine(environment.ContentRootPath, "Infrastructure", "Data", "init.sql");
-        if (File.Exists(initSqlPath))
-        {
-            var sql = await File.ReadAllTextAsync(initSqlPath);
-            await context.Database.OpenConnectionAsync();
-            try
-            {
-                using var command = context.Database.GetDbConnection().CreateCommand();
-                command.CommandText = sql;
-                await command.ExecuteNonQueryAsync();
-
-                // Safe migration for existing databases: check if IsRead & ReadAt exist
-                command.CommandText = "PRAGMA table_info(ChatMessages);";
-                var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    while (await reader.ReadAsync())
-                    {
-                        columns.Add(reader.GetString(1));
-                    }
-                }
-
-                if (!columns.Contains("IsRead"))
-                {
-                    command.CommandText = "ALTER TABLE ChatMessages ADD COLUMN IsRead INTEGER NOT NULL DEFAULT 0;";
-                    await command.ExecuteNonQueryAsync();
-                }
-                if (!columns.Contains("ReadAt"))
-                {
-                    command.CommandText = "ALTER TABLE ChatMessages ADD COLUMN ReadAt TEXT NULL;";
-                    await command.ExecuteNonQueryAsync();
-                }
-
-                // Ensure Users table exists
-                command.CommandText = @"
-                    CREATE TABLE IF NOT EXISTS Users (
-                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        Username TEXT NOT NULL UNIQUE,
-                        Password TEXT NOT NULL,
-                        DisplayName TEXT NOT NULL,
-                        RoleKey TEXT NOT NULL,
-                        AvatarSticker TEXT NOT NULL,
-                        PasswordHint TEXT NULL,
-                        QuickPin TEXT NOT NULL DEFAULT '3000',
-                        IsOnline INTEGER NOT NULL DEFAULT 0,
-                        LastSeenAt TEXT NULL,
-                        CreatedAt TEXT NOT NULL,
-                        LastLoginAt TEXT NULL
-                    );";
-                await command.ExecuteNonQueryAsync();
-
-                // Safe migration for Users columns
-                command.CommandText = "PRAGMA table_info(Users);";
-                var userCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    while (await reader.ReadAsync())
-                    {
-                        userCols.Add(reader.GetString(1));
-                    }
-                }
-
-                if (!userCols.Contains("QuickPin"))
-                {
-                    command.CommandText = "ALTER TABLE Users ADD COLUMN QuickPin TEXT NOT NULL DEFAULT '3000';";
-                    await command.ExecuteNonQueryAsync();
-                }
-                if (!userCols.Contains("IsOnline"))
-                {
-                    command.CommandText = "ALTER TABLE Users ADD COLUMN IsOnline INTEGER NOT NULL DEFAULT 0;";
-                    await command.ExecuteNonQueryAsync();
-                }
-                if (!userCols.Contains("LastSeenAt"))
-                {
-                    command.CommandText = "ALTER TABLE Users ADD COLUMN LastSeenAt TEXT NULL;";
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
-            finally
-            {
-                await context.Database.CloseConnectionAsync();
-            }
-        }
-        else
+        // 1. Ensure SQL Server database and tables are created
+        try
         {
             await context.Database.EnsureCreatedAsync();
         }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "context.Database.EnsureCreatedAsync encountered an issue. Attempting script initialization...");
+        }
 
-        // 2. Seed initial heartfelt data
+        var initSqlPath = Path.Combine(environment.ContentRootPath, "Infrastructure", "Data", "init.sql");
+        if (File.Exists(initSqlPath))
+        {
+            try
+            {
+                var fullScript = await File.ReadAllTextAsync(initSqlPath);
+                // Split SQL Server batches on GO separator
+                var batches = System.Text.RegularExpressions.Regex.Split(
+                    fullScript, 
+                    @"^\s*GO\s*$", 
+                    System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                await context.Database.OpenConnectionAsync();
+                try
+                {
+                    using var command = context.Database.GetDbConnection().CreateCommand();
+                    foreach (var batch in batches)
+                    {
+                        var trimmed = batch.Trim();
+                        if (string.IsNullOrWhiteSpace(trimmed)) continue;
+                        command.CommandText = trimmed;
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+                finally
+                {
+                    await context.Database.CloseConnectionAsync();
+                }
+                logger?.LogInformation("Successfully executed init.sql schema and seed batches against SQL Server.");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to execute init.sql batches directly against SQL Server.");
+            }
+        }
+
+        // 2. Safe one-time SQLite-to-SQL Server data import
+        try
+        {
+            var dataDir = Environment.GetEnvironmentVariable("DATA_DIR");
+            var sqliteCandidate1 = !string.IsNullOrWhiteSpace(dataDir) ? Path.Combine(dataDir, "bestiespace.db") : null;
+            var sqliteCandidate2 = Path.Combine(environment.ContentRootPath, "bestiespace.db");
+            var sqliteDbPath = (sqliteCandidate1 != null && File.Exists(sqliteCandidate1))
+                ? sqliteCandidate1
+                : sqliteCandidate2;
+
+            if (File.Exists(sqliteDbPath))
+            {
+                var migrator = scope.ServiceProvider.GetRequiredService<SqliteToSqlServerDataMigrator>();
+                await migrator.MigrateIfSourceExistsAsync(sqliteDbPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Error occurred during SQLite-to-SQL Server data migration.");
+        }
+
+        // 3. Seed initial heartfelt data & system roles/permissions if not yet populated
         await SeedDataAsync(context);
     }
 
@@ -333,6 +311,10 @@ public static class DatabaseBootstrapper
                 new()
                 {
                     Username = "strawberry_bestie",
+                    NormalizedUsername = "STRAWBERRY_BESTIE",
+                    Email = "strawberry_bestie@bestiespace.local",
+                    NormalizedEmail = "STRAWBERRY_BESTIE@BESTIESPACE.LOCAL",
+                    PasswordHash = "missyou3000!",
                     Password = "missyou3000!",
                     DisplayName = "Sweet Bestie 🌸",
                     RoleKey = "Bestie",
@@ -341,11 +323,16 @@ public static class DatabaseBootstrapper
                     QuickPin = "3000",
                     IsOnline = false,
                     LastSeenAt = DateTime.UtcNow.AddMinutes(-15),
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
                 },
                 new()
                 {
                     Username = "mochi_maker",
+                    NormalizedUsername = "MOCHI_MAKER",
+                    Email = "mochi_maker@bestiespace.local",
+                    NormalizedEmail = "MOCHI_MAKER@BESTIESPACE.LOCAL",
+                    PasswordHash = "bestie4ever!",
                     Password = "bestie4ever!",
                     DisplayName = "Your Bestie 🎀",
                     RoleKey = "Me",
@@ -354,7 +341,8 @@ public static class DatabaseBootstrapper
                     QuickPin = "4040",
                     IsOnline = false,
                     LastSeenAt = DateTime.UtcNow,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    IsActive = true
                 }
             };
 
@@ -363,20 +351,225 @@ public static class DatabaseBootstrapper
         }
         else
         {
-            // Ensure QuickPin is set on existing rows
-            var bestie = await context.Users.FirstOrDefaultAsync(u => u.RoleKey == "Bestie");
+            // Ensure QuickPin, Normalized fields are populated on existing rows
+            var users = await context.Users.ToListAsync();
+            foreach (var user in users)
+            {
+                if (string.IsNullOrWhiteSpace(user.NormalizedUsername))
+                    user.NormalizedUsername = user.Username.ToUpperInvariant();
+                if (string.IsNullOrWhiteSpace(user.Email))
+                    user.Email = $"{user.Username.ToLowerInvariant()}@bestiespace.local";
+                if (string.IsNullOrWhiteSpace(user.NormalizedEmail) && user.Email != null)
+                    user.NormalizedEmail = user.Email.ToUpperInvariant();
+                if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                    user.PasswordHash = user.Password;
+            }
+
+            var bestie = users.FirstOrDefault(u => u.RoleKey == "Bestie");
             if (bestie != null)
             {
                 bestie.QuickPin = "3000";
                 bestie.LastSeenAt ??= DateTime.UtcNow.AddMinutes(-15);
             }
-            var me = await context.Users.FirstOrDefaultAsync(u => u.RoleKey == "Me");
+            var me = users.FirstOrDefault(u => u.RoleKey == "Me");
             if (me != null)
             {
                 me.QuickPin = "4040";
                 me.LastSeenAt ??= DateTime.UtcNow;
             }
             await context.SaveChangesAsync();
+        }
+
+        // Seed default system roles if not present
+        var existingRoleNames = await context.Roles.Select(r => r.RoleName).ToListAsync();
+        var rolesToSeed = new List<Role>
+        {
+            new() { RoleName = "SuperAdmin", Description = "Supreme administrator with full control over all system operations, roles, and staff", IsSystemRole = true },
+            new() { RoleName = "Admin", Description = "System administrator capable of managing users, roles, and permissions", IsSystemRole = true },
+            new() { RoleName = "User", Description = "Default registered platform user with personal profile and social features", IsSystemRole = true },
+            new() { RoleName = "Bestie", Description = "VIP Bestie role with full access to private clubhouse features", IsSystemRole = true },
+            new() { RoleName = "Owner", Description = "Owner and creator of a Bestie Circle with circle administration rights", IsSystemRole = false },
+            new() { RoleName = "Member", Description = "Regular member of a Bestie Circle with chat and memory sharing rights", IsSystemRole = false }
+        };
+
+        foreach (var r in rolesToSeed)
+        {
+            if (!existingRoleNames.Contains(r.RoleName))
+            {
+                context.Roles.Add(r);
+            }
+        }
+        await context.SaveChangesAsync();
+
+        // Seed dynamic permissions catalog
+        var existingPermCodes = await context.Permissions.Select(p => p.PermissionCode).ToListAsync();
+        var permsToSeed = new List<Permission>
+        {
+            new() { PermissionCode = "USER_VIEW", Description = "View user profiles and list platform members" },
+            new() { PermissionCode = "USER_CREATE", Description = "Register or create new user accounts" },
+            new() { PermissionCode = "USER_UPDATE", Description = "Update user profiles and account details" },
+            new() { PermissionCode = "USER_DELETE", Description = "Delete or permanently remove user accounts" },
+            new() { PermissionCode = "USER_MANAGE", Description = "Full user administration, status activation, and account management" },
+            new() { PermissionCode = "ROLE_VIEW", Description = "View system and custom security roles" },
+            new() { PermissionCode = "ROLE_CREATE", Description = "Create new security and circle roles" },
+            new() { PermissionCode = "ROLE_UPDATE", Description = "Modify role descriptions and names" },
+            new() { PermissionCode = "ROLE_DELETE", Description = "Delete custom non-system roles" },
+            new() { PermissionCode = "PERMISSION_VIEW", Description = "View the global permission catalog and matrix" },
+            new() { PermissionCode = "PERMISSION_ASSIGN", Description = "Assign or revoke permissions from security roles" },
+            new() { PermissionCode = "USER_ROLE_MANAGE", Description = "Assign or revoke roles from user accounts" },
+            new() { PermissionCode = "FRIEND_REQUEST_SEND", Description = "Send friend requests to other users" },
+            new() { PermissionCode = "FRIEND_REQUEST_ACCEPT", Description = "Accept or decline received friend requests" },
+            new() { PermissionCode = "FRIEND_REMOVE", Description = "Remove friends or block users" },
+            new() { PermissionCode = "CIRCLE_CREATE", Description = "Create new Bestie Circles (clubs)" },
+            new() { PermissionCode = "CIRCLE_VIEW", Description = "View circle details, member roster, and activities" },
+            new() { PermissionCode = "CIRCLE_UPDATE", Description = "Update circle name, description, and settings" },
+            new() { PermissionCode = "CIRCLE_DELETE", Description = "Disband or delete a Bestie Circle" },
+            new() { PermissionCode = "CIRCLE_MEMBER_MANAGE", Description = "Invite friends and manage circle member roles" },
+            new() { PermissionCode = "CHAT_SEND", Description = "Send text, photo, voice notes, and stickers in chat" },
+            new() { PermissionCode = "CHAT_READ", Description = "Read chat messages and send read receipts" },
+            new() { PermissionCode = "MEMORY_CREATE", Description = "Post new Polaroid memories to the gallery" },
+            new() { PermissionCode = "MEMORY_UPDATE", Description = "Edit Polaroid memory captions and stickers" },
+            new() { PermissionCode = "MEMORY_DELETE", Description = "Delete Polaroid memories from the gallery" },
+            new() { PermissionCode = "SECRET_NOTE_MANAGE", Description = "Read, unlock, and manage secret envelope notes" },
+            new() { PermissionCode = "SYSTEM_INFO_VIEW", Description = "View system statistics, metrics, and audit logs" }
+        };
+
+        foreach (var p in permsToSeed)
+        {
+            if (!existingPermCodes.Contains(p.PermissionCode))
+            {
+                context.Permissions.Add(p);
+            }
+        }
+        await context.SaveChangesAsync();
+
+        // Seed SuperAdmin RolePermissions (All permissions)
+        var allPerms = await context.Permissions.ToListAsync();
+        var superAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "SuperAdmin");
+        if (superAdminRole != null)
+        {
+            var existingSuperPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == superAdminRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms)
+            {
+                if (!existingSuperPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = superAdminRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        // Seed Admin RolePermissions
+        var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Admin");
+        if (adminRole != null)
+        {
+            var adminCodes = new HashSet<string>
+            {
+                "USER_VIEW", "USER_UPDATE", "USER_MANAGE", "ROLE_VIEW", "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE",
+                "PERMISSION_VIEW", "PERMISSION_ASSIGN", "USER_ROLE_MANAGE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT",
+                "FRIEND_REMOVE", "CIRCLE_CREATE", "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_MEMBER_MANAGE",
+                "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW"
+            };
+
+            var existingAdminPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == adminRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms.Where(p => adminCodes.Contains(p.PermissionCode)))
+            {
+                if (!existingAdminPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = adminRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        // Seed User RolePermissions
+        var userRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "User");
+        if (userRole != null)
+        {
+            var userCodes = new HashSet<string>
+            {
+                "USER_VIEW", "USER_UPDATE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT", "FRIEND_REMOVE",
+                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "SECRET_NOTE_MANAGE"
+            };
+
+            var existingUserPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == userRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms.Where(p => userCodes.Contains(p.PermissionCode)))
+            {
+                if (!existingUserPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = userRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        await context.SaveChangesAsync();
+
+        // Ensure at least one SuperAdmin exists in UserRoles
+        if (superAdminRole != null)
+        {
+            var hasSuperAdmin = await context.UserRoles.AnyAsync(ur => ur.RoleId == superAdminRole.RoleId);
+            if (!hasSuperAdmin)
+            {
+                var adminUser = await context.Users.FirstOrDefaultAsync(u => u.RoleKey == "Me" || u.Username == "mochi_maker")
+                                ?? await context.Users.OrderBy(u => u.UserId).FirstOrDefaultAsync();
+
+                if (adminUser != null)
+                {
+                    context.UserRoles.Add(new UserRole { UserId = adminUser.UserId, RoleId = superAdminRole.RoleId });
+                    await context.SaveChangesAsync();
+                }
+            }
+        }
+
+        // Ensure all users have the default 'User' role in UserRoles
+        var defaultUserRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "User");
+        if (defaultUserRole != null)
+        {
+            var userIdsWithoutRole = await context.Users
+                .Where(u => !context.UserRoles.Any(ur => ur.UserId == u.UserId))
+                .Select(u => u.UserId)
+                .ToListAsync();
+
+            if (userIdsWithoutRole.Any())
+            {
+                var newAssignments = userIdsWithoutRole.Select(uid => new UserRole
+                {
+                    UserId = uid,
+                    RoleId = defaultUserRole.RoleId
+                });
+                context.UserRoles.AddRange(newAssignments);
+                await context.SaveChangesAsync();
+            }
+        }
+
+        // Ensure VIP users also have the 'Bestie' role in UserRoles
+        var bestieRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Bestie");
+        if (bestieRole != null)
+        {
+            var bestieUsers = await context.Users
+                .Where(u => (u.RoleKey == "Bestie" || u.RoleKey == "Me") &&
+                            !context.UserRoles.Any(ur => ur.UserId == u.UserId && ur.RoleId == bestieRole.RoleId))
+                .Select(u => u.UserId)
+                .ToListAsync();
+
+            if (bestieUsers.Any())
+            {
+                foreach (var uid in bestieUsers)
+                {
+                    context.UserRoles.Add(new UserRole { UserId = uid, RoleId = bestieRole.RoleId });
+                }
+                await context.SaveChangesAsync();
+            }
         }
     }
 
