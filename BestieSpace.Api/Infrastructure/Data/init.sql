@@ -289,6 +289,11 @@ BEGIN
         [Content] NVARCHAR(MAX) NULL,
         [MediaUrl] NVARCHAR(1000) NULL,
         [VoiceDurationSeconds] FLOAT NULL,
+        [ThumbnailUrl] NVARCHAR(1000) NULL,
+        [FileName] NVARCHAR(260) NULL,
+        [ContentType] NVARCHAR(100) NULL,
+        [FileSize] BIGINT NULL,
+        [MediaId] INT NULL,
         [Timestamp] DATETIME2 NOT NULL,
         [UpdatedAt] DATETIME2 NULL,
         [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ChatMessages_IsDeleted] DEFAULT 0,
@@ -335,6 +340,31 @@ BEGIN
     BEGIN
         ALTER TABLE [dbo].[ChatMessages] ADD [DeletedAt] DATETIME2 NULL;
     END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'ThumbnailUrl')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [ThumbnailUrl] NVARCHAR(1000) NULL;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'FileName')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [FileName] NVARCHAR(260) NULL;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'ContentType')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [ContentType] NVARCHAR(100) NULL;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'FileSize')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [FileSize] BIGINT NULL;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'MediaId')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [MediaId] INT NULL;
+    END
 END
 GO
 
@@ -352,6 +382,68 @@ BEGIN
     );
 
     CREATE UNIQUE NONCLUSTERED INDEX [IX_ChatMessageReads_Message_User] ON [dbo].[ChatMessageReads]([ChatMessageId] ASC, [UserId] ASC);
+END
+GO
+
+-- 15B. MediaFiles (Phase 7 Private Circle Multimedia Storage Metadata)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MediaFiles')
+BEGIN
+    CREATE TABLE [dbo].[MediaFiles] (
+        [MediaId] INT IDENTITY(1,1) NOT NULL,
+        [CircleId] INT NOT NULL,
+        [UploadedByUserId] INT NOT NULL,
+        [StorageKey] NVARCHAR(260) NOT NULL,
+        [ThumbnailStorageKey] NVARCHAR(260) NULL,
+        [OriginalFileName] NVARCHAR(260) NOT NULL,
+        [ContentType] NVARCHAR(100) NOT NULL,
+        [MediaType] NVARCHAR(20) NOT NULL,
+        [FileSize] BIGINT NOT NULL,
+        [DurationSeconds] FLOAT NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_MediaFiles_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_MediaFiles_IsDeleted] DEFAULT 0,
+        [DeletedAt] DATETIME2 NULL,
+        CONSTRAINT [PK_MediaFiles] PRIMARY KEY CLUSTERED ([MediaId] ASC),
+        CONSTRAINT [FK_MediaFiles_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_MediaFiles_User] FOREIGN KEY ([UploadedByUserId]) REFERENCES [dbo].[Users]([UserId])
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_MediaFiles_Circle_CreatedAt] ON [dbo].[MediaFiles]([CircleId] ASC, [CreatedAt] ASC);
+    CREATE NONCLUSTERED INDEX [IX_MediaFiles_UploadedBy] ON [dbo].[MediaFiles]([UploadedByUserId] ASC);
+END
+GO
+
+-- 15C. StickerCategories (Phase 7 Built-In Sticker Collections)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'StickerCategories')
+BEGIN
+    CREATE TABLE [dbo].[StickerCategories] (
+        [CategoryId] INT IDENTITY(1,1) NOT NULL,
+        [CategoryName] NVARCHAR(50) NOT NULL,
+        [Icon] NVARCHAR(50) NOT NULL,
+        [DisplayOrder] INT NOT NULL CONSTRAINT [DF_StickerCategories_DisplayOrder] DEFAULT 0,
+        [IsActive] BIT NOT NULL CONSTRAINT [DF_StickerCategories_IsActive] DEFAULT 1,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_StickerCategories_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_StickerCategories] PRIMARY KEY CLUSTERED ([CategoryId] ASC),
+        CONSTRAINT [UQ_StickerCategories_Name] UNIQUE ([CategoryName])
+    );
+END
+GO
+
+-- 15D. Stickers (Phase 7 Stickers)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Stickers')
+BEGIN
+    CREATE TABLE [dbo].[Stickers] (
+        [StickerId] INT IDENTITY(1,1) NOT NULL,
+        [CategoryId] INT NOT NULL,
+        [StickerName] NVARCHAR(100) NOT NULL,
+        [ImageUrl] NVARCHAR(500) NOT NULL,
+        [DisplayOrder] INT NOT NULL CONSTRAINT [DF_Stickers_DisplayOrder] DEFAULT 0,
+        [IsActive] BIT NOT NULL CONSTRAINT [DF_Stickers_IsActive] DEFAULT 1,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_Stickers_CreatedAt] DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT [PK_Stickers] PRIMARY KEY CLUSTERED ([StickerId] ASC),
+        CONSTRAINT [FK_Stickers_Category] FOREIGN KEY ([CategoryId]) REFERENCES [dbo].[StickerCategories]([CategoryId]) ON DELETE CASCADE
+    );
+
+    CREATE NONCLUSTERED INDEX [IX_Stickers_Category_Order] ON [dbo].[Stickers]([CategoryId] ASC, [DisplayOrder] ASC);
 END
 GO
 
@@ -530,6 +622,150 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_VIEW_HISTORY')
     INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_VIEW_HISTORY', 'View paginated message history for an authorized circle');
+
+-- Phase 7 Permissions (Multimedia Messaging, Photos, Stickers & Voice Notes)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_SEND_IMAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_SEND_IMAGE', 'Upload and send photo messages in circle chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_SEND_STICKER')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_SEND_STICKER', 'Send cute stickers in circle chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_SEND_VOICE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_SEND_VOICE', 'Record and send voice notes in circle chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_VIEW_MEDIA')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_VIEW_MEDIA', 'View and play multimedia photos and voice messages');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_DELETE_MEDIA')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_DELETE_MEDIA', 'Delete multimedia messages in circle chat');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'STICKER_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('STICKER_VIEW', 'Browse and view available sticker packs and categories');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'STICKER_MANAGE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('STICKER_MANAGE', 'Create, update, and manage sticker categories and sticker collections');
+GO
+
+-- Seed Initial Sticker Categories
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Cute')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Cute', '🌸', 1, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Love')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Love', '💖', 2, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Happy')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Happy', '🥳', 3, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Sad')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Sad', '🥺', 4, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Funny')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Funny', '😹', 5, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Miss You')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Miss You', '💌', 6, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Good Morning')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Good Morning', '☀️', 7, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Good Night')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Good Night', '🌙', 8, 1);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Hearts')
+    INSERT INTO [dbo].[StickerCategories] ([CategoryName], [Icon], [DisplayOrder], [IsActive]) VALUES ('Hearts', '💕', 9, 1);
+GO
+
+-- Seed Built-in Stickers
+DECLARE @CatCute INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Cute');
+DECLARE @CatLove INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Love');
+DECLARE @CatHappy INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Happy');
+DECLARE @CatSad INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Sad');
+DECLARE @CatFunny INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Funny');
+DECLARE @CatMissYou INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Miss You');
+DECLARE @CatMorning INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Good Morning');
+DECLARE @CatNight INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Good Night');
+DECLARE @CatHearts INT = (SELECT [CategoryId] FROM [dbo].[StickerCategories] WHERE [CategoryName] = 'Hearts');
+
+IF @CatCute IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatCute AND [StickerName] = 'Cherry Blossom')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatCute, 'Cherry Blossom', '🌸', 1, 1);
+IF @CatCute IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatCute AND [StickerName] = 'Pastel Ribbon')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatCute, 'Pastel Ribbon', '🎀', 2, 1);
+IF @CatCute IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatCute AND [StickerName] = 'Strawberry Kiss')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatCute, 'Strawberry Kiss', '🍓', 3, 1);
+IF @CatCute IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatCute AND [StickerName] = 'Fuzzy Teddy')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatCute, 'Fuzzy Teddy', '🧸', 4, 1);
+
+IF @CatLove IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatLove AND [StickerName] = 'Sparkling Heart')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatLove, 'Sparkling Heart', '💖', 1, 1);
+IF @CatLove IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatLove AND [StickerName] = 'Pinky Promise')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatLove, 'Pinky Promise', '🤞', 2, 1);
+IF @CatLove IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatLove AND [StickerName] = 'Bouquet Hug')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatLove, 'Bouquet Hug', '💐', 3, 1);
+IF @CatLove IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatLove AND [StickerName] = 'Friendship Crown')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatLove, 'Friendship Crown', '👑', 4, 1);
+
+IF @CatHappy IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHappy AND [StickerName] = 'Party Popper')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHappy, 'Party Popper', '🥳', 1, 1);
+IF @CatHappy IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHappy AND [StickerName] = 'Stardust Magic')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHappy, 'Stardust Magic', '✨', 2, 1);
+IF @CatHappy IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHappy AND [StickerName] = 'Sweet Cupcake')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHappy, 'Sweet Cupcake', '🧁', 3, 1);
+IF @CatHappy IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHappy AND [StickerName] = 'Rainbow Cheer')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHappy, 'Rainbow Cheer', '🌈', 4, 1);
+
+IF @CatSad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatSad AND [StickerName] = 'Teary Eyes')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatSad, 'Teary Eyes', '🥺', 1, 1);
+IF @CatSad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatSad AND [StickerName] = 'Bear Hug')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatSad, 'Bear Hug', '🫂', 2, 1);
+IF @CatSad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatSad AND [StickerName] = 'Raincloud')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatSad, 'Raincloud', '🌧️', 3, 1);
+IF @CatSad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatSad AND [StickerName] = 'Bandage Mend')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatSad, 'Bandage Mend', '🩹', 4, 1);
+
+IF @CatFunny IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatFunny AND [StickerName] = 'Laughing Cat')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatFunny, 'Laughing Cat', '😹', 1, 1);
+IF @CatFunny IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatFunny AND [StickerName] = 'Chaotic Bestie')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatFunny, 'Chaotic Bestie', '🤪', 2, 1);
+IF @CatFunny IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatFunny AND [StickerName] = 'Boba Gulp')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatFunny, 'Boba Gulp', '🧋', 3, 1);
+IF @CatFunny IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatFunny AND [StickerName] = 'Pizza Slice')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatFunny, 'Pizza Slice', '🍕', 4, 1);
+
+IF @CatMissYou IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMissYou AND [StickerName] = 'Letter For You')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMissYou, 'Letter For You', '💌', 1, 1);
+IF @CatMissYou IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMissYou AND [StickerName] = 'Paper Plane')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMissYou, 'Paper Plane', '✈️', 2, 1);
+IF @CatMissYou IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMissYou AND [StickerName] = 'Call Me')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMissYou, 'Call Me', '📱', 3, 1);
+IF @CatMissYou IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMissYou AND [StickerName] = 'Hourglass Wait')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMissYou, 'Hourglass Wait', '⏳', 4, 1);
+
+IF @CatMorning IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMorning AND [StickerName] = 'Warm Sunshine')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMorning, 'Warm Sunshine', '☀️', 1, 1);
+IF @CatMorning IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMorning AND [StickerName] = 'Morning Coffee')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMorning, 'Morning Coffee', '☕', 2, 1);
+IF @CatMorning IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMorning AND [StickerName] = 'Fluffy Pancakes')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMorning, 'Fluffy Pancakes', '🥞', 3, 1);
+IF @CatMorning IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatMorning AND [StickerName] = 'Sunflower Smile')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatMorning, 'Sunflower Smile', '🌻', 4, 1);
+
+IF @CatNight IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatNight AND [StickerName] = 'Crescent Moon')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatNight, 'Crescent Moon', '🌙', 1, 1);
+IF @CatNight IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatNight AND [StickerName] = 'Shooting Star')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatNight, 'Shooting Star', '🌠', 2, 1);
+IF @CatNight IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatNight AND [StickerName] = 'Sleepy Cloud')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatNight, 'Sleepy Cloud', '☁️', 3, 1);
+IF @CatNight IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatNight AND [StickerName] = 'Cozy Candle')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatNight, 'Cozy Candle', '🕯️', 4, 1);
+
+IF @CatHearts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHearts AND [StickerName] = 'Pink Ribbon Heart')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHearts, 'Pink Ribbon Heart', '💝', 1, 1);
+IF @CatHearts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHearts AND [StickerName] = 'Spinning Hearts')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHearts, 'Spinning Hearts', '💞', 2, 1);
+IF @CatHearts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHearts AND [StickerName] = 'Growing Heart')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHearts, 'Growing Heart', '💗', 3, 1);
+IF @CatHearts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM [dbo].[Stickers] WHERE [CategoryId] = @CatHearts AND [StickerName] = 'Beating Heart')
+    INSERT INTO [dbo].[Stickers] ([CategoryId], [StickerName], [ImageUrl], [DisplayOrder], [IsActive]) VALUES (@CatHearts, 'Beating Heart', '💓', 4, 1);
 GO
 
 -- Seed RolePermissions (Grant ALL permissions to SuperAdmin role)
@@ -558,6 +794,7 @@ BEGIN
         'PERMISSION_VIEW', 'PERMISSION_ASSIGN', 'USER_ROLE_MANAGE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT',
         'FRIEND_REMOVE', 'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE',
         'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW', 'STICKER_MANAGE',
         'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
@@ -577,7 +814,9 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
@@ -596,7 +835,9 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
@@ -614,7 +855,9 @@ BEGIN
     SELECT @OwnerRoleId, p.[PermissionId]
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
-        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -630,7 +873,11 @@ BEGIN
     INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
     SELECT @MemberRoleId, p.[PermissionId]
     FROM [dbo].[Permissions] p
-    WHERE p.[PermissionCode] IN ('CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE')
+    WHERE p.[PermissionCode] IN (
+        'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE'
+    )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
         WHERE rp.[RoleId] = @MemberRoleId AND rp.[PermissionId] = p.[PermissionId]
@@ -648,7 +895,9 @@ BEGIN
     WHERE p.[PermissionCode] IN (
         'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_INVITE', 'CIRCLE_INVITATION_CANCEL',
         'CIRCLE_MEMBER_VIEW', 'CIRCLE_MEMBER_REMOVE', 'CIRCLE_MEMBER_ROLE_UPDATE', 'CIRCLE_TRANSFER_OWNERSHIP',
-        'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+        'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -666,7 +915,9 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'CIRCLE_VIEW', 'CIRCLE_INVITE', 'CIRCLE_INVITATION_CANCEL', 'CIRCLE_MEMBER_VIEW',
-        'CIRCLE_MEMBER_REMOVE', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+        'CIRCLE_MEMBER_REMOVE', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'CHAT_DELETE_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -683,7 +934,9 @@ BEGIN
     SELECT @CircleMemberRoleId, p.[PermissionId]
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
-        'CIRCLE_VIEW', 'CIRCLE_MEMBER_VIEW', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+        'CIRCLE_VIEW', 'CIRCLE_MEMBER_VIEW', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY',
+        'CHAT_SEND_IMAGE', 'CHAT_SEND_STICKER', 'CHAT_SEND_VOICE', 'CHAT_VIEW_MEDIA', 'STICKER_VIEW',
+        'MEMORY_CREATE'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 

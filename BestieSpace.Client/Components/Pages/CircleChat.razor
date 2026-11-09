@@ -7,6 +7,7 @@
 @using BestieSpace.Client.Services
 @using Microsoft.AspNetCore.SignalR.Client
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject IBestieApiClient ApiClient
 @inject AuthenticationStateProvider AuthStateProvider
@@ -124,7 +125,7 @@
                     <div class="empty-chat-hero">
                         <div class="hero-sticker">💌✨</div>
                         <h3>Welcome to your private Circle chat!</h3>
-                        <p>No messages here yet. Say hello, send a cute message, or make plans with your besties!</p>
+                        <p>No messages here yet. Say hello, send a photo, cute sticker, or voice note to your besties!</p>
                     </div>
                 }
                 else
@@ -147,7 +148,7 @@
                         var isMe = msg.SenderId == currentUserId;
                         var rowClass = isMe ? "msg-me" : "msg-other";
 
-                        <div class="chat-message-row @rowClass @(msg.IsDeleted ? "is-deleted" : "")" id="@($"msg-{msg.Id}")">
+                        <div class="chat-message-row @rowClass @(msg.IsDeleted ? "is-deleted" : "") @(msg.MessageType == "sticker" ? "sticker-msg" : "")" id="@($"msg-{msg.Id}")">
                             @if (!isMe)
                             {
                                 <div class="sender-avatar" title="@msg.SenderDisplayName">
@@ -164,7 +165,7 @@
                                     </div>
                                 }
 
-                                <div class="message-bubble">
+                                <div class="message-bubble @(msg.MessageType)">
                                     @if (editingMessageId == msg.Id)
                                     {
                                         <!-- Inline Editing Mode -->
@@ -187,8 +188,71 @@
                                             {
                                                 <span class="deleted-text">🌸 This message was deleted</span>
                                             }
+                                            else if (msg.MessageType == "photo")
+                                            {
+                                                <!-- Photo Message -->
+                                                var photoSrc = GetMessageMediaUrl(msg);
+                                                <div class="photo-bubble-content">
+                                                    <img src="@photoSrc" 
+                                                         class="chat-photo-img" 
+                                                         alt="Circle photo" 
+                                                         @onclick="@(() => OpenZoomModal(photoSrc, msg.Content))" 
+                                                         loading="lazy" />
+                                                    @if (!string.IsNullOrWhiteSpace(msg.Content))
+                                                    {
+                                                        <p class="photo-caption">@msg.Content</p>
+                                                    }
+                                                </div>
+                                            }
+                                            else if (msg.MessageType == "sticker")
+                                            {
+                                                <!-- Sticker Message -->
+                                                <div class="sticker-bubble-content">
+                                                    @if (msg.Content != null && (msg.Content.StartsWith("http") || msg.Content.StartsWith("/")))
+                                                    {
+                                                        <img src="@msg.Content" class="sticker-img" alt="Sticker" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="sticker-emoji">@msg.Content</span>
+                                                    }
+                                                </div>
+                                            }
+                                            else if (msg.MessageType == "voice")
+                                            {
+                                                <!-- Voice Message -->
+                                                var audioSrc = GetMessageMediaUrl(msg);
+                                                var isThisAudioPlaying = playingAudioId == msg.Id;
+                                                <div class="voice-bubble-content">
+                                                    <button class="btn-voice-play @(isThisAudioPlaying ? "playing" : "")" 
+                                                            @onclick="@(() => TogglePlayAudio(msg.Id))" 
+                                                            title="@(isThisAudioPlaying ? "Pause voice note" : "Play voice note")">
+                                                        <span>@(isThisAudioPlaying ? "⏸️" : "▶️")</span>
+                                                    </button>
+                                                    
+                                                    <div class="voice-waveform-wrap">
+                                                        <div class="voice-bars @(isThisAudioPlaying ? "animated" : "")">
+                                                            <span class="bar bar-1"></span>
+                                                            <span class="bar bar-2"></span>
+                                                            <span class="bar bar-3"></span>
+                                                            <span class="bar bar-4"></span>
+                                                            <span class="bar bar-5"></span>
+                                                            <span class="bar bar-6"></span>
+                                                            <span class="bar bar-7"></span>
+                                                            <span class="bar bar-8"></span>
+                                                        </div>
+                                                        <span class="voice-duration">@FormatDuration(msg.DurationSeconds ?? 0)</span>
+                                                    </div>
+
+                                                    <audio id="@($"audio-{msg.Id}")" 
+                                                           src="@audioSrc" 
+                                                           preload="metadata" 
+                                                           @onended="@(() => OnAudioEnded(msg.Id))"></audio>
+                                                </div>
+                                            }
                                             else
                                             {
+                                                <!-- Text Message -->
                                                 <p class="text-content">@msg.Content</p>
                                                 @if (msg.UpdatedAt.HasValue)
                                                 {
@@ -229,6 +293,143 @@
                 }
             </main>
 
+            <!-- STICKER PICKER DRAWER (if open) -->
+            @if (showStickerDrawer)
+            {
+                <div class="sticker-drawer-pane">
+                    <div class="sticker-drawer-header">
+                        <span class="sticker-drawer-title">🌸 Choose a Bestie Sticker</span>
+                        <button class="btn-close-sm" @onclick="@(() => showStickerDrawer = false)">✕</button>
+                    </div>
+
+                    <!-- Category Pills -->
+                    <div class="sticker-category-tabs">
+                        @foreach (var cat in stickerCategories)
+                        {
+                            <button class="category-pill-tab @(selectedCategoryId == cat.CategoryId ? "active" : "")"
+                                    @onclick="@(() => selectedCategoryId = cat.CategoryId)">
+                                <span>@cat.Icon @cat.CategoryName</span>
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Sticker Grid -->
+                    <div class="sticker-items-grid">
+                        @{
+                            var currentCat = stickerCategories.FirstOrDefault(c => c.CategoryId == selectedCategoryId)
+                                             ?? stickerCategories.FirstOrDefault();
+                            if (currentCat != null)
+                            {
+                                @foreach (var st in currentCat.Stickers)
+                                {
+                                    <button class="btn-sticker-select" 
+                                            title="@st.StickerName" 
+                                            @onclick="@(() => SendStickerAsync(st.StickerId))">
+                                        @if (st.ImageUrl.StartsWith("http") || st.ImageUrl.StartsWith("/"))
+                                        {
+                                            <img src="@st.ImageUrl" alt="@st.StickerName" class="sticker-grid-img" />
+                                        }
+                                        else
+                                        {
+                                            <span class="sticker-grid-emoji">@st.ImageUrl</span>
+                                        }
+                                        <span class="sticker-caption-label">@st.StickerName</span>
+                                    </button>
+                                }
+                            }
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- VOICE RECORDING ACTIVE BAR (if recording) -->
+            @if (isRecordingAudio)
+            {
+                <div class="voice-recording-bar">
+                    <div class="recording-indicator">
+                        <span class="pulse-red-dot">🔴</span>
+                        <span class="recording-label">Recording Voice Note...</span>
+                        <span class="recording-timer">@FormatDuration(recordingSeconds) / 2:00</span>
+                    </div>
+
+                    <div class="recording-waveform-preview">
+                        <span class="wave wave-1"></span>
+                        <span class="wave wave-2"></span>
+                        <span class="wave wave-3"></span>
+                        <span class="wave wave-4"></span>
+                        <span class="wave wave-5"></span>
+                    </div>
+
+                    <div class="recording-actions">
+                        <button class="btn-recording-cancel" title="Cancel recording" @onclick="CancelVoiceRecordingAsync">✕ Cancel</button>
+                        <button class="btn-recording-send" title="Send voice note" @onclick="StopAndSendVoiceRecordingAsync" disabled="@isUploadingVoice">
+                            @if (isUploadingVoice)
+                            {
+                                <span>🌸 Sending...</span>
+                            }
+                            else
+                            {
+                                <span>🎤 Send Voice</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <!-- PHOTO PREVIEW MODAL (before sending) -->
+            @if (showPhotoModal)
+            {
+                <div class="photo-modal-overlay" @onclick="CancelPhotoUpload">
+                    <div class="photo-modal-card" @onclick:stopPropagation>
+                        <div class="photo-modal-header">
+                            <h3>📸 Send Photo to Circle</h3>
+                            <button class="btn-close-sm" @onclick="CancelPhotoUpload">✕</button>
+                        </div>
+                        <div class="photo-preview-wrap">
+                            @if (!string.IsNullOrEmpty(selectedPhotoPreviewBase64))
+                            {
+                                <img src="@selectedPhotoPreviewBase64" class="photo-modal-img" alt="Preview" />
+                            }
+                        </div>
+                        <div class="photo-caption-input-wrap">
+                            <input type="text" 
+                                   class="photo-caption-input" 
+                                   placeholder="Add a cute caption... 🍓 (optional)" 
+                                   @bind="photoCaption" 
+                                   maxlength="500" />
+                        </div>
+                        <div class="photo-modal-footer">
+                            <button class="btn-cancel-modal" @onclick="CancelPhotoUpload">Cancel</button>
+                            <button class="btn-send-photo" @onclick="SendSelectedPhotoAsync" disabled="@isUploadingPhoto">
+                                @if (isUploadingPhoto)
+                                {
+                                    <span>🌸 Uploading...</span>
+                                }
+                                else
+                                {
+                                    <span>🍓 Send Photo</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- FULL IMAGE ZOOM LIGHTBOX -->
+            @if (!string.IsNullOrEmpty(zoomImageUrl))
+            {
+                <div class="zoom-lightbox-overlay" @onclick="CloseZoomModal">
+                    <button class="btn-close-zoom" @onclick="CloseZoomModal">✕</button>
+                    <div class="zoom-img-box" @onclick:stopPropagation>
+                        <img src="@zoomImageUrl" class="zoom-full-img" alt="Enlarged photo" />
+                        @if (!string.IsNullOrEmpty(zoomCaption))
+                        {
+                            <p class="zoom-caption-text">@zoomCaption</p>
+                        }
+                    </div>
+                </div>
+            }
+
             <!-- CHAT INPUT BAR -->
             <footer class="chat-input-bar">
                 @if (!string.IsNullOrWhiteSpace(errorMessage))
@@ -240,6 +441,33 @@
                 }
 
                 <div class="input-composer">
+                    <!-- Multimedia Action Buttons -->
+                    <div class="media-tools-group">
+                        <!-- Hidden Photo File Input -->
+                        <InputFile id="circlePhotoFileInput" 
+                                   OnChange="OnPhotoFileSelected" 
+                                   accept="image/jpeg,image/png,image/webp" 
+                                   style="display:none;" />
+
+                        <label for="circlePhotoFileInput" class="btn-tool-media" title="Share a photo (JPEG, PNG, WebP)">
+                            <span>📸</span>
+                        </label>
+
+                        <button type="button" 
+                                class="btn-tool-media @(showStickerDrawer ? "active" : "")" 
+                                title="Bestie Stickers" 
+                                @onclick="ToggleStickerDrawer">
+                            <span>🌸</span>
+                        </button>
+
+                        <button type="button" 
+                                class="btn-tool-media @(isRecordingAudio ? "recording" : "")" 
+                                title="Record Voice Note" 
+                                @onclick="ToggleVoiceRecorder">
+                            <span>🎤</span>
+                        </button>
+                    </div>
+
                     <textarea class="chat-textarea"
                               placeholder="Message your circle besties... 🌸 (Enter to send, Shift+Enter for new line)"
                               rows="1"
@@ -247,14 +475,14 @@
                               @bind="newMessageText"
                               @bind:event="oninput"
                               @onkeydown="HandleKeyDown"
-                              disabled="@isSending"></textarea>
+                              disabled="@(isSending || isRecordingAudio)"></textarea>
 
                     <div class="composer-side">
                         <span class="char-counter @(newMessageText.Length > 1900 ? "warn" : "")">
                             @newMessageText.Length/2000
                         </span>
                         <button class="btn-send-message" 
-                                disabled="@(string.IsNullOrWhiteSpace(newMessageText) || isSending)" 
+                                disabled="@(string.IsNullOrWhiteSpace(newMessageText) || isSending || isRecordingAudio)" 
                                 @onclick="SendMessageAsync">
                             @if (isSending)
                             {
@@ -349,25 +577,25 @@
         gap: 8px;
     }
     .circle-name {
-        font-size: 1.25rem;
+        margin: 0;
+        font-size: 1.15rem;
         font-weight: 700;
         color: var(--text-cocoa, #4A3B3C);
-        margin: 0;
     }
     .role-pill {
-        background: #fff;
+        background: #FFE5EC;
         color: var(--btn-strawberry-dark, #F72585);
-        border: 1px solid var(--card-blush-border, #FFC2D1);
-        padding: 2px 8px;
+        padding: 2px 10px;
         border-radius: 12px;
         font-size: 0.72rem;
-        font-weight: 600;
+        font-weight: 700;
+        border: 1px solid #FFC2D1;
     }
     .circle-status-row {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-size: 0.82rem;
+        font-size: 0.78rem;
         color: var(--text-cocoa-light, #7E6566);
     }
     .online-indicator {
@@ -377,84 +605,83 @@
         display: inline-block;
     }
     .online-indicator.connected {
-        background: #4ade80;
-        box-shadow: 0 0 6px #4ade80;
+        background: #10B981;
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
     }
     .online-indicator.reconnecting {
-        background: #fbbf24;
+        background: #F59E0B;
     }
     .reconnecting-tag {
-        color: #d97706;
+        color: #F59E0B;
         font-weight: 600;
-        margin-left: 6px;
+        font-size: 0.72rem;
     }
     .btn-header-action {
         background: #ffffff;
-        border: 2px solid var(--card-blush-border, #FFC2D1);
-        padding: 8px 14px;
+        border: 1.5px solid var(--card-blush-border, #FFC2D1);
+        padding: 6px 14px;
         border-radius: 20px;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         font-weight: 600;
         color: var(--text-cocoa, #4A3B3C);
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.2s;
     }
     .btn-header-action:hover {
         background: var(--card-blush, #FFE5EC);
         border-color: var(--btn-strawberry, #FF8FAB);
+        transform: translateY(-1px);
     }
 
     /* Roster Drawer */
     .roster-drawer {
-        position: absolute;
-        top: 75px;
-        right: 20px;
-        width: 320px;
-        max-height: 400px;
-        background: #ffffff;
-        border: 2px solid var(--card-blush-border, #FFC2D1);
-        border-radius: 20px;
-        box-shadow: 0 16px 40px rgba(0,0,0,0.12);
-        z-index: 50;
-        padding: 16px;
+        background: #FFFDF9;
+        border-bottom: 2px solid var(--card-blush-border, #FFC2D1);
+        padding: 14px 20px;
+        max-height: 220px;
         overflow-y: auto;
+        animation: slideDown 0.2s ease-out;
+    }
+    @@keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
     .roster-drawer-header {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        margin-bottom: 12px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid #f3e8ee;
+        align-items: center;
+        margin-bottom: 10px;
     }
     .roster-drawer-header h3 {
-        font-size: 1rem;
-        color: var(--text-cocoa, #4A3B3C);
         margin: 0;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-cocoa, #4A3B3C);
     }
     .btn-close-sm {
         background: none;
         border: none;
         font-size: 16px;
+        color: var(--text-cocoa-light, #7E6566);
         cursor: pointer;
-        color: #999;
     }
     .roster-list {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 8px;
     }
     .roster-item {
         display: flex;
         align-items: center;
         gap: 10px;
-        padding: 6px 8px;
-        border-radius: 12px;
-        background: #FFFDF9;
+        background: #ffffff;
+        padding: 8px 12px;
+        border-radius: 14px;
+        border: 1px solid var(--card-blush-border, #FFC2D1);
     }
     .roster-avatar-wrap {
         position: relative;
-        font-size: 22px;
+        font-size: 24px;
     }
     .status-dot {
         position: absolute;
@@ -463,30 +690,34 @@
         width: 9px;
         height: 9px;
         border-radius: 50%;
-        border: 2px solid #fff;
+        border: 1.5px solid #fff;
     }
-    .status-dot.online { background: #4ade80; }
-    .status-dot.offline { background: #d1d5db; }
+    .status-dot.online {
+        background: #10B981;
+    }
+    .status-dot.offline {
+        background: #9CA3AF;
+    }
     .roster-info {
         display: flex;
         flex-direction: column;
-        flex: 1;
     }
     .roster-name-row {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        font-size: 0.88rem;
+        gap: 6px;
+        font-size: 0.85rem;
     }
     .badge-role {
-        font-size: 0.68rem;
-        background: var(--card-blush, #FFE5EC);
+        font-size: 0.65rem;
+        background: #FFE5EC;
         color: var(--btn-strawberry-dark, #F72585);
         padding: 1px 6px;
         border-radius: 8px;
+        font-weight: 600;
     }
     .roster-sub {
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         color: var(--text-cocoa-light, #7E6566);
     }
 
@@ -494,8 +725,7 @@
     .chat-messages-container {
         flex: 1;
         overflow-y: auto;
-        padding: 20px;
-        background: #FFFDF9;
+        padding: 16px 20px;
         display: flex;
         flex-direction: column;
         gap: 12px;
@@ -612,6 +842,129 @@
         color: var(--text-cocoa, #4A3B3C);
         border-bottom-left-radius: 4px;
     }
+
+    /* Sticker Bubble Overrides */
+    .chat-message-row.sticker-msg .message-bubble {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 4px 8px;
+    }
+    .sticker-emoji {
+        font-size: 52px;
+        display: inline-block;
+        animation: stickerPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @@keyframes stickerPop {
+        0% { transform: scale(0.6); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .sticker-img {
+        max-width: 140px;
+        max-height: 140px;
+        border-radius: 16px;
+    }
+
+    /* Photo Bubble */
+    .photo-bubble-content {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .chat-photo-img {
+        max-width: 260px;
+        max-height: 240px;
+        border-radius: 14px;
+        cursor: pointer;
+        object-fit: cover;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: transform 0.2s;
+    }
+    .chat-photo-img:hover {
+        transform: scale(1.02);
+    }
+    .photo-caption {
+        margin: 2px 0 0;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    /* Voice Bubble */
+    .voice-bubble-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 210px;
+        padding: 4px 2px;
+    }
+    .btn-voice-play {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #ffffff;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.15s;
+    }
+    .btn-voice-play:hover {
+        transform: scale(1.08);
+    }
+    .voice-waveform-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+    }
+    .voice-bars {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 20px;
+    }
+    .voice-bars .bar {
+        width: 3px;
+        border-radius: 2px;
+        background: rgba(255,255,255,0.8);
+    }
+    .msg-other .voice-bars .bar {
+        background: var(--btn-strawberry, #FF8FAB);
+    }
+    .bar-1 { height: 6px; }
+    .bar-2 { height: 14px; }
+    .bar-3 { height: 18px; }
+    .bar-4 { height: 10px; }
+    .bar-5 { height: 16px; }
+    .bar-6 { height: 8px; }
+    .bar-7 { height: 14px; }
+    .bar-8 { height: 6px; }
+
+    .voice-bars.animated .bar {
+        animation: waveAnim 0.7s infinite alternate ease-in-out;
+    }
+    .voice-bars.animated .bar-1 { animation-delay: 0.1s; }
+    .voice-bars.animated .bar-2 { animation-delay: 0.25s; }
+    .voice-bars.animated .bar-3 { animation-delay: 0.4s; }
+    .voice-bars.animated .bar-4 { animation-delay: 0.15s; }
+    .voice-bars.animated .bar-5 { animation-delay: 0.35s; }
+    .voice-bars.animated .bar-6 { animation-delay: 0.05s; }
+    .voice-bars.animated .bar-7 { animation-delay: 0.3s; }
+    .voice-bars.animated .bar-8 { animation-delay: 0.2s; }
+
+    @@keyframes waveAnim {
+        from { transform: scaleY(0.4); }
+        to { transform: scaleY(1.3); }
+    }
+    .voice-duration {
+        font-size: 0.72rem;
+        opacity: 0.85;
+        font-weight: 600;
+    }
+
     .chat-message-row.is-deleted .message-bubble {
         background: #fbf5f7;
         border: 1px dashed #e0c8d2;
@@ -671,6 +1024,342 @@
     }
     .btn-tiny-action:hover {
         transform: scale(1.15);
+    }
+
+    /* Sticker Drawer Pane */
+    .sticker-drawer-pane {
+        background: #FFFDF9;
+        border-top: 2px solid var(--card-blush-border, #FFC2D1);
+        padding: 12px 16px;
+        max-height: 240px;
+        overflow-y: auto;
+        animation: slideUpDrawer 0.2s ease-out;
+    }
+    @@keyframes slideUpDrawer {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .sticker-drawer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .sticker-drawer-title {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .sticker-category-tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+    }
+    .category-pill-tab {
+        background: #ffffff;
+        border: 1px solid var(--card-blush-border, #FFC2D1);
+        padding: 4px 12px;
+        border-radius: 14px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        color: var(--text-cocoa, #4A3B3C);
+        transition: all 0.15s;
+    }
+    .category-pill-tab.active {
+        background: var(--btn-strawberry, #FF8FAB);
+        color: #fff;
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+    .sticker-items-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+        gap: 8px;
+    }
+    .btn-sticker-select {
+        background: #ffffff;
+        border: 1.5px solid #FFD6E0;
+        border-radius: 14px;
+        padding: 8px 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.15s, background 0.15s;
+    }
+    .btn-sticker-select:hover {
+        transform: scale(1.1);
+        background: #FFE5EC;
+    }
+    .sticker-grid-emoji {
+        font-size: 28px;
+    }
+    .sticker-grid-img {
+        width: 32px;
+        height: 32px;
+        object-fit: contain;
+    }
+    .sticker-caption-label {
+        font-size: 0.6rem;
+        color: var(--text-cocoa-light, #7E6566);
+        margin-top: 4px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 60px;
+    }
+
+    /* Voice Recording Bar */
+    .voice-recording-bar {
+        background: #FFE5EC;
+        border-top: 2px solid var(--btn-strawberry, #FF8FAB);
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        animation: slideUpDrawer 0.2s ease-out;
+    }
+    .recording-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .pulse-red-dot {
+        font-size: 14px;
+        animation: pulseRecord 1s infinite alternate;
+    }
+    @@keyframes pulseRecord {
+        from { opacity: 0.3; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1.2); }
+    }
+    .recording-label {
+        font-weight: 700;
+        font-size: 0.88rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .recording-timer {
+        font-weight: 700;
+        color: var(--btn-strawberry-dark, #F72585);
+        font-size: 0.88rem;
+    }
+    .recording-waveform-preview {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .recording-waveform-preview .wave {
+        width: 4px;
+        background: var(--btn-strawberry, #FF8FAB);
+        border-radius: 2px;
+        animation: liveWave 0.5s infinite alternate;
+    }
+    .wave-1 { height: 10px; animation-delay: 0.1s; }
+    .wave-2 { height: 22px; animation-delay: 0.25s; }
+    .wave-3 { height: 14px; animation-delay: 0.4s; }
+    .wave-4 { height: 18px; animation-delay: 0.15s; }
+    .wave-5 { height: 8px; animation-delay: 0.3s; }
+    @@keyframes liveWave {
+        from { transform: scaleY(0.4); }
+        to { transform: scaleY(1.4); }
+    }
+    .recording-actions {
+        display: flex;
+        gap: 8px;
+    }
+    .btn-recording-cancel {
+        background: #ffffff;
+        border: 1px solid #FFC2D1;
+        padding: 6px 14px;
+        border-radius: 16px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-recording-send {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB), var(--btn-strawberry-dark, #F72585));
+        border: none;
+        color: #fff;
+        padding: 6px 16px;
+        border-radius: 16px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(247, 37, 133, 0.3);
+    }
+
+    /* Photo Upload Preview Modal */
+    .photo-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 16px;
+    }
+    .photo-modal-card {
+        background: #ffffff;
+        border-radius: 24px;
+        padding: 20px;
+        max-width: 440px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.25);
+    }
+    .photo-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .photo-modal-header h3 {
+        margin: 0;
+        font-size: 1.05rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .photo-preview-wrap {
+        display: flex;
+        justify-content: center;
+        background: #FFFDF9;
+        border-radius: 16px;
+        border: 2px dashed var(--card-blush-border, #FFC2D1);
+        padding: 10px;
+    }
+    .photo-modal-img {
+        max-width: 100%;
+        max-height: 280px;
+        border-radius: 12px;
+        object-fit: contain;
+    }
+    .photo-caption-input-wrap {
+        width: 100%;
+    }
+    .photo-caption-input {
+        width: 100%;
+        border: 1.5px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 16px;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        outline: none;
+        box-sizing: border-box;
+    }
+    .photo-caption-input:focus {
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+    .photo-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+    .btn-cancel-modal {
+        background: #f3f4f6;
+        border: none;
+        padding: 8px 18px;
+        border-radius: 16px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-send-photo {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB), var(--btn-strawberry-dark, #F72585));
+        border: none;
+        color: #fff;
+        padding: 8px 20px;
+        border-radius: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(247, 37, 133, 0.35);
+    }
+
+    /* Full Zoom Lightbox */
+    .zoom-lightbox-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1200;
+        padding: 20px;
+        cursor: zoom-out;
+    }
+    .btn-close-zoom {
+        position: absolute;
+        top: 20px;
+        right: 24px;
+        background: rgba(255,255,255,0.25);
+        border: none;
+        color: #fff;
+        font-size: 24px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+    .zoom-img-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        max-width: 90vw;
+        max-height: 85vh;
+        cursor: default;
+    }
+    .zoom-full-img {
+        max-width: 100%;
+        max-height: 75vh;
+        border-radius: 16px;
+        box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    }
+    .zoom-caption-text {
+        color: #ffffff;
+        font-size: 1rem;
+        margin: 0;
+        text-align: center;
+        background: rgba(0,0,0,0.4);
+        padding: 6px 16px;
+        border-radius: 14px;
+    }
+
+    /* Composer Tools */
+    .media-tools-group {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+    .btn-tool-media {
+        background: #FFFDF9;
+        border: 1.5px solid var(--card-blush-border, #FFC2D1);
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .btn-tool-media:hover {
+        background: var(--card-blush, #FFE5EC);
+        border-color: var(--btn-strawberry, #FF8FAB);
+        transform: scale(1.08);
+    }
+    .btn-tool-media.active {
+        background: var(--btn-strawberry, #FF8FAB);
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+    .btn-tool-media.recording {
+        background: #fee2e2;
+        border-color: #ef4444;
+        animation: pulseRecord 1s infinite alternate;
     }
 
     /* Inline Edit */
@@ -755,7 +1444,7 @@
     }
     .input-composer {
         display: flex;
-        gap: 12px;
+        gap: 8px;
         align-items: flex-end;
     }
     .chat-textarea {
@@ -794,7 +1483,7 @@
         background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
         color: #ffffff;
         border: none;
-        padding: 10px 20px;
+        padding: 10px 18px;
         border-radius: 20px;
         font-weight: 700;
         font-size: 0.92rem;
@@ -880,6 +1569,32 @@
     private string editingContent = string.Empty;
     private bool isSubmittingEdit = false;
 
+    // Phase 7: Multimedia state
+    private List<StickerCategoryDto> stickerCategories = new();
+    private bool showStickerDrawer = false;
+    private int selectedCategoryId = 1;
+
+    // Photos
+    private bool showPhotoModal = false;
+    private string? selectedPhotoPreviewBase64;
+    private string? selectedPhotoFileName;
+    private string? selectedPhotoContentType;
+    private string photoCaption = string.Empty;
+    private bool isUploadingPhoto = false;
+
+    // Zoom Lightbox
+    private string? zoomImageUrl;
+    private string? zoomCaption;
+
+    // Voice recording
+    private bool isRecordingAudio = false;
+    private int recordingSeconds = 0;
+    private System.Threading.Timer? recordingTimer;
+    private bool isUploadingVoice = false;
+
+    // Audio Playback
+    private int? playingAudioId;
+
     private int onlineMembersCount => members.Count(m => presenceList.Any(p => p.UserId == m.UserId && p.IsOnline));
 
     protected override async Task OnInitializedAsync()
@@ -891,6 +1606,7 @@
         {
             await LoadMessagesAsync(1, appendOlder: false);
             await LoadPresenceAsync();
+            await LoadStickerCategoriesAsync();
             await InitializeSignalRAsync();
         }
 
@@ -930,6 +1646,22 @@
         {
             Logger.LogError(ex, "Failed to load circle {CircleId} details", CircleId);
             isMember = false;
+        }
+    }
+
+    private async Task LoadStickerCategoriesAsync()
+    {
+        try
+        {
+            stickerCategories = await ApiClient.GetStickerCategoriesAsync();
+            if (stickerCategories.Any())
+            {
+                selectedCategoryId = stickerCategories.First().CategoryId;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load sticker categories");
         }
     }
 
@@ -1083,7 +1815,6 @@
                 isHubConnected = true;
                 Logger.LogInformation("SignalR Reconnected: {ConnectionId}. Rejoining circle group {CircleId}", connectionId, CircleId);
                 await hubConnection.InvokeAsync("JoinCircle", CircleId);
-                // Refresh latest messages after reconnect to load any missed messages
                 await LoadMessagesAsync(1, appendOlder: false);
                 await InvokeAsync(StateHasChanged);
             };
@@ -1144,6 +1875,304 @@
             await SendMessageAsync();
         }
     }
+
+    // =========================================================================
+    // Photo Sharing
+    // =========================================================================
+
+    private async Task OnPhotoFileSelected(InputFileChangeEventArgs e)
+    {
+        errorMessage = null;
+        var file = e.File;
+        if (file == null) return;
+
+        // Size check (max 10MB)
+        if (file.Size > 10 * 1024 * 1024)
+        {
+            errorMessage = "Image file is too large (maximum 10MB).";
+            return;
+        }
+
+        try
+        {
+            using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+
+            selectedPhotoFileName = file.Name;
+            selectedPhotoContentType = file.ContentType;
+            selectedPhotoPreviewBase64 = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+            photoCaption = string.Empty;
+            showPhotoModal = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to read selected photo file");
+            errorMessage = "Could not process selected image.";
+        }
+    }
+
+    private void CancelPhotoUpload()
+    {
+        showPhotoModal = false;
+        selectedPhotoPreviewBase64 = null;
+        selectedPhotoFileName = null;
+        photoCaption = string.Empty;
+    }
+
+    private async Task SendSelectedPhotoAsync()
+    {
+        if (string.IsNullOrEmpty(selectedPhotoPreviewBase64) || isUploadingPhoto) return;
+
+        isUploadingPhoto = true;
+        errorMessage = null;
+
+        try
+        {
+            var request = new SendPhotoBase64RequestDto
+            {
+                CircleId = CircleId,
+                Caption = photoCaption,
+                FileName = selectedPhotoFileName ?? "bestie-photo.jpg",
+                ContentType = selectedPhotoContentType ?? "image/jpeg",
+                Base64Data = selectedPhotoPreviewBase64
+            };
+
+            var sent = await ApiClient.SendCirclePhotoBase64Async(CircleId, request);
+            if (sent != null)
+            {
+                CancelPhotoUpload();
+                if (!messages.Any(m => m.Id == sent.Id))
+                {
+                    messages.Add(sent);
+                }
+                await ScrollToBottomAsync();
+            }
+            else
+            {
+                errorMessage = "Failed to upload photo. Ensure you have CHAT_SEND_IMAGE permission.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending photo");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isUploadingPhoto = false;
+        }
+    }
+
+    // =========================================================================
+    // Stickers
+    // =========================================================================
+
+    private void ToggleStickerDrawer()
+    {
+        showStickerDrawer = !showStickerDrawer;
+    }
+
+    private async Task SendStickerAsync(int stickerId)
+    {
+        try
+        {
+            var sent = await ApiClient.SendCircleStickerAsync(CircleId, stickerId);
+            if (sent != null)
+            {
+                showStickerDrawer = false;
+                if (!messages.Any(m => m.Id == sent.Id))
+                {
+                    messages.Add(sent);
+                }
+                await ScrollToBottomAsync();
+            }
+            else
+            {
+                errorMessage = "Failed to send sticker.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending sticker");
+            errorMessage = ex.Message;
+        }
+    }
+
+    // =========================================================================
+    // Voice Messages
+    // =========================================================================
+
+    private async Task ToggleVoiceRecorder()
+    {
+        if (isRecordingAudio)
+        {
+            await CancelVoiceRecordingAsync();
+        }
+        else
+        {
+            await StartVoiceRecordingAsync();
+        }
+    }
+
+    private async Task StartVoiceRecordingAsync()
+    {
+        errorMessage = null;
+        try
+        {
+            var started = await JS.InvokeAsync<bool>("voiceRecorder.startRecording");
+            if (started)
+            {
+                isRecordingAudio = true;
+                recordingSeconds = 0;
+                recordingTimer?.Dispose();
+                recordingTimer = new System.Threading.Timer(async _ =>
+                {
+                    recordingSeconds++;
+                    if (recordingSeconds >= 120)
+                    {
+                        await InvokeAsync(StopAndSendVoiceRecordingAsync);
+                    }
+                    else
+                    {
+                        await InvokeAsync(StateHasChanged);
+                    }
+                }, null, 1000, 1000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error starting voice recording");
+            errorMessage = "Could not access microphone.";
+        }
+    }
+
+    private async Task CancelVoiceRecordingAsync()
+    {
+        recordingTimer?.Dispose();
+        recordingTimer = null;
+        isRecordingAudio = false;
+        recordingSeconds = 0;
+        try
+        {
+            await JS.InvokeVoidAsync("voiceRecorder.cancelRecording");
+        }
+        catch { }
+    }
+
+    private async Task StopAndSendVoiceRecordingAsync()
+    {
+        if (isUploadingVoice) return;
+        isUploadingVoice = true;
+        recordingTimer?.Dispose();
+        recordingTimer = null;
+
+        try
+        {
+            var audioData = await JS.InvokeAsync<VoiceRecordingResultDto>("voiceRecorder.stopAndGetAudio");
+            isRecordingAudio = false;
+
+            if (audioData != null && !string.IsNullOrEmpty(audioData.Base64))
+            {
+                var request = new SendVoiceBase64RequestDto
+                {
+                    CircleId = CircleId,
+                    DurationSeconds = audioData.Duration,
+                    FileName = audioData.FileName ?? "voice-note.webm",
+                    ContentType = audioData.MimeType ?? "audio/webm",
+                    Base64Data = audioData.Base64
+                };
+
+                var sent = await ApiClient.SendCircleVoiceBase64Async(CircleId, request);
+                if (sent != null)
+                {
+                    if (!messages.Any(m => m.Id == sent.Id))
+                    {
+                        messages.Add(sent);
+                    }
+                    await ScrollToBottomAsync();
+                }
+                else
+                {
+                    errorMessage = "Failed to send voice message.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error uploading voice recording");
+            errorMessage = "Failed to upload voice note.";
+        }
+        finally
+        {
+            isUploadingVoice = false;
+            recordingSeconds = 0;
+        }
+    }
+
+    private async Task TogglePlayAudio(int messageId)
+    {
+        var elementId = $"audio-{messageId}";
+        if (playingAudioId == messageId)
+        {
+            await JS.InvokeVoidAsync("pastelAudioPlayer.pause", elementId);
+            playingAudioId = null;
+        }
+        else
+        {
+            if (playingAudioId.HasValue)
+            {
+                await JS.InvokeVoidAsync("pastelAudioPlayer.pause", $"audio-{playingAudioId.Value}");
+            }
+            playingAudioId = messageId;
+            await JS.InvokeVoidAsync("pastelAudioPlayer.play", elementId);
+        }
+    }
+
+    private void OnAudioEnded(int messageId)
+    {
+        if (playingAudioId == messageId)
+        {
+            playingAudioId = null;
+            StateHasChanged();
+        }
+    }
+
+    // =========================================================================
+    // Lightbox & Media Helpers
+    // =========================================================================
+
+    private string GetMessageMediaUrl(CircleChatMessageDto msg)
+    {
+        if (msg.MediaId.HasValue && msg.MediaId.Value > 0)
+        {
+            return ApiClient.GetMediaUrl(msg.CircleId, msg.MediaId.Value, thumbnail: false);
+        }
+        return msg.MediaUrl ?? string.Empty;
+    }
+
+    private void OpenZoomModal(string imageUrl, string? caption = null)
+    {
+        zoomImageUrl = imageUrl;
+        zoomCaption = caption;
+    }
+
+    private void CloseZoomModal()
+    {
+        zoomImageUrl = null;
+        zoomCaption = null;
+    }
+
+    private string FormatDuration(double seconds)
+    {
+        var ts = TimeSpan.FromSeconds(Math.Max(0, seconds));
+        return $"{ts.Minutes}:{ts.Seconds:D2}";
+    }
+
+    // =========================================================================
+    // Edit & Delete
+    // =========================================================================
 
     private void StartEdit(CircleChatMessageDto msg)
     {
@@ -1231,6 +2260,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        recordingTimer?.Dispose();
         if (hubConnection != null)
         {
             try
@@ -1246,5 +2276,13 @@
                 Logger.LogWarning(ex, "Error disposing HubConnection");
             }
         }
+    }
+
+    public class VoiceRecordingResultDto
+    {
+        public string? Base64 { get; set; }
+        public double Duration { get; set; }
+        public string? MimeType { get; set; }
+        public string? FileName { get; set; }
     }
 }

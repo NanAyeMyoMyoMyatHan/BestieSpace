@@ -351,11 +351,18 @@ public class CircleChatService : ICircleChatService
             SenderProfilePicture = m.Sender?.ProfilePicture,
             MessageType = m.MessageType,
             Content = m.IsDeleted ? "🌸 This message was deleted" : m.Content,
+            MediaId = m.MediaId,
+            MediaUrl = m.MediaUrl,
+            ThumbnailUrl = m.ThumbnailUrl,
+            FileName = m.FileName,
+            ContentType = m.ContentType,
+            FileSize = m.FileSize,
+            DurationSeconds = m.VoiceDurationSeconds ?? m.DurationSeconds,
             CreatedAt = m.Timestamp,
             UpdatedAt = m.UpdatedAt,
             IsDeleted = m.IsDeleted,
             IsOwnMessage = isOwn,
-            CanEdit = !m.IsDeleted && isOwn,
+            CanEdit = !m.IsDeleted && isOwn && (m.MessageType == "text"),
             CanDelete = !m.IsDeleted && (isOwn || isModerator)
         };
     }

@@ -109,6 +109,47 @@ window.voiceRecorder = {
         });
     },
 
+    stopAndGetAudio: function () {
+        return new Promise((resolve, reject) => {
+            if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+                resolve(null);
+                return;
+            }
+
+            const durationSec = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+
+            this.mediaRecorder.onstop = async () => {
+                try {
+                    const mimeType = this.mediaRecorder.mimeType || 'audio/webm';
+                    const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+
+                    if (this.stream) {
+                        this.stream.getTracks().forEach(track => track.stop());
+                        this.stream = null;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64Data = reader.result;
+                        resolve({
+                            base64: base64Data,
+                            duration: durationSec,
+                            mimeType: mimeType,
+                            fileName: `voice-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`
+                        });
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(audioBlob);
+                } catch (err) {
+                    console.error("Error stopping voice recorder:", err);
+                    reject(err);
+                }
+            };
+
+            this.mediaRecorder.stop();
+        });
+    },
+
     cancelRecording: function () {
         if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
             this.mediaRecorder.stop();

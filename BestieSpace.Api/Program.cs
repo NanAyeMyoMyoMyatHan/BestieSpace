@@ -2,6 +2,7 @@ using BestieSpace.Api.Features.Auth;
 using BestieSpace.Api.Features.Chat;
 using BestieSpace.Api.Features.Circles;
 using BestieSpace.Api.Features.Dashboard;
+using BestieSpace.Api.Features.Media;
 using BestieSpace.Api.Features.Memories;
 using BestieSpace.Api.Features.Rbac;
 using BestieSpace.Api.Features.SecretNotes;
@@ -69,6 +70,11 @@ builder.Services.AddScoped<ICircleMemberService, CircleMemberService>();
 builder.Services.AddSingleton<IChatPresenceService, ChatPresenceService>();
 builder.Services.AddScoped<ICircleChatService, CircleChatService>();
 
+// Multimedia Messaging, Stickers & Media Storage (Phase 7)
+builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
+builder.Services.AddScoped<IStickerService, StickerService>();
+builder.Services.AddScoped<IChatMediaService, ChatMediaService>();
+
 // Configure JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] 
     ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
@@ -102,7 +108,7 @@ builder.Services.AddAuthentication(options =>
         {
             var accessToken = context.Request.Query["access_token"];
             var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/chathub"))
+            if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/chathub") || path.Value?.Contains("/media") == true))
             {
                 context.Token = accessToken;
             }
@@ -281,7 +287,53 @@ using (var scope = app.Services.CreateScope())
             throw new Exception("Phase 6 dynamic chat policies verification failed");
         Console.WriteLine("[PASS] Dynamic Phase 6 policies verified (CHAT_SEND, CHAT_EDIT_OWN, CHAT_DELETE_OWN, CHAT_MODERATE, CHAT_VIEW_HISTORY)");
 
-        Console.WriteLine("================ ALL AUTH, RBAC, SOCIAL, CIRCLE & REAL-TIME CHAT TESTS PASSED! 🌸 ================\n");
+        // 8. Phase 7 Multimedia Messaging, Stickers & Media Storage Verification
+        var mediaStorageSvc = scope.ServiceProvider.GetRequiredService<IMediaStorageService>();
+        var stickerSvc = scope.ServiceProvider.GetRequiredService<IStickerService>();
+        var chatMediaSvc = scope.ServiceProvider.GetRequiredService<IChatMediaService>();
+        if (mediaStorageSvc == null || stickerSvc == null || chatMediaSvc == null)
+            throw new Exception("Phase 7 Multimedia services DI resolution failed");
+
+        // Magic byte verification for JPEG, PNG, WebP
+        byte[] validJpeg = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46 };
+        byte[] validPng = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00 };
+        byte[] validWebp = new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50 };
+        byte[] fakeExe = new byte[] { 0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00 };
+
+        if (!mediaStorageSvc.ValidateImageMagicBytes(validJpeg, "jpeg")) throw new Exception("JPEG magic byte validation failed");
+        if (!mediaStorageSvc.ValidateImageMagicBytes(validPng, "png")) throw new Exception("PNG magic byte validation failed");
+        if (!mediaStorageSvc.ValidateImageMagicBytes(validWebp, "webp")) throw new Exception("WebP magic byte validation failed");
+        if (mediaStorageSvc.ValidateImageMagicBytes(fakeExe, "png")) throw new Exception("Fake EXE passed PNG magic byte validation");
+        Console.WriteLine("[PASS] Phase 7 Image Magic Byte inspection verified (JPEG, PNG, WebP vs malicious spoof: PASS)");
+
+        // Magic byte verification for WebM, OGG, WAV, MP3
+        byte[] validWebm = new byte[] { 0x1A, 0x45, 0xDF, 0xA3, 0x01, 0x00, 0x00, 0x00 };
+        byte[] validOgg = new byte[] { 0x4F, 0x67, 0x67, 0x53, 0x00, 0x02, 0x00, 0x00 };
+        byte[] validWav = new byte[] { 0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x45 };
+        byte[] validMp3 = new byte[] { 0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00 };
+
+        if (!mediaStorageSvc.ValidateVoiceMagicBytes(validWebm, "webm")) throw new Exception("WebM magic byte validation failed");
+        if (!mediaStorageSvc.ValidateVoiceMagicBytes(validOgg, "ogg")) throw new Exception("OGG magic byte validation failed");
+        if (!mediaStorageSvc.ValidateVoiceMagicBytes(validWav, "wav")) throw new Exception("WAV magic byte validation failed");
+        if (!mediaStorageSvc.ValidateVoiceMagicBytes(validMp3, "mp3")) throw new Exception("MP3 magic byte validation failed");
+        if (mediaStorageSvc.ValidateVoiceMagicBytes(fakeExe, "webm")) throw new Exception("Fake EXE passed WebM magic byte validation");
+        Console.WriteLine("[PASS] Phase 7 Voice Magic Byte inspection verified (WebM, Ogg, WAV, MP3 vs malicious spoof: PASS)");
+
+        // Verify Phase 7 dynamic policies
+        var sendImgPolicy = await policyProvider.GetPolicyAsync("CHAT_SEND_IMAGE");
+        var sendStickerPolicy = await policyProvider.GetPolicyAsync("CHAT_SEND_STICKER");
+        var sendVoicePolicy = await policyProvider.GetPolicyAsync("CHAT_SEND_VOICE");
+        var viewMediaPolicy = await policyProvider.GetPolicyAsync("CHAT_VIEW_MEDIA");
+        var deleteMediaPolicy = await policyProvider.GetPolicyAsync("CHAT_DELETE_MEDIA");
+        var stickerViewPolicy = await policyProvider.GetPolicyAsync("STICKER_VIEW");
+        var stickerManagePolicy = await policyProvider.GetPolicyAsync("STICKER_MANAGE");
+
+        if (sendImgPolicy == null || sendStickerPolicy == null || sendVoicePolicy == null || 
+            viewMediaPolicy == null || deleteMediaPolicy == null || stickerViewPolicy == null || stickerManagePolicy == null)
+            throw new Exception("Phase 7 dynamic multimedia policies verification failed");
+        Console.WriteLine("[PASS] Dynamic Phase 7 policies verified (CHAT_SEND_IMAGE, CHAT_SEND_STICKER, CHAT_SEND_VOICE, CHAT_VIEW_MEDIA, CHAT_DELETE_MEDIA, STICKER_VIEW, STICKER_MANAGE)");
+
+        Console.WriteLine("================ ALL AUTH, RBAC, SOCIAL, CIRCLE, CHAT & MULTIMEDIA TESTS PASSED! 🌸 ================\n");
         return;
     }
 

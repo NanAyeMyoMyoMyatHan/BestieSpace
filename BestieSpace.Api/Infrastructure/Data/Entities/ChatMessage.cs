@@ -5,14 +5,14 @@ namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
 /// <summary>
 /// Entity representing real-time multimedia and circle group chat messages.
-/// Upgraded in Phase 6 to support private Bestie Circle group chats, soft deletion, and editing.
+/// Upgraded in Phase 7 to support photos, thumbnails, stickers, voice messages, and media files.
 /// </summary>
 public partial class ChatMessage
 {
     public int Id { get; set; }
 
     /// <summary>
-    /// Alias for ChatMessageId matching Phase 6 specification.
+    /// Alias for ChatMessageId matching specifications.
     /// </summary>
     public int ChatMessageId => Id;
 
@@ -28,18 +28,34 @@ public partial class ChatMessage
 
     public string SenderName { get; set; } = null!;
 
-    public string MessageType { get; set; } = "text"; // "text", "system", "sticker", "photo", "voice"
+    public string MessageType { get; set; } = "text"; // "text", "image", "sticker", "voice", "system"
 
     public string? Content { get; set; }
 
     public string? MediaUrl { get; set; }
 
+    public string? ThumbnailUrl { get; set; }
+
+    public string? FileName { get; set; }
+
+    public string? ContentType { get; set; }
+
+    public long? FileSize { get; set; }
+
     public double? VoiceDurationSeconds { get; set; }
+
+    public double? DurationSeconds
+    {
+        get => VoiceDurationSeconds;
+        set => VoiceDurationSeconds = value;
+    }
+
+    public int? MediaId { get; set; }
 
     public DateTime Timestamp { get; set; }
 
     /// <summary>
-    /// Alias for CreatedAt matching Phase 6 specification.
+    /// Alias for CreatedAt matching specifications.
     /// </summary>
     public DateTime CreatedAt
     {
@@ -60,5 +76,6 @@ public partial class ChatMessage
     // Navigation properties
     public virtual BestieCircle? Circle { get; set; }
     public virtual User? Sender { get; set; }
+    public virtual MediaFile? MediaFile { get; set; }
     public virtual ICollection<ChatMessageRead> ReadReceipts { get; set; } = new List<ChatMessageRead>();
 }

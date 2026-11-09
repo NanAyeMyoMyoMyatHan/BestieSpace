@@ -218,6 +218,17 @@ public class BestieChatHub : Hub
         return await chatService.DeleteCircleMessageAsync(request.MessageId, request.CircleId, userId);
     }
 
+    /// <summary>
+    /// Client-to-server SendSticker event.
+    /// </summary>
+    public async Task<CircleChatMessageDto> SendSticker(SendStickerMessageRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var mediaService = scope.ServiceProvider.GetRequiredService<BestieSpace.Api.Features.Media.IChatMediaService>();
+        return await mediaService.SendStickerMessageAsync(request.CircleId, request.StickerId, userId);
+    }
+
     // =========================================================================
     // Legacy Hub methods preserved for Phase 1-4 Clubhouse Compatibility
     // =========================================================================

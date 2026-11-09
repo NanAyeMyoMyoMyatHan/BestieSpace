@@ -453,7 +453,14 @@ public static class DatabaseBootstrapper
             new() { PermissionCode = "CHAT_EDIT_OWN", Description = "Edit own chat messages in an authorized circle" },
             new() { PermissionCode = "CHAT_DELETE_OWN", Description = "Soft delete own chat messages in an authorized circle" },
             new() { PermissionCode = "CHAT_MODERATE", Description = "Moderate (soft delete/censor) any circle message as owner or admin" },
-            new() { PermissionCode = "CHAT_VIEW_HISTORY", Description = "View paginated message history for an authorized circle" }
+            new() { PermissionCode = "CHAT_VIEW_HISTORY", Description = "View paginated message history for an authorized circle" },
+            new() { PermissionCode = "CHAT_SEND_IMAGE", Description = "Upload and send photo messages in circle chat" },
+            new() { PermissionCode = "CHAT_SEND_STICKER", Description = "Send cute stickers in circle chat" },
+            new() { PermissionCode = "CHAT_SEND_VOICE", Description = "Record and send voice notes in circle chat" },
+            new() { PermissionCode = "CHAT_VIEW_MEDIA", Description = "View and play multimedia photos and voice messages" },
+            new() { PermissionCode = "CHAT_DELETE_MEDIA", Description = "Delete multimedia messages in circle chat" },
+            new() { PermissionCode = "STICKER_VIEW", Description = "Browse and view available sticker packs and categories" },
+            new() { PermissionCode = "STICKER_MANAGE", Description = "Create, update, and manage sticker categories and sticker collections" }
         };
 
         foreach (var p in permsToSeed)
@@ -494,6 +501,7 @@ public static class DatabaseBootstrapper
                 "PERMISSION_VIEW", "PERMISSION_ASSIGN", "USER_ROLE_MANAGE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT",
                 "FRIEND_REMOVE", "CIRCLE_CREATE", "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_MEMBER_MANAGE",
                 "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
+                "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW", "STICKER_MANAGE",
                 "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
@@ -519,7 +527,9 @@ public static class DatabaseBootstrapper
             var userCodes = new HashSet<string>
             {
                 "USER_VIEW", "USER_UPDATE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT", "FRIEND_REMOVE",
-                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY", "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
+                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY",
+                "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "STICKER_VIEW",
+                "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
 
@@ -545,7 +555,9 @@ public static class DatabaseBootstrapper
             {
                 "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_INVITE", "CIRCLE_INVITATION_CANCEL",
                 "CIRCLE_MEMBER_VIEW", "CIRCLE_MEMBER_REMOVE", "CIRCLE_MEMBER_ROLE_UPDATE", "CIRCLE_TRANSFER_OWNERSHIP",
-                "CIRCLE_MEMBER_MANAGE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+                "CIRCLE_MEMBER_MANAGE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
+                "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW",
+                "MEMORY_CREATE"
             };
 
             var existingPermIds = await context.RolePermissions
@@ -569,7 +581,9 @@ public static class DatabaseBootstrapper
             var circleAdminCodes = new HashSet<string>
             {
                 "CIRCLE_VIEW", "CIRCLE_INVITE", "CIRCLE_INVITATION_CANCEL", "CIRCLE_MEMBER_VIEW",
-                "CIRCLE_MEMBER_REMOVE", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+                "CIRCLE_MEMBER_REMOVE", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
+                "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "CHAT_DELETE_MEDIA", "STICKER_VIEW",
+                "MEMORY_CREATE"
             };
 
             var existingPermIds = await context.RolePermissions
@@ -592,7 +606,9 @@ public static class DatabaseBootstrapper
         {
             var circleMemberCodes = new HashSet<string>
             {
-                "CIRCLE_VIEW", "CIRCLE_MEMBER_VIEW", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+                "CIRCLE_VIEW", "CIRCLE_MEMBER_VIEW", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY",
+                "CHAT_SEND_IMAGE", "CHAT_SEND_STICKER", "CHAT_SEND_VOICE", "CHAT_VIEW_MEDIA", "STICKER_VIEW",
+                "MEMORY_CREATE"
             };
 
             var existingPermIds = await context.RolePermissions
@@ -667,6 +683,86 @@ public static class DatabaseBootstrapper
                 }
                 await context.SaveChangesAsync();
             }
+        }
+
+        // Seed StickerCategories and Stickers (Phase 7)
+        if (!await context.StickerCategories.AnyAsync())
+        {
+            var categories = new List<StickerCategory>
+            {
+                new() { CategoryName = "Cute", Icon = "🌸", DisplayOrder = 1, IsActive = true },
+                new() { CategoryName = "Love", Icon = "💖", DisplayOrder = 2, IsActive = true },
+                new() { CategoryName = "Happy", Icon = "🥳", DisplayOrder = 3, IsActive = true },
+                new() { CategoryName = "Sad", Icon = "🥺", DisplayOrder = 4, IsActive = true },
+                new() { CategoryName = "Funny", Icon = "😹", DisplayOrder = 5, IsActive = true },
+                new() { CategoryName = "Miss You", Icon = "💌", DisplayOrder = 6, IsActive = true },
+                new() { CategoryName = "Good Morning", Icon = "☀️", DisplayOrder = 7, IsActive = true },
+                new() { CategoryName = "Good Night", Icon = "🌙", DisplayOrder = 8, IsActive = true },
+                new() { CategoryName = "Hearts", Icon = "💕", DisplayOrder = 9, IsActive = true }
+            };
+            context.StickerCategories.AddRange(categories);
+            await context.SaveChangesAsync();
+
+            var catMap = await context.StickerCategories.ToDictionaryAsync(c => c.CategoryName, c => c.CategoryId);
+
+            var stickers = new List<Sticker>
+            {
+                // Cute
+                new() { CategoryId = catMap["Cute"], StickerName = "Cherry Blossom", ImageUrl = "🌸", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Cute"], StickerName = "Pastel Ribbon", ImageUrl = "🎀", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Cute"], StickerName = "Strawberry Kiss", ImageUrl = "🍓", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Cute"], StickerName = "Fuzzy Teddy", ImageUrl = "🧸", DisplayOrder = 4, IsActive = true },
+
+                // Love
+                new() { CategoryId = catMap["Love"], StickerName = "Sparkling Heart", ImageUrl = "💖", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Love"], StickerName = "Pinky Promise", ImageUrl = "🤞", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Love"], StickerName = "Bouquet Hug", ImageUrl = "💐", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Love"], StickerName = "Friendship Crown", ImageUrl = "👑", DisplayOrder = 4, IsActive = true },
+
+                // Happy
+                new() { CategoryId = catMap["Happy"], StickerName = "Party Popper", ImageUrl = "🥳", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Happy"], StickerName = "Stardust Magic", ImageUrl = "✨", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Happy"], StickerName = "Sweet Cupcake", ImageUrl = "🧁", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Happy"], StickerName = "Rainbow Cheer", ImageUrl = "🌈", DisplayOrder = 4, IsActive = true },
+
+                // Sad
+                new() { CategoryId = catMap["Sad"], StickerName = "Teary Eyes", ImageUrl = "🥺", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Sad"], StickerName = "Bear Hug", ImageUrl = "🫂", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Sad"], StickerName = "Raincloud", ImageUrl = "🌧️", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Sad"], StickerName = "Bandage Mend", ImageUrl = "🩹", DisplayOrder = 4, IsActive = true },
+
+                // Funny
+                new() { CategoryId = catMap["Funny"], StickerName = "Laughing Cat", ImageUrl = "😹", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Funny"], StickerName = "Chaotic Bestie", ImageUrl = "🤪", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Funny"], StickerName = "Boba Gulp", ImageUrl = "🧋", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Funny"], StickerName = "Pizza Slice", ImageUrl = "🍕", DisplayOrder = 4, IsActive = true },
+
+                // Miss You
+                new() { CategoryId = catMap["Miss You"], StickerName = "Letter For You", ImageUrl = "💌", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Miss You"], StickerName = "Paper Plane", ImageUrl = "✈️", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Miss You"], StickerName = "Call Me", ImageUrl = "📱", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Miss You"], StickerName = "Hourglass Wait", ImageUrl = "⏳", DisplayOrder = 4, IsActive = true },
+
+                // Good Morning
+                new() { CategoryId = catMap["Good Morning"], StickerName = "Warm Sunshine", ImageUrl = "☀️", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Good Morning"], StickerName = "Morning Coffee", ImageUrl = "☕", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Good Morning"], StickerName = "Fluffy Pancakes", ImageUrl = "🥞", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Good Morning"], StickerName = "Sunflower Smile", ImageUrl = "🌻", DisplayOrder = 4, IsActive = true },
+
+                // Good Night
+                new() { CategoryId = catMap["Good Night"], StickerName = "Crescent Moon", ImageUrl = "🌙", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Good Night"], StickerName = "Shooting Star", ImageUrl = "🌠", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Good Night"], StickerName = "Sleepy Cloud", ImageUrl = "☁️", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Good Night"], StickerName = "Cozy Candle", ImageUrl = "🕯️", DisplayOrder = 4, IsActive = true },
+
+                // Hearts
+                new() { CategoryId = catMap["Hearts"], StickerName = "Pink Ribbon Heart", ImageUrl = "💝", DisplayOrder = 1, IsActive = true },
+                new() { CategoryId = catMap["Hearts"], StickerName = "Spinning Hearts", ImageUrl = "💞", DisplayOrder = 2, IsActive = true },
+                new() { CategoryId = catMap["Hearts"], StickerName = "Growing Heart", ImageUrl = "💗", DisplayOrder = 3, IsActive = true },
+                new() { CategoryId = catMap["Hearts"], StickerName = "Beating Heart", ImageUrl = "💓", DisplayOrder = 4, IsActive = true }
+            };
+            context.Stickers.AddRange(stickers);
+            await context.SaveChangesAsync();
         }
     }
 

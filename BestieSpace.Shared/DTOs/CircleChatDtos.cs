@@ -16,8 +16,16 @@ public class CircleChatMessageDto
     public string SenderDisplayName { get; set; } = string.Empty;
     public string? SenderAvatarSticker { get; set; }
     public string? SenderProfilePicture { get; set; }
-    public string MessageType { get; set; } = "text"; // "text", "system", etc.
+    public string MessageType { get; set; } = "text"; // "text", "system", "photo", "sticker", "voice"
     public string? Content { get; set; }
+    public int? MediaId { get; set; }
+    public string? MediaUrl { get; set; }
+    public string? ThumbnailUrl { get; set; }
+    public string? FileName { get; set; }
+    public string? ContentType { get; set; }
+    public long? FileSize { get; set; }
+    public double? DurationSeconds { get; set; }
+    public double? VoiceDurationSeconds => DurationSeconds;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }

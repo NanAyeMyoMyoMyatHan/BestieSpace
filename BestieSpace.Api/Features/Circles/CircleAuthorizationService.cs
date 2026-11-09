@@ -57,12 +57,15 @@ public class CircleAuthorizationService : ICircleAuthorizationService
             return new List<string>(); // Strict privacy: non-members have zero access
         }
 
-        // If user is owner, they always hold all circle permissions
+        // If user is owner, they always hold all circle, chat, sticker, and memory permissions
         if (circle.OwnerUserId == userId || membership.Role.RoleName == "CircleOwner" || membership.Role.RoleName == "Owner")
         {
             return await _context.Permissions
                 .AsNoTracking()
-                .Where(p => p.PermissionCode.StartsWith("CIRCLE_"))
+                .Where(p => p.PermissionCode.StartsWith("CIRCLE_") || 
+                            p.PermissionCode.StartsWith("CHAT_") || 
+                            p.PermissionCode.StartsWith("STICKER_") || 
+                            p.PermissionCode.StartsWith("MEMORY_"))
                 .Select(p => p.PermissionCode.ToUpperInvariant())
                 .Distinct()
                 .ToListAsync();

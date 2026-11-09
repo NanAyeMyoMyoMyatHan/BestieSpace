@@ -84,6 +84,15 @@ public interface IBestieApiClient
     Task<CircleChatMessageDto?> EditCircleMessageAsync(int circleId, int messageId, string newContent);
     Task<bool> DeleteCircleMessageAsync(int circleId, int messageId);
     Task<List<CircleMemberPresenceEventDto>> GetCirclePresenceAsync(int circleId);
+
+    // Multimedia Messaging, Stickers & Media (Phase 7)
+    Task<CircleChatMessageDto?> SendCirclePhotoAsync(int circleId, MultipartFormDataContent content);
+    Task<CircleChatMessageDto?> SendCirclePhotoBase64Async(int circleId, SendPhotoBase64RequestDto request);
+    Task<CircleChatMessageDto?> SendCircleVoiceAsync(int circleId, MultipartFormDataContent content);
+    Task<CircleChatMessageDto?> SendCircleVoiceBase64Async(int circleId, SendVoiceBase64RequestDto request);
+    Task<CircleChatMessageDto?> SendCircleStickerAsync(int circleId, int stickerId);
+    Task<List<StickerCategoryDto>> GetStickerCategoriesAsync();
+    string GetMediaUrl(int circleId, int mediaId, bool thumbnail = false);
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -1266,6 +1275,129 @@ public class BestieApiClient : IBestieApiClient
             _logger.LogError(ex, "Failed to get presence for circle {CircleId}", circleId);
             return new();
         }
+    }
+
+    // =========================================================================
+    // Multimedia Messaging, Stickers & Media (Phase 7)
+    // =========================================================================
+
+    public async Task<CircleChatMessageDto?> SendCirclePhotoAsync(int circleId, MultipartFormDataContent content)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/circles/{circleId}/media/photo", content);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to upload circle photo: {Err}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload photo for circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<CircleChatMessageDto?> SendCirclePhotoBase64Async(int circleId, SendPhotoBase64RequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/media/photo-base64", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to upload circle photo base64: {Err}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload base64 photo for circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<CircleChatMessageDto?> SendCircleVoiceAsync(int circleId, MultipartFormDataContent content)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/circles/{circleId}/media/voice", content);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to upload circle voice note: {Err}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload voice note for circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<CircleChatMessageDto?> SendCircleVoiceBase64Async(int circleId, SendVoiceBase64RequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/media/voice-base64", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to upload circle voice base64: {Err}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload base64 voice for circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<CircleChatMessageDto?> SendCircleStickerAsync(int circleId, int stickerId)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/media/sticker", new SendStickerMessageRequestDto
+            {
+                CircleId = circleId,
+                StickerId = stickerId
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+            var err = await res.Content.ReadAsStringAsync();
+            _logger.LogError("Failed to send circle sticker: {Err}", err);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send sticker for circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<List<StickerCategoryDto>> GetStickerCategoriesAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<StickerCategoryDto>>("/api/stickers/categories") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get sticker categories");
+            return new();
+        }
+    }
+
+    public string GetMediaUrl(int circleId, int mediaId, bool thumbnail = false)
+    {
+        var suffix = thumbnail ? "/thumb" : "";
+        var tokenParam = !string.IsNullOrEmpty(_bearerToken) ? $"?access_token={Uri.EscapeDataString(_bearerToken)}" : "";
+        return $"{_baseUrl}/api/circles/{circleId}/media/{mediaId}{suffix}{tokenParam}";
     }
 
     private static List<ChatMessageDto> CreateFallbackMessages()

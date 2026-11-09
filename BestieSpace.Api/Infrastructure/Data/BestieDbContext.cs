@@ -39,6 +39,11 @@ public partial class BestieDbContext : DbContext
     public virtual DbSet<ChatMessageRead> ChatMessageReads { get; set; } = null!;
     public virtual DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
+    // Multimedia Messaging & Stickers (Phase 7)
+    public virtual DbSet<MediaFile> MediaFiles { get; set; } = null!;
+    public virtual DbSet<StickerCategory> StickerCategories { get; set; } = null!;
+    public virtual DbSet<Sticker> Stickers { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -360,7 +365,12 @@ public partial class BestieDbContext : DbContext
             entity.Property(e => e.MessageType).IsRequired().HasMaxLength(20);
             entity.Property(e => e.Content).IsRequired(false);
             entity.Property(e => e.MediaUrl).IsRequired(false).HasMaxLength(1000);
+            entity.Property(e => e.ThumbnailUrl).IsRequired(false).HasMaxLength(1000);
+            entity.Property(e => e.FileName).IsRequired(false).HasMaxLength(260);
+            entity.Property(e => e.ContentType).IsRequired(false).HasMaxLength(100);
+            entity.Property(e => e.FileSize).IsRequired(false);
             entity.Property(e => e.VoiceDurationSeconds).IsRequired(false);
+            entity.Property(e => e.MediaId).IsRequired(false);
             entity.Property(e => e.Timestamp).IsRequired();
             entity.Property(e => e.UpdatedAt).IsRequired(false);
             entity.Property(e => e.IsDeleted).HasDefaultValue(false);
@@ -370,6 +380,7 @@ public partial class BestieDbContext : DbContext
 
             entity.Ignore(e => e.ChatMessageId);
             entity.Ignore(e => e.CreatedAt);
+            entity.Ignore(e => e.DurationSeconds);
 
             entity.HasIndex(e => new { e.CircleId, e.Timestamp });
             entity.HasIndex(e => new { e.SenderId, e.Timestamp });
@@ -383,6 +394,11 @@ public partial class BestieDbContext : DbContext
             entity.HasOne(e => e.Sender)
                 .WithMany(u => u.SentMessages)
                 .HasForeignKey(e => e.SenderId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.MediaFile)
+                .WithMany(m => m.Messages)
+                .HasForeignKey(e => e.MediaId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
@@ -429,6 +445,81 @@ public partial class BestieDbContext : DbContext
             entity.HasOne(e => e.User)
                 .WithMany(u => u.RefreshTokens)
                 .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // 17. MediaFiles (Phase 7 multimedia photo & voice storage metadata)
+        modelBuilder.Entity<MediaFile>(entity =>
+        {
+            entity.ToTable("MediaFiles");
+
+            entity.HasKey(e => e.MediaId);
+            entity.Property(e => e.MediaId).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.CircleId).IsRequired();
+            entity.Property(e => e.UploadedByUserId).IsRequired();
+            entity.Property(e => e.StorageKey).IsRequired().HasMaxLength(260);
+            entity.Property(e => e.ThumbnailStorageKey).IsRequired(false).HasMaxLength(260);
+            entity.Property(e => e.OriginalFileName).IsRequired().HasMaxLength(260);
+            entity.Property(e => e.ContentType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.MediaType).IsRequired().HasMaxLength(20);
+            entity.Property(e => e.FileSize).IsRequired();
+            entity.Property(e => e.DurationSeconds).IsRequired(false);
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.DeletedAt).IsRequired(false);
+
+            entity.HasIndex(e => new { e.CircleId, e.CreatedAt });
+            entity.HasIndex(e => e.UploadedByUserId);
+
+            entity.HasOne(e => e.Circle)
+                .WithMany()
+                .HasForeignKey(e => e.CircleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.UploadedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.UploadedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // 18. StickerCategories (Phase 7 sticker collections)
+        modelBuilder.Entity<StickerCategory>(entity =>
+        {
+            entity.ToTable("StickerCategories");
+
+            entity.HasKey(e => e.CategoryId);
+            entity.Property(e => e.CategoryId).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.CategoryName).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Icon).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).IsRequired();
+
+            entity.HasIndex(e => e.CategoryName).IsUnique();
+        });
+
+        // 19. Stickers (Phase 7 stickers)
+        modelBuilder.Entity<Sticker>(entity =>
+        {
+            entity.ToTable("Stickers");
+
+            entity.HasKey(e => e.StickerId);
+            entity.Property(e => e.StickerId).ValueGeneratedOnAdd();
+
+            entity.Property(e => e.CategoryId).IsRequired();
+            entity.Property(e => e.StickerName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ImageUrl).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).IsRequired();
+
+            entity.HasIndex(e => new { e.CategoryId, e.DisplayOrder });
+
+            entity.HasOne(e => e.Category)
+                .WithMany(c => c.Stickers)
+                .HasForeignKey(e => e.CategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
