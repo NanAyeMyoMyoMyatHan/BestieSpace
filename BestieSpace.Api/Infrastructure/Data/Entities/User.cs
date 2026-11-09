@@ -1,30 +1,15 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// User entity for BestieSpace platform.
-/// Upgraded in Phase 1 for multi-user social friendship and circle foundation.
-/// </summary>
-public class User
+public partial class User
 {
-    // Primary Key (UserId)
     public int UserId { get; set; }
 
-    /// <summary>
-    /// Backward-compatibility alias for UserId so existing controllers, services, and DTO mappings compile seamlessly.
-    /// Ignored in EF Core mapping.
-    /// </summary>
-    public int Id
-    {
-        get => UserId;
-        set => UserId = value;
-    }
+    public string Username { get; set; } = null!;
 
-    public string Username { get; set; } = string.Empty;
-
-    public string NormalizedUsername { get; set; } = string.Empty;
+    public string NormalizedUsername { get; set; } = null!;
 
     public string? Email { get; set; }
 
@@ -32,53 +17,61 @@ public class User
 
     public string? PasswordHash { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; set; }
 
-    // Preserved fields from initial Kawaii clubhouse implementation
-    public string Password { get; set; } = string.Empty;
+    public string Password { get; set; } = null!;
 
-    public string DisplayName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = null!;
 
-    // Phase 4: User Profiles
     public string? ProfilePicture { get; set; }
 
     public string? Bio { get; set; }
 
-    public string RoleKey { get; set; } = string.Empty; // "Bestie", "Me", "Admin", etc.
+    public string RoleKey { get; set; } = null!;
 
-    public string AvatarSticker { get; set; } = "🌸";
+    public string AvatarSticker { get; set; } = null!;
 
     public string? PasswordHint { get; set; }
 
-    public string QuickPin { get; set; } = "3000";
+    public string QuickPin { get; set; } = null!;
 
-    public bool IsOnline { get; set; } = false;
+    public bool IsOnline { get; set; }
 
     public DateTime? LastSeenAt { get; set; }
 
     public DateTime? LastLoginAt { get; set; }
 
-    // Navigation properties for relationships
-    public virtual ICollection<Friendship> InitiatedFriendships { get; set; } = new List<Friendship>();
-    public virtual ICollection<Friendship> ReceivedFriendships { get; set; } = new List<Friendship>();
+    public virtual ICollection<BestieCircleMember> BestieCircleMembers { get; set; } = new List<BestieCircleMember>();
 
-    public virtual ICollection<UserBlock> BlockedUsers { get; set; } = new List<UserBlock>();
-    public virtual ICollection<UserBlock> BlockedByUsers { get; set; } = new List<UserBlock>();
+    public virtual ICollection<BestieCircle> BestieCircles { get; set; } = new List<BestieCircle>();
 
-    public virtual ICollection<BestieCircle> OwnedCircles { get; set; } = new List<BestieCircle>();
-    public virtual ICollection<BestieCircleMember> CircleMemberships { get; set; } = new List<BestieCircleMember>();
+    public virtual ICollection<ChatMessageDelivery> ChatMessageDeliveries { get; set; } = new List<ChatMessageDelivery>();
 
-    public virtual ICollection<CircleInvitation> SentInvitations { get; set; } = new List<CircleInvitation>();
-    public virtual ICollection<CircleInvitation> ReceivedInvitations { get; set; } = new List<CircleInvitation>();
+    public virtual ICollection<ChatMessageRead> ChatMessageReads { get; set; } = new List<ChatMessageRead>();
+
+    public virtual ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
+
+    public virtual ICollection<CircleInvitation> CircleInvitationInviteeUsers { get; set; } = new List<CircleInvitation>();
+
+    public virtual ICollection<CircleInvitation> CircleInvitationInviterUsers { get; set; } = new List<CircleInvitation>();
+
+    public virtual ICollection<Friendship> FriendshipFriendUsers { get; set; } = new List<Friendship>();
+
+    public virtual ICollection<Friendship> FriendshipUsers { get; set; } = new List<Friendship>();
+
+    public virtual ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
+
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+
+    public virtual ICollection<UserBlock> UserBlockBlockedUsers { get; set; } = new List<UserBlock>();
+
+    public virtual ICollection<UserBlock> UserBlockBlockerUsers { get; set; } = new List<UserBlock>();
 
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
-    public virtual ICollection<ChatMessageRead> MessageReads { get; set; } = new List<ChatMessageRead>();
-    public virtual ICollection<ChatMessage> SentMessages { get; set; } = new List<ChatMessage>();
-    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
-    public virtual ICollection<ChatMessageDelivery> ChatMessageDeliveries { get; set; } = new List<ChatMessageDelivery>();
-    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

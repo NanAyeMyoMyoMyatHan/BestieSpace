@@ -1,34 +1,35 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Represents a private friendship circle (maximum of 9 members including owner).
-/// </summary>
-public class BestieCircle
+public partial class BestieCircle
 {
     public int CircleId { get; set; }
 
-    public string CircleName { get; set; } = string.Empty;
+    public string CircleName { get; set; } = null!;
 
     public string? Description { get; set; }
 
-    public string CircleIcon { get; set; } = "🌸";
+    public string CircleIcon { get; set; } = null!;
 
     public string? CircleImage { get; set; }
 
     public int OwnerUserId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; set; }
 
-    // Navigation properties
-    public virtual User Owner { get; set; } = null!;
-    public virtual ICollection<BestieCircleMember> Members { get; set; } = new List<BestieCircleMember>();
-    public virtual ICollection<CircleInvitation> Invitations { get; set; } = new List<CircleInvitation>();
-    public virtual ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
+    public virtual ICollection<BestieCircleMember> BestieCircleMembers { get; set; } = new List<BestieCircleMember>();
+
+    public virtual ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
+
+    public virtual ICollection<CircleInvitation> CircleInvitations { get; set; } = new List<CircleInvitation>();
+
+    public virtual ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
+
+    public virtual User OwnerUser { get; set; } = null!;
 }

@@ -1,11 +1,9 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Represents a read receipt for a chat message by a specific user.
-/// </summary>
-public class ChatMessageRead
+public partial class ChatMessageRead
 {
     public int ChatMessageReadId { get; set; }
 
@@ -13,9 +11,9 @@ public class ChatMessageRead
 
     public int UserId { get; set; }
 
-    public DateTime ReadAt { get; set; } = DateTime.UtcNow;
+    public DateTime ReadAt { get; set; }
 
-    // Navigation properties
     public virtual ChatMessage ChatMessage { get; set; } = null!;
+
     public virtual User User { get; set; } = null!;
 }

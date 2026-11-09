@@ -1,11 +1,9 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Represents a user blocking another user from interaction.
-/// </summary>
-public class UserBlock
+public partial class UserBlock
 {
     public int UserBlockId { get; set; }
 
@@ -13,9 +11,9 @@ public class UserBlock
 
     public int BlockedUserId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
-    // Navigation properties
-    public virtual User BlockerUser { get; set; } = null!;
     public virtual User BlockedUser { get; set; } = null!;
+
+    public virtual User BlockerUser { get; set; } = null!;
 }

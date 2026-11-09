@@ -1,11 +1,8 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Entity representing an interactive mystery envelope note.
-/// Scaffolded to match SecretNotes SQL table.
-/// </summary>
 public partial class SecretNote
 {
     public int Id { get; set; }

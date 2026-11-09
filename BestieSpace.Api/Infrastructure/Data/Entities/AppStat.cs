@@ -1,11 +1,8 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Entity representing global application statistics and the heartfelt welcome letter.
-/// Scaffolded to match AppStats SQL table.
-/// </summary>
 public partial class AppStat
 {
     public int Id { get; set; }

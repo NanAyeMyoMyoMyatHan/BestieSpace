@@ -1,12 +1,9 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Represents a membership in a Bestie Circle.
-/// Maximum 9 members (including owner) is enforced at the service layer transactionally in Phase 2.
-/// </summary>
-public class BestieCircleMember
+public partial class BestieCircleMember
 {
     public int CircleMemberId { get; set; }
 
@@ -16,12 +13,13 @@ public class BestieCircleMember
 
     public int RoleId { get; set; }
 
-    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime JoinedAt { get; set; }
 
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; set; }
 
-    // Navigation properties
     public virtual BestieCircle Circle { get; set; } = null!;
-    public virtual User User { get; set; } = null!;
+
     public virtual Role Role { get; set; } = null!;
+
+    public virtual User User { get; set; } = null!;
 }

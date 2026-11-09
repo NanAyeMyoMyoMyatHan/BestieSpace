@@ -1,577 +1,429 @@
+﻿using System;
+using System.Collections.Generic;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace BestieSpace.Api.Infrastructure.Data;
 
-/// <summary>
-/// EF Core DbContext for BestieSpace platform using Microsoft SQL Server.
-/// Configures complete multi-user social friendships, circles, RBAC, and chat foundations,
-/// while preserving existing Kawaii memory box, secret notes, app stats, and chat history.
-/// </summary>
 public partial class BestieDbContext : DbContext
 {
-    public BestieDbContext()
-    {
-    }
-
     public BestieDbContext(DbContextOptions<BestieDbContext> options)
         : base(options)
     {
     }
 
-    // Existing entities (preserved)
-    public virtual DbSet<AppStat> AppStats { get; set; } = null!;
-    public virtual DbSet<Memory> Memories { get; set; } = null!;
-    public virtual DbSet<SecretNote> SecretNotes { get; set; } = null!;
-    public virtual DbSet<ChatMessage> ChatMessages { get; set; } = null!;
-    public virtual DbSet<User> Users { get; set; } = null!;
+    public virtual DbSet<AppStat> AppStats { get; set; }
 
-    // New social, circle, and RBAC entities (Phase 1)
-    public virtual DbSet<Friendship> Friendships { get; set; } = null!;
-    public virtual DbSet<UserBlock> UserBlocks { get; set; } = null!;
-    public virtual DbSet<BestieCircle> BestieCircles { get; set; } = null!;
-    public virtual DbSet<BestieCircleMember> BestieCircleMembers { get; set; } = null!;
-    public virtual DbSet<CircleInvitation> CircleInvitations { get; set; } = null!;
-    public virtual DbSet<Role> Roles { get; set; } = null!;
-    public virtual DbSet<Permission> Permissions { get; set; } = null!;
-    public virtual DbSet<UserRole> UserRoles { get; set; } = null!;
-    public virtual DbSet<RolePermission> RolePermissions { get; set; } = null!;
-    public virtual DbSet<ChatMessageRead> ChatMessageReads { get; set; } = null!;
-    public virtual DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
+    public virtual DbSet<BestieCircle> BestieCircles { get; set; }
 
-    // Multimedia Messaging & Stickers (Phase 7)
-    public virtual DbSet<MediaFile> MediaFiles { get; set; } = null!;
-    public virtual DbSet<StickerCategory> StickerCategories { get; set; } = null!;
-    public virtual DbSet<Sticker> Stickers { get; set; } = null!;
+    public virtual DbSet<BestieCircleMember> BestieCircleMembers { get; set; }
 
-    // Offline Messaging, Delivery Receipts & Notifications (Phase 8)
-    public virtual DbSet<ChatMessageDelivery> ChatMessageDeliveries { get; set; } = null!;
-    public virtual DbSet<Notification> Notifications { get; set; } = null!;
+    public virtual DbSet<ChatMessage> ChatMessages { get; set; }
+
+    public virtual DbSet<ChatMessageDelivery> ChatMessageDeliveries { get; set; }
+
+    public virtual DbSet<ChatMessageRead> ChatMessageReads { get; set; }
+
+    public virtual DbSet<CircleInvitation> CircleInvitations { get; set; }
+
+    public virtual DbSet<Friendship> Friendships { get; set; }
+
+    public virtual DbSet<MediaFile> MediaFiles { get; set; }
+
+    public virtual DbSet<Memory> Memories { get; set; }
+
+    public virtual DbSet<Notification> Notifications { get; set; }
+
+    public virtual DbSet<Permission> Permissions { get; set; }
+
+    public virtual DbSet<RefreshToken> RefreshTokens { get; set; }
+
+    public virtual DbSet<Role> Roles { get; set; }
+
+    public virtual DbSet<RolePermission> RolePermissions { get; set; }
+
+    public virtual DbSet<SecretNote> SecretNotes { get; set; }
+
+    public virtual DbSet<Sticker> Stickers { get; set; }
+
+    public virtual DbSet<StickerCategory> StickerCategories { get; set; }
+
+    public virtual DbSet<User> Users { get; set; }
+
+    public virtual DbSet<UserBlock> UserBlocks { get; set; }
+
+    public virtual DbSet<UserRole> UserRoles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
-
-        // 1. AppStats (Preserved)
         modelBuilder.Entity<AppStat>(entity =>
         {
-            entity.ToTable("AppStats");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-            entity.Property(e => e.MissYouCount).HasDefaultValue(1000);
-            entity.Property(e => e.MainLetterTitle).IsRequired().HasMaxLength(250);
-            entity.Property(e => e.MainLetterContent).IsRequired();
-            entity.Property(e => e.SenderNickname).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.RecipientNickname).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.LastUpdated).IsRequired();
+            entity.Property(e => e.LastUpdated).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.MainLetterTitle).HasMaxLength(250);
+            entity.Property(e => e.MissYouCount).HasDefaultValue(1000, "DF_AppStats_MissYouCount");
+            entity.Property(e => e.RecipientNickname).HasMaxLength(100);
+            entity.Property(e => e.SenderNickname).HasMaxLength(100);
         });
 
-        // 2. Memories (Preserved)
-        modelBuilder.Entity<Memory>(entity =>
-        {
-            entity.ToTable("Memories");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-            entity.Property(e => e.Caption).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.ImageUrl).IsRequired().HasMaxLength(1000);
-            entity.Property(e => e.MemoryDate).IsRequired();
-            entity.Property(e => e.StickerType).IsRequired().HasMaxLength(50).HasDefaultValue("heart");
-            entity.Property(e => e.RotationAngle).HasDefaultValue(0.0);
-            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
-            entity.Property(e => e.CreatedAt).IsRequired();
-        });
-
-        // 3. SecretNotes (Preserved)
-        modelBuilder.Entity<SecretNote>(entity =>
-        {
-            entity.ToTable("SecretNotes");
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
-            entity.Property(e => e.PreviewHint).IsRequired().HasMaxLength(300);
-            entity.Property(e => e.Content).IsRequired();
-            entity.Property(e => e.StickerIcon).IsRequired().HasMaxLength(50).HasDefaultValue("💌");
-            entity.Property(e => e.IsUnlocked).HasDefaultValue(false);
-            entity.Property(e => e.UnlockedAt).IsRequired(false);
-        });
-
-        // 4. Users (Upgraded with UserId PK while preserving existing auth fields)
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.ToTable("Users");
-
-            entity.HasKey(e => e.UserId);
-            entity.Property(e => e.UserId).ValueGeneratedOnAdd();
-
-            // Ignore the backward-compatibility 'Id' alias in EF Core mapping
-            entity.Ignore(e => e.Id);
-
-            entity.Property(e => e.Username).IsRequired().HasMaxLength(50);
-            entity.HasIndex(e => e.Username).IsUnique();
-
-            entity.Property(e => e.NormalizedUsername).IsRequired().HasMaxLength(50);
-            entity.HasIndex(e => e.NormalizedUsername).IsUnique();
-
-            entity.Property(e => e.Email).HasMaxLength(255);
-            entity.Property(e => e.NormalizedEmail).HasMaxLength(255);
-            entity.HasIndex(e => e.NormalizedEmail);
-
-            entity.Property(e => e.PasswordHash).HasMaxLength(255);
-
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-
-            // Existing Kawaii auth fields (preserved)
-            entity.Property(e => e.Password).IsRequired().HasMaxLength(100).HasDefaultValue(string.Empty);
-            entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(100).HasDefaultValue(string.Empty);
-            entity.Property(e => e.ProfilePicture).HasMaxLength(1000);
-            entity.Property(e => e.Bio).HasMaxLength(1000);
-            entity.Property(e => e.RoleKey).IsRequired().HasMaxLength(50).HasDefaultValue("User");
-            entity.Property(e => e.AvatarSticker).IsRequired().HasMaxLength(50).HasDefaultValue("🌸");
-            entity.Property(e => e.PasswordHint).HasMaxLength(255);
-            entity.Property(e => e.QuickPin).IsRequired().HasMaxLength(10).HasDefaultValue("3000");
-            entity.Property(e => e.IsOnline).HasDefaultValue(false);
-            entity.Property(e => e.LastSeenAt);
-            entity.Property(e => e.LastLoginAt);
-        });
-
-        // 5. Friendships
-        modelBuilder.Entity<Friendship>(entity =>
-        {
-            entity.ToTable("Friendships", t =>
-            {
-                t.HasCheckConstraint("CK_Friendships_NoSelfFriendship", "[UserId] <> [FriendUserId]");
-                t.HasCheckConstraint("CK_Friendships_ValidStatus", "[Status] IN ('Pending', 'Accepted', 'Rejected')");
-            });
-
-            entity.HasKey(e => e.FriendshipId);
-            entity.Property(e => e.FriendshipId).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Pending");
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt);
-
-            // Computed canonical pairing to guarantee friendship pair is stored consistently and prevent duplicates in SQL Server
-            entity.Property(e => e.UserA)
-                .HasComputedColumnSql("CASE WHEN [UserId] < [FriendUserId] THEN [UserId] ELSE [FriendUserId] END", stored: true);
-            entity.Property(e => e.UserB)
-                .HasComputedColumnSql("CASE WHEN [UserId] < [FriendUserId] THEN [FriendUserId] ELSE [UserId] END", stored: true);
-
-            entity.HasIndex(e => new { e.UserA, e.UserB }).IsUnique();
-            entity.HasIndex(e => new { e.UserId, e.Status });
-            entity.HasIndex(e => new { e.FriendUserId, e.Status });
-
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.InitiatedFriendships)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.FriendUser)
-                .WithMany(u => u.ReceivedFriendships)
-                .HasForeignKey(e => e.FriendUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 6. UserBlocks
-        modelBuilder.Entity<UserBlock>(entity =>
-        {
-            entity.ToTable("UserBlocks", t =>
-            {
-                t.HasCheckConstraint("CK_UserBlocks_NoSelfBlock", "[BlockerUserId] <> [BlockedUserId]");
-            });
-
-            entity.HasKey(e => e.UserBlockId);
-            entity.Property(e => e.UserBlockId).ValueGeneratedOnAdd();
-            entity.Property(e => e.CreatedAt).IsRequired();
-
-            entity.HasIndex(e => new { e.BlockerUserId, e.BlockedUserId }).IsUnique();
-
-            entity.HasOne(e => e.BlockerUser)
-                .WithMany(u => u.BlockedUsers)
-                .HasForeignKey(e => e.BlockerUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.BlockedUser)
-                .WithMany(u => u.BlockedByUsers)
-                .HasForeignKey(e => e.BlockedUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 7. BestieCircles (Maximum 9 members including owner, prepared for transactional service-layer enforcement)
         modelBuilder.Entity<BestieCircle>(entity =>
         {
-            entity.ToTable("BestieCircles");
-
             entity.HasKey(e => e.CircleId);
-            entity.Property(e => e.CircleId).ValueGeneratedOnAdd();
 
-            entity.Property(e => e.CircleName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.CircleIcon).IsRequired().HasMaxLength(50).HasDefaultValue("🌸");
+            entity.HasIndex(e => e.IsActive, "IX_BestieCircles_IsActive");
+
+            entity.HasIndex(e => e.OwnerUserId, "IX_BestieCircles_OwnerUserId");
+
+            entity.Property(e => e.CircleIcon)
+                .HasMaxLength(50)
+                .HasDefaultValue("ðŸŒ¸", "DF_BestieCircles_CircleIcon");
             entity.Property(e => e.CircleImage).HasMaxLength(1000);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.UpdatedAt);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CircleName).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_BestieCircles_CreatedAt");
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_BestieCircles_IsActive");
 
-            entity.HasIndex(e => e.OwnerUserId);
-            entity.HasIndex(e => e.IsActive);
-
-            entity.HasOne(e => e.Owner)
-                .WithMany(u => u.OwnedCircles)
-                .HasForeignKey(e => e.OwnerUserId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.OwnerUser).WithMany(p => p.BestieCircles)
+                .HasForeignKey(d => d.OwnerUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BestieCircles_Owner");
         });
 
-        // 8. BestieCircleMembers
         modelBuilder.Entity<BestieCircleMember>(entity =>
         {
-            entity.ToTable("BestieCircleMembers");
-
             entity.HasKey(e => e.CircleMemberId);
-            entity.Property(e => e.CircleMemberId).ValueGeneratedOnAdd();
-            entity.Property(e => e.JoinedAt).IsRequired();
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
 
-            // A user cannot join the same circle twice
-            entity.HasIndex(e => new { e.CircleId, e.UserId }).IsUnique();
-            entity.HasIndex(e => new { e.CircleId, e.IsActive });
-            entity.HasIndex(e => new { e.UserId, e.IsActive });
+            entity.HasIndex(e => new { e.CircleId, e.IsActive }, "IX_BestieCircleMembers_CircleId_IsActive");
 
-            entity.HasOne(e => e.Circle)
-                .WithMany(c => c.Members)
-                .HasForeignKey(e => e.CircleId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => new { e.CircleId, e.UserId }, "IX_BestieCircleMembers_CircleId_UserId").IsUnique();
 
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.CircleMemberships)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.UserId, e.IsActive }, "IX_BestieCircleMembers_UserId_IsActive");
 
-            entity.HasOne(e => e.Role)
-                .WithMany(r => r.CircleMembers)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_BestieCircleMembers_IsActive");
+            entity.Property(e => e.JoinedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_BestieCircleMembers_JoinedAt");
+
+            entity.HasOne(d => d.Circle).WithMany(p => p.BestieCircleMembers)
+                .HasForeignKey(d => d.CircleId)
+                .HasConstraintName("FK_BestieCircleMembers_Circle");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.BestieCircleMembers)
+                .HasForeignKey(d => d.RoleId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BestieCircleMembers_Role");
+
+            entity.HasOne(d => d.User).WithMany(p => p.BestieCircleMembers)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_BestieCircleMembers_User");
         });
 
-        // 9. CircleInvitations
-        modelBuilder.Entity<CircleInvitation>(entity =>
-        {
-            entity.ToTable("CircleInvitations", t =>
-            {
-                t.HasCheckConstraint("CK_CircleInvitations_NoSelfInvite", "[InviterUserId] <> [InviteeUserId]");
-                t.HasCheckConstraint("CK_CircleInvitations_ValidStatus", "[Status] IN ('Pending', 'Accepted', 'Declined', 'Rejected', 'Cancelled')");
-            });
-
-            entity.HasKey(e => e.InvitationId);
-            entity.Property(e => e.InvitationId).ValueGeneratedOnAdd();
-            entity.Property(e => e.Status).IsRequired().HasMaxLength(50).HasDefaultValue("Pending");
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.RespondedAt);
-
-            entity.HasIndex(e => new { e.CircleId, e.InviteeUserId, e.Status });
-
-            entity.HasOne(e => e.Circle)
-                .WithMany(c => c.Invitations)
-                .HasForeignKey(e => e.CircleId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.InviterUser)
-                .WithMany(u => u.SentInvitations)
-                .HasForeignKey(e => e.InviterUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(e => e.InviteeUser)
-                .WithMany(u => u.ReceivedInvitations)
-                .HasForeignKey(e => e.InviteeUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 10. Roles
-        modelBuilder.Entity<Role>(entity =>
-        {
-            entity.ToTable("Roles");
-
-            entity.HasKey(e => e.RoleId);
-            entity.Property(e => e.RoleId).ValueGeneratedOnAdd();
-            entity.Property(e => e.RoleName).IsRequired().HasMaxLength(50);
-            entity.HasIndex(e => e.RoleName).IsUnique();
-            entity.Property(e => e.Description).HasMaxLength(255);
-            entity.Property(e => e.IsSystemRole).HasDefaultValue(false);
-        });
-
-        // 11. Permissions
-        modelBuilder.Entity<Permission>(entity =>
-        {
-            entity.ToTable("Permissions");
-
-            entity.HasKey(e => e.PermissionId);
-            entity.Property(e => e.PermissionId).ValueGeneratedOnAdd();
-            entity.Property(e => e.PermissionCode).IsRequired().HasMaxLength(100);
-            entity.HasIndex(e => e.PermissionCode).IsUnique();
-            entity.Property(e => e.Description).HasMaxLength(255);
-        });
-
-        // 12. UserRoles
-        modelBuilder.Entity<UserRole>(entity =>
-        {
-            entity.ToTable("UserRoles");
-
-            entity.HasKey(e => e.UserRoleId);
-            entity.Property(e => e.UserRoleId).ValueGeneratedOnAdd();
-
-            entity.HasIndex(e => new { e.UserId, e.RoleId }).IsUnique();
-
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.UserRoles)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.Role)
-                .WithMany(r => r.UserRoles)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // 13. RolePermissions
-        modelBuilder.Entity<RolePermission>(entity =>
-        {
-            entity.ToTable("RolePermissions");
-
-            entity.HasKey(e => e.RolePermissionId);
-            entity.Property(e => e.RolePermissionId).ValueGeneratedOnAdd();
-
-            entity.HasIndex(e => new { e.RoleId, e.PermissionId }).IsUnique();
-
-            entity.HasOne(e => e.Role)
-                .WithMany(r => r.RolePermissions)
-                .HasForeignKey(e => e.RoleId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.Permission)
-                .WithMany(p => p.RolePermissions)
-                .HasForeignKey(e => e.PermissionId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // 14. ChatMessages (Upgraded with optional CircleId and SenderId, preserving existing records)
         modelBuilder.Entity<ChatMessage>(entity =>
         {
-            entity.ToTable("ChatMessages");
+            entity.HasIndex(e => new { e.CircleId, e.Timestamp }, "IX_ChatMessages_Circle_Timestamp");
 
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.HasIndex(e => new { e.SenderId, e.Timestamp }, "IX_ChatMessages_Sender_Timestamp");
 
-            entity.Property(e => e.CircleId).IsRequired(false);
-            entity.Property(e => e.SenderId).IsRequired(false);
+            entity.HasIndex(e => e.Timestamp, "IX_ChatMessages_Timestamp");
 
-            entity.Property(e => e.SenderName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.MessageType).IsRequired().HasMaxLength(20);
-            entity.Property(e => e.Content).IsRequired(false);
-            entity.Property(e => e.MediaUrl).IsRequired(false).HasMaxLength(1000);
-            entity.Property(e => e.ThumbnailUrl).IsRequired(false).HasMaxLength(1000);
-            entity.Property(e => e.FileName).IsRequired(false).HasMaxLength(260);
-            entity.Property(e => e.ContentType).IsRequired(false).HasMaxLength(100);
-            entity.Property(e => e.FileSize).IsRequired(false);
-            entity.Property(e => e.VoiceDurationSeconds).IsRequired(false);
-            entity.Property(e => e.MediaId).IsRequired(false);
-            entity.Property(e => e.Timestamp).IsRequired();
-            entity.Property(e => e.UpdatedAt).IsRequired(false);
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.DeletedAt).IsRequired(false);
-            entity.Property(e => e.IsRead).HasDefaultValue(false);
-            entity.Property(e => e.ReadAt).IsRequired(false);
+            entity.Property(e => e.ContentType).HasMaxLength(100);
+            entity.Property(e => e.FileName).HasMaxLength(260);
+            entity.Property(e => e.MediaUrl).HasMaxLength(1000);
+            entity.Property(e => e.MessageType)
+                .HasMaxLength(20)
+                .HasDefaultValue("text", "DF_ChatMessages_MessageType");
+            entity.Property(e => e.SenderName).HasMaxLength(100);
+            entity.Property(e => e.ThumbnailUrl).HasMaxLength(1000);
 
-            entity.Ignore(e => e.ChatMessageId);
-            entity.Ignore(e => e.CreatedAt);
-            entity.Ignore(e => e.DurationSeconds);
+            entity.HasOne(d => d.Circle).WithMany(p => p.ChatMessages)
+                .HasForeignKey(d => d.CircleId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_ChatMessages_Circle");
 
-            entity.HasIndex(e => new { e.CircleId, e.Timestamp });
-            entity.HasIndex(e => new { e.SenderId, e.Timestamp });
-            entity.HasIndex(e => e.Timestamp);
-
-            entity.HasOne(e => e.Circle)
-                .WithMany(c => c.Messages)
-                .HasForeignKey(e => e.CircleId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(e => e.Sender)
-                .WithMany(u => u.SentMessages)
-                .HasForeignKey(e => e.SenderId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            entity.HasOne(e => e.MediaFile)
-                .WithMany(m => m.Messages)
-                .HasForeignKey(e => e.MediaId)
-                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(d => d.Sender).WithMany(p => p.ChatMessages)
+                .HasForeignKey(d => d.SenderId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("FK_ChatMessages_Sender");
         });
 
-        // 15. ChatMessageReads (Receipt unique per message and user)
-        modelBuilder.Entity<ChatMessageRead>(entity =>
-        {
-            entity.ToTable("ChatMessageReads");
-
-            entity.HasKey(e => e.ChatMessageReadId);
-            entity.Property(e => e.ChatMessageReadId).ValueGeneratedOnAdd();
-            entity.Property(e => e.ReadAt).IsRequired();
-
-            entity.HasIndex(e => new { e.ChatMessageId, e.UserId }).IsUnique();
-
-            entity.HasOne(e => e.ChatMessage)
-                .WithMany(m => m.ReadReceipts)
-                .HasForeignKey(e => e.ChatMessageId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.MessageReads)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 16. RefreshTokens (Phase 2 JWT token rotation & revocation)
-        modelBuilder.Entity<RefreshToken>(entity =>
-        {
-            entity.ToTable("RefreshTokens");
-
-            entity.HasKey(e => e.RefreshTokenId);
-            entity.Property(e => e.RefreshTokenId).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(256);
-            entity.Property(e => e.ExpiresAt).IsRequired();
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.RevokedAt);
-            entity.Property(e => e.ReplacedByTokenHash).HasMaxLength(256);
-
-            entity.HasIndex(e => e.TokenHash);
-            entity.HasIndex(e => e.UserId);
-            entity.HasIndex(e => e.ExpiresAt);
-
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.RefreshTokens)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // 17. MediaFiles (Phase 7 multimedia photo & voice storage metadata)
-        modelBuilder.Entity<MediaFile>(entity =>
-        {
-            entity.ToTable("MediaFiles");
-
-            entity.HasKey(e => e.MediaId);
-            entity.Property(e => e.MediaId).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.CircleId).IsRequired();
-            entity.Property(e => e.UploadedByUserId).IsRequired();
-            entity.Property(e => e.StorageKey).IsRequired().HasMaxLength(260);
-            entity.Property(e => e.ThumbnailStorageKey).IsRequired(false).HasMaxLength(260);
-            entity.Property(e => e.OriginalFileName).IsRequired().HasMaxLength(260);
-            entity.Property(e => e.ContentType).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.MediaType).IsRequired().HasMaxLength(20);
-            entity.Property(e => e.FileSize).IsRequired();
-            entity.Property(e => e.DurationSeconds).IsRequired(false);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
-            entity.Property(e => e.DeletedAt).IsRequired(false);
-
-            entity.HasIndex(e => new { e.CircleId, e.CreatedAt });
-            entity.HasIndex(e => e.UploadedByUserId);
-
-            entity.HasOne(e => e.Circle)
-                .WithMany()
-                .HasForeignKey(e => e.CircleId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.UploadedByUser)
-                .WithMany()
-                .HasForeignKey(e => e.UploadedByUserId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        // 18. StickerCategories (Phase 7 sticker collections)
-        modelBuilder.Entity<StickerCategory>(entity =>
-        {
-            entity.ToTable("StickerCategories");
-
-            entity.HasKey(e => e.CategoryId);
-            entity.Property(e => e.CategoryId).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.CategoryName).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.Icon).IsRequired().HasMaxLength(50);
-            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.CreatedAt).IsRequired();
-
-            entity.HasIndex(e => e.CategoryName).IsUnique();
-        });
-
-        // 19. Stickers (Phase 7 stickers)
-        modelBuilder.Entity<Sticker>(entity =>
-        {
-            entity.ToTable("Stickers");
-
-            entity.HasKey(e => e.StickerId);
-            entity.Property(e => e.StickerId).ValueGeneratedOnAdd();
-
-            entity.Property(e => e.CategoryId).IsRequired();
-            entity.Property(e => e.StickerName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.ImageUrl).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.DisplayOrder).HasDefaultValue(0);
-            entity.Property(e => e.IsActive).HasDefaultValue(true);
-            entity.Property(e => e.CreatedAt).IsRequired();
-
-            entity.HasIndex(e => new { e.CategoryId, e.DisplayOrder });
-
-            entity.HasOne(e => e.Category)
-                .WithMany(c => c.Stickers)
-                .HasForeignKey(e => e.CategoryId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // 17. ChatMessageDeliveries (Phase 8: Independent delivery acknowledgment per recipient)
         modelBuilder.Entity<ChatMessageDelivery>(entity =>
         {
-            entity.ToTable("ChatMessageDeliveries");
+            entity.HasIndex(e => new { e.ChatMessageId, e.UserId }, "IX_ChatMessageDeliveries_Message_User").IsUnique();
 
-            entity.HasKey(e => e.ChatMessageDeliveryId);
-            entity.Property(e => e.ChatMessageDeliveryId).ValueGeneratedOnAdd();
-            entity.Property(e => e.DeliveredAt).IsRequired();
+            entity.HasIndex(e => new { e.UserId, e.DeliveredAt }, "IX_ChatMessageDeliveries_User_DeliveredAt");
 
-            entity.HasIndex(e => new { e.ChatMessageId, e.UserId }).IsUnique();
-            entity.HasIndex(e => new { e.UserId, e.DeliveredAt });
+            entity.Property(e => e.DeliveredAt).HasDefaultValueSql("(sysutcdatetime())", "DF_ChatMessageDeliveries_DeliveredAt");
 
-            entity.HasOne(e => e.ChatMessage)
-                .WithMany(m => m.DeliveryReceipts)
-                .HasForeignKey(e => e.ChatMessageId)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(d => d.ChatMessage).WithMany(p => p.ChatMessageDeliveries)
+                .HasForeignKey(d => d.ChatMessageId)
+                .HasConstraintName("FK_ChatMessageDeliveries_Message");
 
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.ChatMessageDeliveries)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(d => d.User).WithMany(p => p.ChatMessageDeliveries)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChatMessageDeliveries_User");
         });
 
-        // 18. Notifications (Phase 8: Durable user notifications)
+        modelBuilder.Entity<ChatMessageRead>(entity =>
+        {
+            entity.HasIndex(e => new { e.ChatMessageId, e.UserId }, "IX_ChatMessageReads_Message_User").IsUnique();
+
+            entity.Property(e => e.ReadAt).HasDefaultValueSql("(sysutcdatetime())", "DF_ChatMessageReads_ReadAt");
+
+            entity.HasOne(d => d.ChatMessage).WithMany(p => p.ChatMessageReads)
+                .HasForeignKey(d => d.ChatMessageId)
+                .HasConstraintName("FK_ChatMessageReads_Message");
+
+            entity.HasOne(d => d.User).WithMany(p => p.ChatMessageReads)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_ChatMessageReads_User");
+        });
+
+        modelBuilder.Entity<CircleInvitation>(entity =>
+        {
+            entity.HasKey(e => e.InvitationId);
+
+            entity.HasIndex(e => new { e.CircleId, e.InviteeUserId, e.Status }, "IX_CircleInvitations_Circle_Invitee_Status");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_CircleInvitations_CreatedAt");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValue("Pending", "DF_CircleInvitations_Status");
+
+            entity.HasOne(d => d.Circle).WithMany(p => p.CircleInvitations)
+                .HasForeignKey(d => d.CircleId)
+                .HasConstraintName("FK_CircleInvitations_Circle");
+
+            entity.HasOne(d => d.InviteeUser).WithMany(p => p.CircleInvitationInviteeUsers)
+                .HasForeignKey(d => d.InviteeUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CircleInvitations_Invitee");
+
+            entity.HasOne(d => d.InviterUser).WithMany(p => p.CircleInvitationInviterUsers)
+                .HasForeignKey(d => d.InviterUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_CircleInvitations_Inviter");
+        });
+
+        modelBuilder.Entity<Friendship>(entity =>
+        {
+            entity.HasIndex(e => new { e.UserA, e.UserB }, "IX_Friendships_CanonicalPair").IsUnique();
+
+            entity.HasIndex(e => new { e.FriendUserId, e.Status }, "IX_Friendships_FriendUserId_Status");
+
+            entity.HasIndex(e => new { e.UserId, e.Status }, "IX_Friendships_UserId_Status");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_Friendships_CreatedAt");
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValue("Pending", "DF_Friendships_Status");
+            entity.Property(e => e.UserA).HasComputedColumnSql("(case when [UserId]<[FriendUserId] then [UserId] else [FriendUserId] end)", true);
+            entity.Property(e => e.UserB).HasComputedColumnSql("(case when [UserId]<[FriendUserId] then [FriendUserId] else [UserId] end)", true);
+
+            entity.HasOne(d => d.FriendUser).WithMany(p => p.FriendshipFriendUsers)
+                .HasForeignKey(d => d.FriendUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Friendships_FriendUsers");
+
+            entity.HasOne(d => d.User).WithMany(p => p.FriendshipUsers)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Friendships_Users");
+        });
+
+        modelBuilder.Entity<MediaFile>(entity =>
+        {
+            entity.HasKey(e => e.MediaId);
+
+            entity.HasIndex(e => new { e.CircleId, e.CreatedAt }, "IX_MediaFiles_Circle_CreatedAt");
+
+            entity.HasIndex(e => e.UploadedByUserId, "IX_MediaFiles_UploadedBy");
+
+            entity.Property(e => e.ContentType).HasMaxLength(100);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_MediaFiles_CreatedAt");
+            entity.Property(e => e.MediaType).HasMaxLength(20);
+            entity.Property(e => e.OriginalFileName).HasMaxLength(260);
+            entity.Property(e => e.StorageKey).HasMaxLength(260);
+            entity.Property(e => e.ThumbnailStorageKey).HasMaxLength(260);
+
+            entity.HasOne(d => d.Circle).WithMany(p => p.MediaFiles)
+                .HasForeignKey(d => d.CircleId)
+                .HasConstraintName("FK_MediaFiles_Circle");
+
+            entity.HasOne(d => d.UploadedByUser).WithMany(p => p.MediaFiles)
+                .HasForeignKey(d => d.UploadedByUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MediaFiles_User");
+        });
+
+        modelBuilder.Entity<Memory>(entity =>
+        {
+            entity.Property(e => e.Caption).HasMaxLength(500);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.ImageUrl).HasMaxLength(1000);
+            entity.Property(e => e.StickerType)
+                .HasMaxLength(50)
+                .HasDefaultValue("heart", "DF_Memories_StickerType");
+        });
+
         modelBuilder.Entity<Notification>(entity =>
         {
-            entity.ToTable("Notifications");
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt }, "IX_Notifications_User_CreatedAt").IsDescending(false, true);
 
-            entity.HasKey(e => e.NotificationId);
-            entity.Property(e => e.NotificationId).ValueGeneratedOnAdd();
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt }, "IX_Notifications_User_IsRead_CreatedAt").IsDescending(false, false, true);
 
-            entity.Property(e => e.NotificationType).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Title).IsRequired().HasMaxLength(250);
-            entity.Property(e => e.Message).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_Notifications_CreatedAt");
+            entity.Property(e => e.Message).HasMaxLength(1000);
+            entity.Property(e => e.NotificationType).HasMaxLength(100);
             entity.Property(e => e.RelatedEntityType).HasMaxLength(50);
-            entity.Property(e => e.IsRead).HasDefaultValue(false);
-            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.Title).HasMaxLength(250);
 
-            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt });
-            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            entity.HasOne(d => d.User).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_Notifications_User");
+        });
 
-            entity.HasOne(e => e.User)
-                .WithMany(u => u.Notifications)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.HasIndex(e => e.PermissionCode, "IX_Permissions_PermissionCode").IsUnique();
+
+            entity.Property(e => e.Description).HasMaxLength(255);
+            entity.Property(e => e.PermissionCode).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(e => e.ExpiresAt, "IX_RefreshTokens_ExpiresAt");
+
+            entity.HasIndex(e => e.TokenHash, "IX_RefreshTokens_TokenHash");
+
+            entity.HasIndex(e => e.UserId, "IX_RefreshTokens_UserId");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_RefreshTokens_CreatedAt");
+            entity.Property(e => e.ReplacedByTokenHash).HasMaxLength(256);
+            entity.Property(e => e.TokenHash).HasMaxLength(256);
+
+            entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_RefreshTokens_Users");
+        });
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.HasIndex(e => e.RoleName, "IX_Roles_RoleName").IsUnique();
+
+            entity.Property(e => e.Description).HasMaxLength(255);
+            entity.Property(e => e.RoleName).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            entity.HasIndex(e => new { e.RoleId, e.PermissionId }, "IX_RolePermissions_RoleId_PermissionId").IsUnique();
+
+            entity.HasOne(d => d.Permission).WithMany(p => p.RolePermissions)
+                .HasForeignKey(d => d.PermissionId)
+                .HasConstraintName("FK_RolePermissions_Permissions");
+
+            entity.HasOne(d => d.Role).WithMany(p => p.RolePermissions)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("FK_RolePermissions_Roles");
+        });
+
+        modelBuilder.Entity<SecretNote>(entity =>
+        {
+            entity.Property(e => e.PreviewHint).HasMaxLength(300);
+            entity.Property(e => e.StickerIcon)
+                .HasMaxLength(50)
+                .HasDefaultValue("ðŸ’Œ", "DF_SecretNotes_StickerIcon");
+            entity.Property(e => e.Title).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<Sticker>(entity =>
+        {
+            entity.HasIndex(e => new { e.CategoryId, e.DisplayOrder }, "IX_Stickers_Category_Order");
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_Stickers_CreatedAt");
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_Stickers_IsActive");
+            entity.Property(e => e.StickerName).HasMaxLength(100);
+
+            entity.HasOne(d => d.Category).WithMany(p => p.Stickers)
+                .HasForeignKey(d => d.CategoryId)
+                .HasConstraintName("FK_Stickers_Category");
+        });
+
+        modelBuilder.Entity<StickerCategory>(entity =>
+        {
+            entity.HasKey(e => e.CategoryId);
+
+            entity.HasIndex(e => e.CategoryName, "UQ_StickerCategories_Name").IsUnique();
+
+            entity.Property(e => e.CategoryName).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_StickerCategories_CreatedAt");
+            entity.Property(e => e.Icon).HasMaxLength(50);
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_StickerCategories_IsActive");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(e => e.NormalizedUsername, "IX_Users_NormalizedUsername").IsUnique();
+
+            entity.HasIndex(e => e.Username, "IX_Users_Username").IsUnique();
+
+            entity.Property(e => e.AvatarSticker)
+                .HasMaxLength(50)
+                .HasDefaultValue("ðŸŒ¸", "DF_Users_AvatarSticker");
+            entity.Property(e => e.Bio).HasMaxLength(1000);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_Users_CreatedAt");
+            entity.Property(e => e.DisplayName)
+                .HasMaxLength(100)
+                .HasDefaultValue("", "DF_Users_DisplayName");
+            entity.Property(e => e.Email).HasMaxLength(255);
+            entity.Property(e => e.IsActive).HasDefaultValue(true, "DF_Users_IsActive");
+            entity.Property(e => e.NormalizedEmail).HasMaxLength(255);
+            entity.Property(e => e.NormalizedUsername).HasMaxLength(50);
+            entity.Property(e => e.Password)
+                .HasMaxLength(100)
+                .HasDefaultValue("", "DF_Users_Password");
+            entity.Property(e => e.PasswordHash).HasMaxLength(255);
+            entity.Property(e => e.PasswordHint).HasMaxLength(255);
+            entity.Property(e => e.ProfilePicture).HasMaxLength(1000);
+            entity.Property(e => e.QuickPin)
+                .HasMaxLength(10)
+                .HasDefaultValue("3000", "DF_Users_QuickPin");
+            entity.Property(e => e.RoleKey)
+                .HasMaxLength(50)
+                .HasDefaultValue("User", "DF_Users_RoleKey");
+            entity.Property(e => e.Username).HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<UserBlock>(entity =>
+        {
+            entity.HasIndex(e => new { e.BlockerUserId, e.BlockedUserId }, "IX_UserBlocks_Blocker_Blocked").IsUnique();
+
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())", "DF_UserBlocks_CreatedAt");
+
+            entity.HasOne(d => d.BlockedUser).WithMany(p => p.UserBlockBlockedUsers)
+                .HasForeignKey(d => d.BlockedUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserBlocks_Blocked");
+
+            entity.HasOne(d => d.BlockerUser).WithMany(p => p.UserBlockBlockerUsers)
+                .HasForeignKey(d => d.BlockerUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_UserBlocks_Blocker");
+        });
+
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasIndex(e => new { e.UserId, e.RoleId }, "IX_UserRoles_UserId_RoleId").IsUnique();
+
+            entity.HasOne(d => d.Role).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.RoleId)
+                .HasConstraintName("FK_UserRoles_Roles");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK_UserRoles_Users");
         });
 
         OnModelCreatingPartial(modelBuilder);

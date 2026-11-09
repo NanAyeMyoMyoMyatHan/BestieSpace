@@ -1,11 +1,8 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
-/// <summary>
-/// Entity representing a Polaroid photo memory with rotation and stickers.
-/// Scaffolded to match Memories SQL table.
-/// </summary>
 public partial class Memory
 {
     public int Id { get; set; }
