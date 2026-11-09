@@ -216,6 +216,8 @@ BEGIN
         [CircleId] INT IDENTITY(1,1) NOT NULL,
         [CircleName] NVARCHAR(100) NOT NULL,
         [Description] NVARCHAR(500) NULL,
+        [CircleIcon] NVARCHAR(50) NOT NULL CONSTRAINT [DF_BestieCircles_CircleIcon] DEFAULT '🌸',
+        [CircleImage] NVARCHAR(1000) NULL,
         [OwnerUserId] INT NOT NULL,
         [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_BestieCircles_CreatedAt] DEFAULT SYSUTCDATETIME(),
         [UpdatedAt] DATETIME2 NULL,
@@ -265,7 +267,7 @@ BEGIN
         [RespondedAt] DATETIME2 NULL,
         CONSTRAINT [PK_CircleInvitations] PRIMARY KEY CLUSTERED ([InvitationId] ASC),
         CONSTRAINT [CK_CircleInvitations_NoSelfInvite] CHECK ([InviterUserId] <> [InviteeUserId]),
-        CONSTRAINT [CK_CircleInvitations_ValidStatus] CHECK ([Status] IN ('Pending', 'Accepted', 'Declined', 'Cancelled')),
+        CONSTRAINT [CK_CircleInvitations_ValidStatus] CHECK ([Status] IN ('Pending', 'Accepted', 'Declined', 'Rejected', 'Cancelled')),
         CONSTRAINT [FK_CircleInvitations_Circle] FOREIGN KEY ([CircleId]) REFERENCES [dbo].[BestieCircles]([CircleId]) ON DELETE CASCADE,
         CONSTRAINT [FK_CircleInvitations_Inviter] FOREIGN KEY ([InviterUserId]) REFERENCES [dbo].[Users]([UserId]),
         CONSTRAINT [FK_CircleInvitations_Invitee] FOREIGN KEY ([InviteeUserId]) REFERENCES [dbo].[Users]([UserId])
@@ -283,11 +285,14 @@ BEGIN
         [CircleId] INT NULL,
         [SenderId] INT NULL,
         [SenderName] NVARCHAR(100) NOT NULL,
-        [MessageType] NVARCHAR(20) NOT NULL,
+        [MessageType] NVARCHAR(20) NOT NULL CONSTRAINT [DF_ChatMessages_MessageType] DEFAULT 'text',
         [Content] NVARCHAR(MAX) NULL,
         [MediaUrl] NVARCHAR(1000) NULL,
         [VoiceDurationSeconds] FLOAT NULL,
         [Timestamp] DATETIME2 NOT NULL,
+        [UpdatedAt] DATETIME2 NULL,
+        [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ChatMessages_IsDeleted] DEFAULT 0,
+        [DeletedAt] DATETIME2 NULL,
         [IsRead] BIT NOT NULL CONSTRAINT [DF_ChatMessages_IsRead] DEFAULT 0,
         [ReadAt] DATETIME2 NULL,
         CONSTRAINT [PK_ChatMessages] PRIMARY KEY CLUSTERED ([Id] ASC),
@@ -314,6 +319,21 @@ BEGIN
         ALTER TABLE [dbo].[ChatMessages] ADD [SenderId] INT NULL;
         ALTER TABLE [dbo].[ChatMessages] ADD CONSTRAINT [FK_ChatMessages_Sender] FOREIGN KEY ([SenderId]) REFERENCES [dbo].[Users]([UserId]) ON DELETE SET NULL;
         CREATE NONCLUSTERED INDEX [IX_ChatMessages_Sender_Timestamp] ON [dbo].[ChatMessages]([SenderId] ASC, [Timestamp] ASC);
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'UpdatedAt')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [UpdatedAt] DATETIME2 NULL;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'IsDeleted')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [IsDeleted] BIT NOT NULL CONSTRAINT [DF_ChatMessages_IsDeleted] DEFAULT 0;
+    END
+
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[ChatMessages]') AND name = 'DeletedAt')
+    BEGIN
+        ALTER TABLE [dbo].[ChatMessages] ADD [DeletedAt] DATETIME2 NULL;
     END
 END
 GO
@@ -357,6 +377,16 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Owner')
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'Member')
     INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('Member', 'Regular member of a Bestie Circle with chat and memory sharing rights', 0);
+
+-- Phase 5 Circle Roles
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'CircleOwner')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('CircleOwner', 'Sole owner and administrator of a Bestie Circle with full privileges', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'CircleAdmin')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('CircleAdmin', 'Circle administrator capable of managing invitations and ordinary members', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Roles] WHERE [RoleName] = 'CircleMember')
+    INSERT INTO [dbo].[Roles] ([RoleName], [Description], [IsSystemRole]) VALUES ('CircleMember', 'Active circle member with viewing, chat, and departure privileges', 0);
 GO
 
 -- Seed Standard Dynamic Permissions Catalog
@@ -465,6 +495,41 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'BLOCKED_USERS_VIEW')
     INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('BLOCKED_USERS_VIEW', 'View own list of blocked accounts');
+
+-- Phase 5 Permissions (Bestie Circles & Membership Management)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_INVITE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_INVITE', 'Invite accepted bestie friends to join the circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_INVITATION_CANCEL')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_INVITATION_CANCEL', 'Cancel outgoing pending circle invitations');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_MEMBER_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_MEMBER_VIEW', 'View members and roster in a circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_MEMBER_REMOVE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_MEMBER_REMOVE', 'Remove non-owner members from a circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_MEMBER_ROLE_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_MEMBER_ROLE_UPDATE', 'Change roles of circle members (promote to admin or demote)');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_LEAVE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_LEAVE', 'Leave a circle voluntarily as a non-owner member');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CIRCLE_TRANSFER_OWNERSHIP')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CIRCLE_TRANSFER_OWNERSHIP', 'Transfer sole circle ownership to another active member');
+
+-- Phase 6 Permissions (Real-Time Circle Group Chat & Moderation)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_EDIT_OWN')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_EDIT_OWN', 'Edit own chat messages in an authorized circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_DELETE_OWN')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_DELETE_OWN', 'Soft delete own chat messages in an authorized circle');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_MODERATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_MODERATE', 'Moderate (soft delete/censor) any circle message as owner or admin');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'CHAT_VIEW_HISTORY')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('CHAT_VIEW_HISTORY', 'View paginated message history for an authorized circle');
 GO
 
 -- Seed RolePermissions (Grant ALL permissions to SuperAdmin role)
@@ -492,7 +557,8 @@ BEGIN
         'USER_VIEW', 'USER_UPDATE', 'USER_MANAGE', 'ROLE_VIEW', 'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE',
         'PERMISSION_VIEW', 'PERMISSION_ASSIGN', 'USER_ROLE_MANAGE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT',
         'FRIEND_REMOVE', 'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE',
-        'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW',
+        'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY',
+        'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
@@ -511,7 +577,7 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
@@ -530,7 +596,7 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
         'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
@@ -548,7 +614,7 @@ BEGIN
     SELECT @OwnerRoleId, p.[PermissionId]
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
-        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE'
+        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -564,10 +630,64 @@ BEGIN
     INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
     SELECT @MemberRoleId, p.[PermissionId]
     FROM [dbo].[Permissions] p
-    WHERE p.[PermissionCode] IN ('CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE')
+    WHERE p.[PermissionCode] IN ('CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE')
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
         WHERE rp.[RoleId] = @MemberRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to CircleOwner role)
+DECLARE @CircleOwnerRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'CircleOwner');
+IF @CircleOwnerRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @CircleOwnerRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_INVITE', 'CIRCLE_INVITATION_CANCEL',
+        'CIRCLE_MEMBER_VIEW', 'CIRCLE_MEMBER_REMOVE', 'CIRCLE_MEMBER_ROLE_UPDATE', 'CIRCLE_TRANSFER_OWNERSHIP',
+        'CIRCLE_MEMBER_MANAGE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @CircleOwnerRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to CircleAdmin role)
+DECLARE @CircleAdminRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'CircleAdmin');
+IF @CircleAdminRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @CircleAdminRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'CIRCLE_VIEW', 'CIRCLE_INVITE', 'CIRCLE_INVITATION_CANCEL', 'CIRCLE_MEMBER_VIEW',
+        'CIRCLE_MEMBER_REMOVE', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_MODERATE', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @CircleAdminRoleId AND rp.[PermissionId] = p.[PermissionId]
+    );
+END
+GO
+
+-- Seed RolePermissions (Grant permissions to CircleMember role)
+DECLARE @CircleMemberRoleId INT = (SELECT [RoleId] FROM [dbo].[Roles] WHERE [RoleName] = 'CircleMember');
+IF @CircleMemberRoleId IS NOT NULL
+BEGIN
+    INSERT INTO [dbo].[RolePermissions] ([RoleId], [PermissionId])
+    SELECT @CircleMemberRoleId, p.[PermissionId]
+    FROM [dbo].[Permissions] p
+    WHERE p.[PermissionCode] IN (
+        'CIRCLE_VIEW', 'CIRCLE_MEMBER_VIEW', 'CIRCLE_LEAVE', 'CHAT_SEND', 'CHAT_READ', 'CHAT_EDIT_OWN', 'CHAT_DELETE_OWN', 'CHAT_VIEW_HISTORY', 'MEMORY_CREATE'
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[RolePermissions] rp 
+        WHERE rp.[RoleId] = @CircleMemberRoleId AND rp.[PermissionId] = p.[PermissionId]
     );
 END
 GO

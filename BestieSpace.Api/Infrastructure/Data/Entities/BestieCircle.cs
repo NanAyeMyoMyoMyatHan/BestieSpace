@@ -14,6 +14,10 @@ public class BestieCircle
 
     public string? Description { get; set; }
 
+    public string CircleIcon { get; set; } = "🌸";
+
+    public string? CircleImage { get; set; }
+
     public int OwnerUserId { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

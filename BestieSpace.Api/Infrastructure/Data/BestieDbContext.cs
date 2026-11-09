@@ -199,6 +199,8 @@ public partial class BestieDbContext : DbContext
 
             entity.Property(e => e.CircleName).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.CircleIcon).IsRequired().HasMaxLength(50).HasDefaultValue("🌸");
+            entity.Property(e => e.CircleImage).HasMaxLength(1000);
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.Property(e => e.UpdatedAt);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
@@ -249,7 +251,7 @@ public partial class BestieDbContext : DbContext
             entity.ToTable("CircleInvitations", t =>
             {
                 t.HasCheckConstraint("CK_CircleInvitations_NoSelfInvite", "[InviterUserId] <> [InviteeUserId]");
-                t.HasCheckConstraint("CK_CircleInvitations_ValidStatus", "[Status] IN ('Pending', 'Accepted', 'Declined', 'Cancelled')");
+                t.HasCheckConstraint("CK_CircleInvitations_ValidStatus", "[Status] IN ('Pending', 'Accepted', 'Declined', 'Rejected', 'Cancelled')");
             });
 
             entity.HasKey(e => e.InvitationId);
@@ -360,8 +362,14 @@ public partial class BestieDbContext : DbContext
             entity.Property(e => e.MediaUrl).IsRequired(false).HasMaxLength(1000);
             entity.Property(e => e.VoiceDurationSeconds).IsRequired(false);
             entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.UpdatedAt).IsRequired(false);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.DeletedAt).IsRequired(false);
             entity.Property(e => e.IsRead).HasDefaultValue(false);
             entity.Property(e => e.ReadAt).IsRequired(false);
+
+            entity.Ignore(e => e.ChatMessageId);
+            entity.Ignore(e => e.CreatedAt);
 
             entity.HasIndex(e => new { e.CircleId, e.Timestamp });
             entity.HasIndex(e => new { e.SenderId, e.Timestamp });

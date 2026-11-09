@@ -389,7 +389,10 @@ public static class DatabaseBootstrapper
             new() { RoleName = "User", Description = "Default registered platform user with personal profile and social features", IsSystemRole = true },
             new() { RoleName = "Bestie", Description = "VIP Bestie role with full access to private clubhouse features", IsSystemRole = true },
             new() { RoleName = "Owner", Description = "Owner and creator of a Bestie Circle with circle administration rights", IsSystemRole = false },
-            new() { RoleName = "Member", Description = "Regular member of a Bestie Circle with chat and memory sharing rights", IsSystemRole = false }
+            new() { RoleName = "Member", Description = "Regular member of a Bestie Circle with chat and memory sharing rights", IsSystemRole = false },
+            new() { RoleName = "CircleOwner", Description = "Sole owner and administrator of a Bestie Circle with full privileges", IsSystemRole = false },
+            new() { RoleName = "CircleAdmin", Description = "Circle administrator capable of managing invitations and ordinary members", IsSystemRole = false },
+            new() { RoleName = "CircleMember", Description = "Active circle member with viewing, chat, and departure privileges", IsSystemRole = false }
         };
 
         foreach (var r in rolesToSeed)
@@ -439,7 +442,18 @@ public static class DatabaseBootstrapper
             new() { PermissionCode = "FRIEND_REQUEST_CANCEL", Description = "Cancel outgoing pending friend requests" },
             new() { PermissionCode = "USER_BLOCK", Description = "Block other users from social interactions" },
             new() { PermissionCode = "USER_UNBLOCK", Description = "Unblock previously blocked users" },
-            new() { PermissionCode = "BLOCKED_USERS_VIEW", Description = "View own list of blocked accounts" }
+            new() { PermissionCode = "BLOCKED_USERS_VIEW", Description = "View own list of blocked accounts" },
+            new() { PermissionCode = "CIRCLE_INVITE", Description = "Invite accepted bestie friends to join the circle" },
+            new() { PermissionCode = "CIRCLE_INVITATION_CANCEL", Description = "Cancel outgoing pending circle invitations" },
+            new() { PermissionCode = "CIRCLE_MEMBER_VIEW", Description = "View members and roster in a circle" },
+            new() { PermissionCode = "CIRCLE_MEMBER_REMOVE", Description = "Remove non-owner members from a circle" },
+            new() { PermissionCode = "CIRCLE_MEMBER_ROLE_UPDATE", Description = "Change roles of circle members (promote to admin or demote)" },
+            new() { PermissionCode = "CIRCLE_LEAVE", Description = "Leave a circle voluntarily as a non-owner member" },
+            new() { PermissionCode = "CIRCLE_TRANSFER_OWNERSHIP", Description = "Transfer sole circle ownership to another active member" },
+            new() { PermissionCode = "CHAT_EDIT_OWN", Description = "Edit own chat messages in an authorized circle" },
+            new() { PermissionCode = "CHAT_DELETE_OWN", Description = "Soft delete own chat messages in an authorized circle" },
+            new() { PermissionCode = "CHAT_MODERATE", Description = "Moderate (soft delete/censor) any circle message as owner or admin" },
+            new() { PermissionCode = "CHAT_VIEW_HISTORY", Description = "View paginated message history for an authorized circle" }
         };
 
         foreach (var p in permsToSeed)
@@ -479,7 +493,8 @@ public static class DatabaseBootstrapper
                 "USER_VIEW", "USER_UPDATE", "USER_MANAGE", "ROLE_VIEW", "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE",
                 "PERMISSION_VIEW", "PERMISSION_ASSIGN", "USER_ROLE_MANAGE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT",
                 "FRIEND_REMOVE", "CIRCLE_CREATE", "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_MEMBER_MANAGE",
-                "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW",
+                "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY",
+                "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
 
@@ -504,7 +519,7 @@ public static class DatabaseBootstrapper
             var userCodes = new HashSet<string>
             {
                 "USER_VIEW", "USER_UPDATE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT", "FRIEND_REMOVE",
-                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
+                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY", "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
                 "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
 
@@ -518,6 +533,78 @@ public static class DatabaseBootstrapper
                 if (!existingUserPermIds.Contains(perm.PermissionId))
                 {
                     context.RolePermissions.Add(new RolePermission { RoleId = userRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        // Seed CircleOwner RolePermissions
+        var circleOwnerRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "CircleOwner" || r.RoleName == "Owner");
+        if (circleOwnerRole != null)
+        {
+            var circleOwnerCodes = new HashSet<string>
+            {
+                "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_INVITE", "CIRCLE_INVITATION_CANCEL",
+                "CIRCLE_MEMBER_VIEW", "CIRCLE_MEMBER_REMOVE", "CIRCLE_MEMBER_ROLE_UPDATE", "CIRCLE_TRANSFER_OWNERSHIP",
+                "CIRCLE_MEMBER_MANAGE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+            };
+
+            var existingPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == circleOwnerRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms.Where(p => circleOwnerCodes.Contains(p.PermissionCode)))
+            {
+                if (!existingPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = circleOwnerRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        // Seed CircleAdmin RolePermissions
+        var circleAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "CircleAdmin");
+        if (circleAdminRole != null)
+        {
+            var circleAdminCodes = new HashSet<string>
+            {
+                "CIRCLE_VIEW", "CIRCLE_INVITE", "CIRCLE_INVITATION_CANCEL", "CIRCLE_MEMBER_VIEW",
+                "CIRCLE_MEMBER_REMOVE", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_MODERATE", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+            };
+
+            var existingPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == circleAdminRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms.Where(p => circleAdminCodes.Contains(p.PermissionCode)))
+            {
+                if (!existingPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = circleAdminRole.RoleId, PermissionId = perm.PermissionId });
+                }
+            }
+        }
+
+        // Seed CircleMember RolePermissions
+        var circleMemberRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "CircleMember" || r.RoleName == "Member");
+        if (circleMemberRole != null)
+        {
+            var circleMemberCodes = new HashSet<string>
+            {
+                "CIRCLE_VIEW", "CIRCLE_MEMBER_VIEW", "CIRCLE_LEAVE", "CHAT_SEND", "CHAT_READ", "CHAT_EDIT_OWN", "CHAT_DELETE_OWN", "CHAT_VIEW_HISTORY", "MEMORY_CREATE"
+            };
+
+            var existingPermIds = await context.RolePermissions
+                .Where(rp => rp.RoleId == circleMemberRole.RoleId)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+
+            foreach (var perm in allPerms.Where(p => circleMemberCodes.Contains(p.PermissionCode)))
+            {
+                if (!existingPermIds.Contains(perm.PermissionId))
+                {
+                    context.RolePermissions.Add(new RolePermission { RoleId = circleMemberRole.RoleId, PermissionId = perm.PermissionId });
                 }
             }
         }

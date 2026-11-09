@@ -59,6 +59,31 @@ public interface IBestieApiClient
     Task<List<UserBlockDto>> GetBlockedUsersAsync();
     Task<PagedResultDto<UserDiscoveryCardDto>> DiscoverUsersAsync(string? query = null, int pageNumber = 1, int pageSize = 10);
     Task<List<UserDiscoveryCardDto>> GetSuggestedUsersAsync(int limit = 6);
+
+    // Bestie Circles & Membership Management (Phase 5)
+    Task<CircleDetailDto?> CreateCircleAsync(CreateCircleRequestDto request);
+    Task<List<CircleDto>> GetMyCirclesAsync();
+    Task<CircleDetailDto?> GetCircleDetailsAsync(int circleId);
+    Task<CircleDetailDto?> UpdateCircleAsync(int circleId, UpdateCircleRequestDto request);
+    Task<CircleOperationResultDto> DeleteCircleAsync(int circleId);
+    Task<CircleOperationResultDto> SendCircleInvitationAsync(SendCircleInvitationRequestDto request);
+    Task<CircleOperationResultDto> AcceptCircleInvitationAsync(int invitationId);
+    Task<CircleOperationResultDto> RejectCircleInvitationAsync(int invitationId);
+    Task<CircleOperationResultDto> CancelCircleInvitationAsync(int invitationId);
+    Task<List<CircleInvitationDto>> GetIncomingCircleInvitationsAsync();
+    Task<List<CircleInvitationDto>> GetCircleInvitationsAsync(int circleId);
+    Task<List<CircleMemberDto>> GetCircleMembersAsync(int circleId);
+    Task<CircleOperationResultDto> RemoveCircleMemberAsync(int circleId, int targetUserId);
+    Task<CircleOperationResultDto> LeaveCircleAsync(int circleId);
+    Task<CircleOperationResultDto> ChangeCircleMemberRoleAsync(int circleId, ChangeMemberRoleRequestDto request);
+    Task<CircleOperationResultDto> TransferCircleOwnershipAsync(int circleId, TransferCircleOwnershipRequestDto request);
+
+    // Real-Time Private Group Chat (Phase 6)
+    Task<CircleChatPaginationDto?> GetCircleMessagesAsync(int circleId, int pageNumber = 1, int pageSize = 30);
+    Task<CircleChatMessageDto?> SendCircleMessageAsync(int circleId, string content, string? messageType = "text");
+    Task<CircleChatMessageDto?> EditCircleMessageAsync(int circleId, int messageId, string newContent);
+    Task<bool> DeleteCircleMessageAsync(int circleId, int messageId);
+    Task<List<CircleMemberPresenceEventDto>> GetCirclePresenceAsync(int circleId);
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -908,6 +933,338 @@ public class BestieApiClient : IBestieApiClient
         {
             _logger.LogError(ex, "Failed to load suggested users.");
             return new List<UserDiscoveryCardDto>();
+        }
+    }
+
+    // =========================================================================
+    // PHASE 5: BESTIE CIRCLES & MEMBERSHIP MANAGEMENT
+    // =========================================================================
+
+    public async Task<CircleDetailDto?> CreateCircleAsync(CreateCircleRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("/api/bestiecircle", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleDetailDto>();
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create circle.");
+            return null;
+        }
+    }
+
+    public async Task<List<CircleDto>> GetMyCirclesAsync()
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<CircleDto>>("/api/bestiecircle/my");
+            return list ?? new List<CircleDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load circles.");
+            return new List<CircleDto>();
+        }
+    }
+
+    public async Task<CircleDetailDto?> GetCircleDetailsAsync(int circleId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<CircleDetailDto>($"/api/bestiecircle/{circleId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get circle details for circle {CircleId}", circleId);
+            return null;
+        }
+    }
+
+    public async Task<CircleDetailDto?> UpdateCircleAsync(int circleId, UpdateCircleRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"/api/bestiecircle/{circleId}", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleDetailDto>();
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update circle {CircleId}", circleId);
+            return null;
+        }
+    }
+
+    public async Task<CircleOperationResultDto> DeleteCircleAsync(int circleId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/bestiecircle/{circleId}");
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete circle {CircleId}", circleId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> SendCircleInvitationAsync(SendCircleInvitationRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("/api/circleinvitation", request);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending circle invitation");
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> AcceptCircleInvitationAsync(int invitationId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/circleinvitation/{invitationId}/accept", null);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting circle invitation {InvitationId}", invitationId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> RejectCircleInvitationAsync(int invitationId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/circleinvitation/{invitationId}/reject", null);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error declining circle invitation {InvitationId}", invitationId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> CancelCircleInvitationAsync(int invitationId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/circleinvitation/{invitationId}/cancel");
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling circle invitation {InvitationId}", invitationId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<List<CircleInvitationDto>> GetIncomingCircleInvitationsAsync()
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<CircleInvitationDto>>("/api/circleinvitation/incoming");
+            return list ?? new List<CircleInvitationDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load incoming circle invitations.");
+            return new List<CircleInvitationDto>();
+        }
+    }
+
+    public async Task<List<CircleInvitationDto>> GetCircleInvitationsAsync(int circleId)
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<CircleInvitationDto>>($"/api/circleinvitation/circle/{circleId}");
+            return list ?? new List<CircleInvitationDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load circle invitations for circle {CircleId}", circleId);
+            return new List<CircleInvitationDto>();
+        }
+    }
+
+    public async Task<List<CircleMemberDto>> GetCircleMembersAsync(int circleId)
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<CircleMemberDto>>($"/api/circlemember/circle/{circleId}");
+            return list ?? new List<CircleMemberDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load members for circle {CircleId}", circleId);
+            return new List<CircleMemberDto>();
+        }
+    }
+
+    public async Task<CircleOperationResultDto> RemoveCircleMemberAsync(int circleId, int targetUserId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/circlemember/circle/{circleId}/user/{targetUserId}");
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing user {UserId} from circle {CircleId}", targetUserId, circleId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> LeaveCircleAsync(int circleId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/circlemember/circle/{circleId}/leave", null);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error leaving circle {CircleId}", circleId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> ChangeCircleMemberRoleAsync(int circleId, ChangeMemberRoleRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"/api/circlemember/circle/{circleId}/role", request);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing role for user {UserId} in circle {CircleId}", request.TargetUserId, circleId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<CircleOperationResultDto> TransferCircleOwnershipAsync(int circleId, TransferCircleOwnershipRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circlemember/circle/{circleId}/transfer-ownership", request);
+            var result = await res.Content.ReadFromJsonAsync<CircleOperationResultDto>();
+            return result ?? new CircleOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error transferring ownership of circle {CircleId}", circleId);
+            return new CircleOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    // =========================================================================
+    // Real-Time Private Circle Group Chat (Phase 6)
+    // =========================================================================
+
+    public async Task<CircleChatPaginationDto?> GetCircleMessagesAsync(int circleId, int pageNumber = 1, int pageSize = 30)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<CircleChatPaginationDto>($"/api/circles/{circleId}/messages?pageNumber={pageNumber}&pageSize={pageSize}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get messages for circle {CircleId}", circleId);
+            return null;
+        }
+    }
+
+    public async Task<CircleChatMessageDto?> SendCircleMessageAsync(int circleId, string content, string? messageType = "text")
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"/api/circles/{circleId}/messages", new SendCircleMessageRequestDto
+            {
+                CircleId = circleId,
+                Content = content,
+                MessageType = messageType
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send message to circle {CircleId}", circleId);
+        }
+        return null;
+    }
+
+    public async Task<CircleChatMessageDto?> EditCircleMessageAsync(int circleId, int messageId, string newContent)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"/api/circles/{circleId}/messages/{messageId}", new EditCircleMessageRequestDto
+            {
+                CircleId = circleId,
+                MessageId = messageId,
+                Content = newContent
+            });
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<CircleChatMessageDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to edit message {MessageId} in circle {CircleId}", messageId, circleId);
+        }
+        return null;
+    }
+
+    public async Task<bool> DeleteCircleMessageAsync(int circleId, int messageId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/circles/{circleId}/messages/{messageId}");
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete message {MessageId} in circle {CircleId}", messageId, circleId);
+            return false;
+        }
+    }
+
+    public async Task<List<CircleMemberPresenceEventDto>> GetCirclePresenceAsync(int circleId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<List<CircleMemberPresenceEventDto>>($"/api/circles/{circleId}/presence") ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get presence for circle {CircleId}", circleId);
+            return new();
         }
     }
 

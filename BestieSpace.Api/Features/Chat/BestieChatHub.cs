@@ -1,8 +1,15 @@
+using System;
 using System.Collections.Concurrent;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using BestieSpace.Api.Features.Circles;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Shared.DTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace BestieSpace.Api.Features.Chat;
 
@@ -10,12 +17,22 @@ public class BestieChatHub : Hub
 {
     private readonly ILogger<BestieChatHub> _logger;
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IChatPresenceService _presenceService;
+    private readonly ICircleAuthorizationService _circleAuth;
+
+    // Preserved for legacy compatibility with Phase 1-4 clubhouse
     private static readonly ConcurrentDictionary<string, string> ConnectedRoles = new();
 
-    public BestieChatHub(ILogger<BestieChatHub> logger, IServiceScopeFactory scopeFactory)
+    public BestieChatHub(
+        ILogger<BestieChatHub> logger,
+        IServiceScopeFactory scopeFactory,
+        IChatPresenceService presenceService,
+        ICircleAuthorizationService circleAuth)
     {
         _logger = logger;
         _scopeFactory = scopeFactory;
+        _presenceService = presenceService;
+        _circleAuth = circleAuth;
     }
 
     public static bool IsRoleOnline(string roleKey)
@@ -25,17 +42,190 @@ public class BestieChatHub : Hub
         return ConnectedRoles.Values.Any(r => r.Equals(clean, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static bool IsUserOnline(string userName)
+    public static bool IsUserOnline(string userName) => IsRoleOnline(userName);
+
+    public override async Task OnConnectedAsync()
     {
-        return IsRoleOnline(userName);
+        _logger.LogInformation("SignalR connection established: {ConnectionId}", Context.ConnectionId);
+
+        var userId = GetCurrentUserId();
+        if (userId.HasValue)
+        {
+            var becameOnline = await _presenceService.UserConnectedAsync(userId.Value, Context.ConnectionId);
+            if (becameOnline)
+            {
+                // Notify connected clients that user came online
+                var (displayName, avatarSticker) = await GetUserDetailsAsync(userId.Value);
+                var presenceEvent = new CircleMemberPresenceEventDto
+                {
+                    UserId = userId.Value,
+                    DisplayName = displayName,
+                    AvatarSticker = avatarSticker,
+                    IsOnline = true,
+                    LastSeenAt = DateTime.UtcNow
+                };
+                await Clients.All.SendAsync("UserOnline", presenceEvent);
+            }
+        }
+
+        await base.OnConnectedAsync();
     }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        _logger.LogInformation("SignalR connection closing: {ConnectionId}", Context.ConnectionId);
+
+        // 1. Phase 6 multi-connection presence cleanup
+        var (isOffline, userId, joinedCircles) = await _presenceService.UserDisconnectedAsync(Context.ConnectionId);
+
+        if (isOffline && userId.HasValue)
+        {
+            var (displayName, avatarSticker) = await GetUserDetailsAsync(userId.Value);
+            var presenceEvent = new CircleMemberPresenceEventDto
+            {
+                UserId = userId.Value,
+                DisplayName = displayName,
+                AvatarSticker = avatarSticker,
+                IsOnline = false,
+                LastSeenAt = DateTime.UtcNow
+            };
+            await Clients.All.SendAsync("UserOffline", presenceEvent);
+        }
+
+        // 2. Legacy Role-based cleanup (preserved for backwards compatibility)
+        if (ConnectedRoles.TryRemove(Context.ConnectionId, out var roleKey))
+        {
+            var stillOnline = ConnectedRoles.Values.Any(r => r == roleKey);
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<BestieDbContext>();
+                var user = await db.Users.FirstOrDefaultAsync(u => u.RoleKey == roleKey);
+                if (user != null)
+                {
+                    user.IsOnline = stillOnline;
+                    user.LastSeenAt = DateTime.UtcNow;
+                    await db.SaveChangesAsync();
+                }
+
+                var presence = new UserPresenceDto
+                {
+                    RoleKey = roleKey,
+                    DisplayName = user?.DisplayName ?? (roleKey == "Bestie" ? "Sweet Bestie 🌸" : "Your Bestie 🎀"),
+                    IsOnline = stillOnline,
+                    LastSeenAt = DateTime.UtcNow
+                };
+                await Clients.All.SendAsync("UserPresenceChanged", presence);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed legacy role cleanup on disconnect for '{RoleKey}'", roleKey);
+            }
+        }
+
+        await base.OnDisconnectedAsync(exception);
+    }
+
+    /// <summary>
+    /// Join a private circle's SignalR group after strict server-side authorization check.
+    /// </summary>
+    public async Task JoinCircle(int circleId)
+    {
+        var userId = GetRequiredUserId();
+
+        // 1. Strict server-side verification: user must be active member of this circle
+        var isMember = await _circleAuth.IsCircleMemberAsync(userId, circleId);
+        if (!isMember)
+        {
+            _logger.LogWarning("User {UserId} attempted unauthorized join to circle {CircleId}", userId, circleId);
+            throw new HubException("Access Denied: You are not an active member of this Bestie Circle.");
+        }
+
+        var groupName = $"circle_{circleId}";
+        await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
+        _presenceService.AddConnectionToCircle(Context.ConnectionId, circleId);
+
+        _logger.LogInformation("User {UserId} ({ConnectionId}) joined group {GroupName}", userId, Context.ConnectionId, groupName);
+
+        var (displayName, _) = await GetUserDetailsAsync(userId);
+        var joinEvent = new CircleMemberJoinedEventDto
+        {
+            CircleId = circleId,
+            UserId = userId,
+            DisplayName = displayName,
+            JoinedAt = DateTime.UtcNow
+        };
+
+        await Clients.Group(groupName).SendAsync("UserJoinedCircle", joinEvent);
+    }
+
+    /// <summary>
+    /// Leave a private circle's SignalR group.
+    /// </summary>
+    public async Task LeaveCircle(int circleId)
+    {
+        var userId = GetCurrentUserId();
+        var groupName = $"circle_{circleId}";
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
+        _presenceService.RemoveConnectionFromCircle(Context.ConnectionId, circleId);
+
+        _logger.LogInformation("Connection {ConnectionId} left group {GroupName}", Context.ConnectionId, groupName);
+
+        if (userId.HasValue)
+        {
+            var (displayName, _) = await GetUserDetailsAsync(userId.Value);
+            var leaveEvent = new CircleMemberLeftEventDto
+            {
+                CircleId = circleId,
+                UserId = userId.Value,
+                DisplayName = displayName
+            };
+            await Clients.Group(groupName).SendAsync("UserLeftCircle", leaveEvent);
+        }
+    }
+
+    /// <summary>
+    /// Client-to-server SendMessage event.
+    /// </summary>
+    public async Task<CircleChatMessageDto> SendMessage(SendCircleMessageRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var chatService = scope.ServiceProvider.GetRequiredService<ICircleChatService>();
+        return await chatService.SendCircleMessageAsync(request.CircleId, request.Content, request.MessageType, userId);
+    }
+
+    /// <summary>
+    /// Client-to-server EditMessage event.
+    /// </summary>
+    public async Task<CircleChatMessageDto> EditMessage(EditCircleMessageRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var chatService = scope.ServiceProvider.GetRequiredService<ICircleChatService>();
+        return await chatService.EditCircleMessageAsync(request.MessageId, request.CircleId, request.Content, userId);
+    }
+
+    /// <summary>
+    /// Client-to-server DeleteMessage event.
+    /// </summary>
+    public async Task<bool> DeleteMessage(DeleteCircleMessageRequestDto request)
+    {
+        var userId = GetRequiredUserId();
+        using var scope = _scopeFactory.CreateScope();
+        var chatService = scope.ServiceProvider.GetRequiredService<ICircleChatService>();
+        return await chatService.DeleteCircleMessageAsync(request.MessageId, request.CircleId, userId);
+    }
+
+    // =========================================================================
+    // Legacy Hub methods preserved for Phase 1-4 Clubhouse Compatibility
+    // =========================================================================
 
     public async Task RegisterUser(string userName)
     {
         var roleKey = userName.Contains("Bestie", StringComparison.OrdinalIgnoreCase) ? "Bestie" : "Me";
         ConnectedRoles[Context.ConnectionId] = roleKey;
-        _logger.LogInformation("Connection {ConnectionId} registered as role '{RoleKey}' (name: {UserName})", 
-            Context.ConnectionId, roleKey, userName);
 
         try
         {
@@ -63,55 +253,8 @@ public class BestieChatHub : Hub
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update online presence for role '{RoleKey}'", roleKey);
+            _logger.LogError(ex, "Failed legacy RegisterUser for '{RoleKey}'", roleKey);
         }
-    }
-
-    public override Task OnConnectedAsync()
-    {
-        _logger.LogInformation("SignalR Client connected: {ConnectionId}", Context.ConnectionId);
-        return base.OnConnectedAsync();
-    }
-
-    public override async Task OnDisconnectedAsync(Exception? exception)
-    {
-        if (ConnectedRoles.TryRemove(Context.ConnectionId, out var roleKey))
-        {
-            var stillOnline = ConnectedRoles.Values.Any(r => r == roleKey);
-            _logger.LogInformation("Connection {ConnectionId} disconnected (Role: {RoleKey}, StillOnline: {StillOnline})", 
-                Context.ConnectionId, roleKey, stillOnline);
-
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<BestieDbContext>();
-                var user = await db.Users.FirstOrDefaultAsync(u => u.RoleKey == roleKey);
-                var now = DateTime.UtcNow;
-
-                if (user != null)
-                {
-                    user.IsOnline = stillOnline;
-                    user.LastSeenAt = now;
-                    await db.SaveChangesAsync();
-                }
-
-                var presence = new UserPresenceDto
-                {
-                    RoleKey = roleKey,
-                    DisplayName = user?.DisplayName ?? (roleKey == "Bestie" ? "Sweet Bestie 🌸" : "Your Bestie 🎀"),
-                    IsOnline = stillOnline,
-                    LastSeenAt = now
-                };
-
-                await Clients.All.SendAsync("UserPresenceChanged", presence);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to update presence on disconnect for role '{RoleKey}'", roleKey);
-            }
-        }
-
-        await base.OnDisconnectedAsync(exception);
     }
 
     public async Task BroadcastChatMessage(ChatMessageDto message)
@@ -122,5 +265,47 @@ public class BestieChatHub : Hub
     public async Task BroadcastMessagesRead(MessagesReadNotification notification)
     {
         await Clients.All.SendAsync("MessagesRead", notification);
+    }
+
+    // =========================================================================
+    // Helper Methods
+    // =========================================================================
+
+    private int? GetCurrentUserId()
+    {
+        var claim = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? Context.User?.FindFirst("sub")?.Value
+                    ?? Context.User?.FindFirst("userId")?.Value;
+
+        if (int.TryParse(claim, out var uid))
+        {
+            return uid;
+        }
+        return null;
+    }
+
+    private int GetRequiredUserId()
+    {
+        var uid = GetCurrentUserId();
+        if (!uid.HasValue)
+        {
+            throw new HubException("Unauthorized: Authentication token is missing or invalid.");
+        }
+        return uid.Value;
+    }
+
+    private async Task<(string displayName, string? avatarSticker)> GetUserDetailsAsync(int userId)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<BestieDbContext>();
+            var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
+            return (user?.DisplayName ?? $"User {userId}", user?.AvatarSticker);
+        }
+        catch
+        {
+            return ($"User {userId}", null);
+        }
     }
 }

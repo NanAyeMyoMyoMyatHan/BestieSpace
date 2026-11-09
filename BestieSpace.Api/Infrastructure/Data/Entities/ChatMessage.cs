@@ -4,12 +4,17 @@ using System.Collections.Generic;
 namespace BestieSpace.Api.Infrastructure.Data.Entities;
 
 /// <summary>
-/// Entity representing real-time multimedia chat messages (text, sticker, photo, voice).
-/// Upgraded in Phase 1 to support Bestie Circles and multi-user chat while preserving 1-on-1 private clubhouse messages.
+/// Entity representing real-time multimedia and circle group chat messages.
+/// Upgraded in Phase 6 to support private Bestie Circle group chats, soft deletion, and editing.
 /// </summary>
 public partial class ChatMessage
 {
     public int Id { get; set; }
+
+    /// <summary>
+    /// Alias for ChatMessageId matching Phase 6 specification.
+    /// </summary>
+    public int ChatMessageId => Id;
 
     /// <summary>
     /// Optional CircleId. NULL for legacy 1-on-1 private clubhouse chat messages; set for circle group chat.
@@ -23,7 +28,7 @@ public partial class ChatMessage
 
     public string SenderName { get; set; } = null!;
 
-    public string MessageType { get; set; } = null!; // "text", "sticker", "photo", "voice"
+    public string MessageType { get; set; } = "text"; // "text", "system", "sticker", "photo", "voice"
 
     public string? Content { get; set; }
 
@@ -32,6 +37,21 @@ public partial class ChatMessage
     public double? VoiceDurationSeconds { get; set; }
 
     public DateTime Timestamp { get; set; }
+
+    /// <summary>
+    /// Alias for CreatedAt matching Phase 6 specification.
+    /// </summary>
+    public DateTime CreatedAt
+    {
+        get => Timestamp;
+        set => Timestamp = value;
+    }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    public bool IsDeleted { get; set; } = false;
+
+    public DateTime? DeletedAt { get; set; }
 
     public bool IsRead { get; set; }
 

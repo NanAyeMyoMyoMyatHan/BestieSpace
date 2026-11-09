@@ -1,0 +1,1250 @@
+@page "/circles/{CircleId:int}/chat"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+@using System.Security.Claims
+@using BestieSpace.Shared.DTOs
+@using BestieSpace.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IBestieApiClient ApiClient
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<CircleChat> Logger
+
+<PageTitle>@(circle?.CircleName ?? "Circle Chat") - BestieSpace 🌸</PageTitle>
+
+<div class="circle-chat-page">
+    @if (isLoadingInitial)
+    {
+        <div class="chat-loading-state">
+            <div class="kawaii-spinner">🌸</div>
+            <p>Gathering your besties into the chat room...</p>
+        </div>
+    }
+    else if (!isMember)
+    {
+        <div class="chat-forbidden-card">
+            <div class="lock-icon">🔒</div>
+            <h2>Private Bestie Circle</h2>
+            <p>You must be an active member of this circle to open its private group chat.</p>
+            <button class="btn-back" @onclick="GoBackToCircles">← Back to Bestie Circles</button>
+        </div>
+    }
+    else
+    {
+        <!-- CHAT WRAPPER -->
+        <div class="chat-wrapper">
+            <!-- CHAT HEADER -->
+            <header class="chat-header">
+                <div class="header-left">
+                    <button class="btn-icon-back" title="Back to circles" @onclick="GoBackToCircles">
+                        <span>←</span>
+                    </button>
+                    <div class="circle-avatar-bubble">
+                        <span class="circle-icon">@(string.IsNullOrWhiteSpace(circle?.CircleIcon) ? "🌸" : circle.CircleIcon)</span>
+                    </div>
+                    <div class="circle-header-meta">
+                        <div class="circle-title-row">
+                            <h2 class="circle-name">@(circle?.CircleName ?? "Bestie Circle")</h2>
+                            <span class="role-pill">@myRoleName</span>
+                        </div>
+                        <div class="circle-status-row">
+                            <span class="online-indicator @(isHubConnected ? "connected" : "reconnecting")"></span>
+                            <span class="online-text">
+                                @(onlineMembersCount) of @(members.Count)/9 besties online
+                            </span>
+                            @if (!isHubConnected)
+                            {
+                                <span class="reconnecting-tag">🔄 Reconnecting...</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <button class="btn-header-action" title="View Circle Details & Roster" @onclick="OpenCircleRoster">
+                        <span>👑 Roster (@members.Count/9)</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- CHAT ROSTER DRAWER (if toggled) -->
+            @if (showRosterDrawer)
+            {
+                <div class="roster-drawer">
+                    <div class="roster-drawer-header">
+                        <h3>Circle Members (@members.Count / 9)</h3>
+                        <button class="btn-close-sm" @onclick="@(() => showRosterDrawer = false)">✕</button>
+                    </div>
+                    <div class="roster-list">
+                        @foreach (var m in members)
+                        {
+                            var isUserOnline = presenceList.Any(p => p.UserId == m.UserId && p.IsOnline);
+                            <div class="roster-item">
+                                <div class="roster-avatar-wrap">
+                                    <span class="roster-sticker">@(m.UserAvatarSticker ?? "🌸")</span>
+                                    <span class="status-dot @(isUserOnline ? "online" : "offline")"></span>
+                                </div>
+                                <div class="roster-info">
+                                    <div class="roster-name-row">
+                                        <strong>@m.UserDisplayName</strong>
+                                        <span class="badge-role">@m.RoleName</span>
+                                    </div>
+                                    <span class="roster-sub">@@@m.Username • @(isUserOnline ? "Active now" : "Offline")</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- MESSAGES CONTAINER -->
+            <main class="chat-messages-container" id="chat-messages-box">
+                @if (hasMoreMessages)
+                {
+                    <div class="load-older-bar">
+                        <button class="btn-load-older" disabled="@isLoadingOlder" @onclick="LoadOlderMessages">
+                            @if (isLoadingOlder)
+                            {
+                                <span>🌸 Loading earlier memories...</span>
+                            }
+                            else
+                            {
+                                <span>📜 Load older bestie messages</span>
+                            }
+                        </button>
+                    </div>
+                }
+
+                @if (messages.Count == 0)
+                {
+                    <div class="empty-chat-hero">
+                        <div class="hero-sticker">💌✨</div>
+                        <h3>Welcome to your private Circle chat!</h3>
+                        <p>No messages here yet. Say hello, send a cute message, or make plans with your besties!</p>
+                    </div>
+                }
+                else
+                {
+                    string? lastDateHeader = null;
+
+                    @for (int i = 0; i < messages.Count; i++)
+                    {
+                        var msg = messages[i];
+                        var msgDate = msg.CreatedAt.ToLocalTime().ToString("MMMM d, yyyy");
+                        var isNewDate = msgDate != lastDateHeader;
+                        if (isNewDate)
+                        {
+                            lastDateHeader = msgDate;
+                            <div class="date-divider">
+                                <span>@FormatDateDivider(msg.CreatedAt.ToLocalTime())</span>
+                            </div>
+                        }
+
+                        var isMe = msg.SenderId == currentUserId;
+                        var rowClass = isMe ? "msg-me" : "msg-other";
+
+                        <div class="chat-message-row @rowClass @(msg.IsDeleted ? "is-deleted" : "")" id="@($"msg-{msg.Id}")">
+                            @if (!isMe)
+                            {
+                                <div class="sender-avatar" title="@msg.SenderDisplayName">
+                                    <span>@(string.IsNullOrWhiteSpace(msg.SenderAvatarSticker) ? "🌸" : msg.SenderAvatarSticker)</span>
+                                </div>
+                            }
+
+                            <div class="bubble-wrapper">
+                                @if (!isMe)
+                                {
+                                    <div class="sender-tag">
+                                        <span class="sender-name">@msg.SenderDisplayName</span>
+                                        <span class="sender-username">@@@msg.SenderUsername</span>
+                                    </div>
+                                }
+
+                                <div class="message-bubble">
+                                    @if (editingMessageId == msg.Id)
+                                    {
+                                        <!-- Inline Editing Mode -->
+                                        <div class="inline-edit-box">
+                                            <input type="text" 
+                                                   class="edit-input" 
+                                                   @bind="editingContent" 
+                                                   @bind:event="oninput" 
+                                                   maxlength="2000" />
+                                            <div class="edit-actions">
+                                                <button class="btn-edit-save" @onclick="SaveEditAsync" disabled="@isSubmittingEdit">💾 Save</button>
+                                                <button class="btn-edit-cancel" @onclick="CancelEdit">✕ Cancel</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="bubble-content">
+                                            @if (msg.IsDeleted)
+                                            {
+                                                <span class="deleted-text">🌸 This message was deleted</span>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-content">@msg.Content</p>
+                                                @if (msg.UpdatedAt.HasValue)
+                                                {
+                                                    <span class="edited-flag">(edited)</span>
+                                                }
+                                            }
+                                        </div>
+
+                                        <div class="bubble-footer">
+                                            <span class="msg-time">@msg.CreatedAt.ToLocalTime().ToString("h:mm tt")</span>
+
+                                            @if (!msg.IsDeleted && (msg.CanEdit || msg.CanDelete))
+                                            {
+                                                <div class="msg-actions-dropdown">
+                                                    @if (msg.CanEdit)
+                                                    {
+                                                        <button class="btn-tiny-action" title="Edit message" @onclick="@(() => StartEdit(msg))">✏️</button>
+                                                    }
+                                                    @if (msg.CanDelete)
+                                                    {
+                                                        <button class="btn-tiny-action delete" title="Delete message" @onclick="@(() => DeleteMessageAsync(msg.Id))">🗑️</button>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (isMe)
+                            {
+                                <div class="sender-avatar my-avatar" title="You">
+                                    <span>@(currentUserAvatar ?? "🎀")</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </main>
+
+            <!-- CHAT INPUT BAR -->
+            <footer class="chat-input-bar">
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="chat-error-toast">
+                        <span>⚠️ @errorMessage</span>
+                        <button class="btn-dismiss-err" @onclick="@(() => errorMessage = null)">✕</button>
+                    </div>
+                }
+
+                <div class="input-composer">
+                    <textarea class="chat-textarea"
+                              placeholder="Message your circle besties... 🌸 (Enter to send, Shift+Enter for new line)"
+                              rows="1"
+                              maxlength="2000"
+                              @bind="newMessageText"
+                              @bind:event="oninput"
+                              @onkeydown="HandleKeyDown"
+                              disabled="@isSending"></textarea>
+
+                    <div class="composer-side">
+                        <span class="char-counter @(newMessageText.Length > 1900 ? "warn" : "")">
+                            @newMessageText.Length/2000
+                        </span>
+                        <button class="btn-send-message" 
+                                disabled="@(string.IsNullOrWhiteSpace(newMessageText) || isSending)" 
+                                @onclick="SendMessageAsync">
+                            @if (isSending)
+                            {
+                                <span>🌸...</span>
+                            }
+                            else
+                            {
+                                <span>💌 Send</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    }
+</div>
+
+<style>
+    .circle-chat-page {
+        max-width: 1000px;
+        margin: 20px auto;
+        padding: 0 16px;
+        min-height: calc(100vh - 120px);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-wrapper {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 28px;
+        display: flex;
+        flex-direction: column;
+        height: 82vh;
+        box-shadow: 0 12px 36px rgba(255, 143, 171, 0.18);
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Header */
+    .chat-header {
+        background: linear-gradient(135deg, #FFF0F5 0%, #FFE5EC 100%);
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 2px solid var(--card-blush-border, #FFC2D1);
+    }
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .btn-icon-back {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    .btn-icon-back:hover {
+        background: var(--btn-strawberry, #FF8FAB);
+        color: #fff;
+        transform: scale(1.05);
+    }
+    .circle-avatar-bubble {
+        width: 46px;
+        height: 46px;
+        background: #fff;
+        border: 2px solid var(--btn-strawberry, #FF8FAB);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 4px 12px rgba(255, 143, 171, 0.25);
+    }
+    .circle-header-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .circle-title-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .circle-name {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-cocoa, #4A3B3C);
+        margin: 0;
+    }
+    .role-pill {
+        background: #fff;
+        color: var(--btn-strawberry-dark, #F72585);
+        border: 1px solid var(--card-blush-border, #FFC2D1);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.72rem;
+        font-weight: 600;
+    }
+    .circle-status-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .online-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .online-indicator.connected {
+        background: #4ade80;
+        box-shadow: 0 0 6px #4ade80;
+    }
+    .online-indicator.reconnecting {
+        background: #fbbf24;
+    }
+    .reconnecting-tag {
+        color: #d97706;
+        font-weight: 600;
+        margin-left: 6px;
+    }
+    .btn-header-action {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        padding: 8px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-cocoa, #4A3B3C);
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-header-action:hover {
+        background: var(--card-blush, #FFE5EC);
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+
+    /* Roster Drawer */
+    .roster-drawer {
+        position: absolute;
+        top: 75px;
+        right: 20px;
+        width: 320px;
+        max-height: 400px;
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 20px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.12);
+        z-index: 50;
+        padding: 16px;
+        overflow-y: auto;
+    }
+    .roster-drawer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #f3e8ee;
+    }
+    .roster-drawer-header h3 {
+        font-size: 1rem;
+        color: var(--text-cocoa, #4A3B3C);
+        margin: 0;
+    }
+    .btn-close-sm {
+        background: none;
+        border: none;
+        font-size: 16px;
+        cursor: pointer;
+        color: #999;
+    }
+    .roster-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .roster-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px;
+        border-radius: 12px;
+        background: #FFFDF9;
+    }
+    .roster-avatar-wrap {
+        position: relative;
+        font-size: 22px;
+    }
+    .status-dot {
+        position: absolute;
+        bottom: 0;
+        right: -2px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+    }
+    .status-dot.online { background: #4ade80; }
+    .status-dot.offline { background: #d1d5db; }
+    .roster-info {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+    }
+    .roster-name-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.88rem;
+    }
+    .badge-role {
+        font-size: 0.68rem;
+        background: var(--card-blush, #FFE5EC);
+        color: var(--btn-strawberry-dark, #F72585);
+        padding: 1px 6px;
+        border-radius: 8px;
+    }
+    .roster-sub {
+        font-size: 0.72rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+
+    /* Messages container */
+    .chat-messages-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #FFFDF9;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        scroll-behavior: smooth;
+    }
+    .load-older-bar {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 10px;
+    }
+    .btn-load-older {
+        background: #ffffff;
+        border: 1px solid var(--card-blush-border, #FFC2D1);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--text-cocoa-light, #7E6566);
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: all 0.2s;
+    }
+    .btn-load-older:hover:not(:disabled) {
+        background: var(--card-blush, #FFE5EC);
+        color: var(--btn-strawberry-dark, #F72585);
+    }
+
+    .date-divider {
+        display: flex;
+        justify-content: center;
+        margin: 14px 0 8px 0;
+    }
+    .date-divider span {
+        background: #f4ecf0;
+        color: var(--text-cocoa-light, #7E6566);
+        padding: 3px 14px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Message rows */
+    .chat-message-row {
+        display: flex;
+        gap: 10px;
+        max-width: 80%;
+        animation: chatFadeIn 0.25s ease-out;
+    }
+    @@keyframes chatFadeIn {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .chat-message-row.msg-me {
+        align-self: flex-end;
+        flex-direction: row;
+    }
+    .chat-message-row.msg-other {
+        align-self: flex-start;
+        flex-direction: row;
+    }
+    .sender-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(255, 143, 171, 0.15);
+    }
+    .sender-avatar.my-avatar {
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+    .bubble-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-width: 100%;
+    }
+    .sender-tag {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        font-size: 0.76rem;
+        padding-left: 6px;
+    }
+    .sender-name {
+        font-weight: 700;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .sender-username {
+        color: var(--text-cocoa-light, #7E6566);
+        font-size: 0.7rem;
+    }
+
+    .message-bubble {
+        padding: 10px 14px;
+        border-radius: 20px;
+        position: relative;
+        word-break: break-word;
+        box-shadow: 0 4px 14px rgba(74, 59, 60, 0.05);
+    }
+    .msg-me .message-bubble {
+        background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+        color: #ffffff;
+        border-bottom-right-radius: 4px;
+    }
+    .msg-other .message-bubble {
+        background: #ffffff;
+        border: 1.5px solid var(--card-blush-border, #FFC2D1);
+        color: var(--text-cocoa, #4A3B3C);
+        border-bottom-left-radius: 4px;
+    }
+    .chat-message-row.is-deleted .message-bubble {
+        background: #fbf5f7;
+        border: 1px dashed #e0c8d2;
+        color: #9c848e;
+    }
+    .deleted-text {
+        font-style: italic;
+        font-size: 0.88rem;
+    }
+    .text-content {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+    }
+    .edited-flag {
+        font-size: 0.68rem;
+        opacity: 0.75;
+        margin-left: 4px;
+        font-style: italic;
+    }
+    .bubble-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 4px;
+    }
+    .msg-time {
+        font-size: 0.68rem;
+        opacity: 0.75;
+    }
+    .msg-me .msg-time {
+        color: rgba(255,255,255,0.85);
+    }
+    .msg-other .msg-time {
+        color: var(--text-cocoa-light, #7E6566);
+    }
+
+    .msg-actions-dropdown {
+        display: none;
+        align-items: center;
+        gap: 3px;
+        margin-left: 4px;
+    }
+    .message-bubble:hover .msg-actions-dropdown {
+        display: flex;
+    }
+    .btn-tiny-action {
+        background: rgba(255,255,255,0.85);
+        border: none;
+        font-size: 11px;
+        padding: 2px 4px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: transform 0.15s;
+    }
+    .btn-tiny-action:hover {
+        transform: scale(1.15);
+    }
+
+    /* Inline Edit */
+    .inline-edit-box {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 200px;
+    }
+    .edit-input {
+        background: #fff;
+        color: var(--text-cocoa, #4A3B3C);
+        border: 2px solid var(--btn-strawberry, #FF8FAB);
+        padding: 6px 10px;
+        border-radius: 12px;
+        font-size: 0.92rem;
+    }
+    .edit-actions {
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+    }
+    .btn-edit-save {
+        background: #4ade80;
+        border: none;
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-edit-cancel {
+        background: #e5e7eb;
+        border: none;
+        color: #374151;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        cursor: pointer;
+    }
+
+    /* Empty hero */
+    .empty-chat-hero {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .hero-sticker {
+        font-size: 52px;
+        margin-bottom: 10px;
+    }
+    .empty-chat-hero h3 {
+        color: var(--text-cocoa, #4A3B3C);
+        margin-bottom: 6px;
+    }
+
+    /* Input composer */
+    .chat-input-bar {
+        background: #ffffff;
+        border-top: 2px solid var(--card-blush-border, #FFC2D1);
+        padding: 12px 18px;
+        position: relative;
+    }
+    .chat-error-toast {
+        background: #fee2e2;
+        color: #b91c1c;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-size: 0.82rem;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .btn-dismiss-err {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #b91c1c;
+        font-weight: 700;
+    }
+    .input-composer {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+    }
+    .chat-textarea {
+        flex: 1;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 20px;
+        padding: 10px 16px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        color: var(--text-cocoa, #4A3B3C);
+        resize: none;
+        outline: none;
+        background: #FFFDF9;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        max-height: 120px;
+    }
+    .chat-textarea:focus {
+        border-color: var(--btn-strawberry, #FF8FAB);
+        box-shadow: 0 0 0 3px rgba(255, 143, 171, 0.2);
+    }
+    .composer-side {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+    .char-counter {
+        font-size: 0.7rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .char-counter.warn {
+        color: #dc2626;
+        font-weight: 700;
+    }
+    .btn-send-message {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.92rem;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(251, 111, 146, 0.35);
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .btn-send-message:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+    }
+    .btn-send-message:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    /* Loading and Forbidden */
+    .chat-loading-state, .chat-forbidden-card {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 28px;
+        padding: 60px 24px;
+        text-align: center;
+        box-shadow: 0 12px 32px rgba(255, 143, 171, 0.15);
+        margin-top: 40px;
+    }
+    .kawaii-spinner {
+        font-size: 48px;
+        animation: spinKawaii 1.5s infinite linear;
+        display: inline-block;
+        margin-bottom: 12px;
+    }
+    @@keyframes spinKawaii {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    .lock-icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+    }
+    .btn-back {
+        margin-top: 18px;
+        background: var(--card-blush, #FFE5EC);
+        border: 2px solid var(--btn-strawberry, #FF8FAB);
+        color: var(--text-cocoa, #4A3B3C);
+        padding: 10px 24px;
+        border-radius: 20px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int CircleId { get; set; }
+
+    private CircleDetailDto? circle;
+    private List<CircleMemberDto> members = new();
+    private List<CircleMemberPresenceEventDto> presenceList = new();
+    private List<CircleChatMessageDto> messages = new();
+
+    private HubConnection? hubConnection;
+    private bool isHubConnected = false;
+
+    private int currentUserId = 0;
+    private string? currentUserAvatar = "🎀";
+    private string myRoleName = "Member";
+    private bool isMember = false;
+    private bool isLoadingInitial = true;
+    private bool isLoadingOlder = false;
+    private bool hasMoreMessages = false;
+    private int currentPage = 1;
+
+    private string newMessageText = string.Empty;
+    private bool isSending = false;
+    private string? errorMessage;
+    private bool showRosterDrawer = false;
+
+    // Editing
+    private int? editingMessageId;
+    private string editingContent = string.Empty;
+    private bool isSubmittingEdit = false;
+
+    private int onlineMembersCount => members.Count(m => presenceList.Any(p => p.UserId == m.UserId && p.IsOnline));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUserAsync();
+        await LoadCircleAndMembershipAsync();
+
+        if (isMember)
+        {
+            await LoadMessagesAsync(1, appendOlder: false);
+            await LoadPresenceAsync();
+            await InitializeSignalRAsync();
+        }
+
+        isLoadingInitial = false;
+    }
+
+    private async Task LoadCurrentUserAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var idClaim = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? user.FindFirst("sub")?.Value;
+            int.TryParse(idClaim, out currentUserId);
+            currentUserAvatar = user.FindFirst("avatarSticker")?.Value ?? "🎀";
+        }
+    }
+
+    private async Task LoadCircleAndMembershipAsync()
+    {
+        try
+        {
+            circle = await ApiClient.GetCircleDetailsAsync(CircleId);
+            if (circle != null)
+            {
+                members = await ApiClient.GetCircleMembersAsync(CircleId);
+                var me = members.FirstOrDefault(m => m.UserId == currentUserId);
+                if (me != null)
+                {
+                    isMember = true;
+                    myRoleName = me.RoleName;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load circle {CircleId} details", CircleId);
+            isMember = false;
+        }
+    }
+
+    private async Task LoadMessagesAsync(int page, bool appendOlder)
+    {
+        try
+        {
+            var result = await ApiClient.GetCircleMessagesAsync(CircleId, page, pageSize: 30);
+            if (result != null)
+            {
+                hasMoreMessages = result.HasMore;
+                currentPage = result.PageNumber;
+
+                if (appendOlder)
+                {
+                    // Prepend older messages avoiding duplicates
+                    var newOldMessages = result.Messages.Where(m => !messages.Any(existing => existing.Id == m.Id)).ToList();
+                    messages.InsertRange(0, newOldMessages);
+                }
+                else
+                {
+                    messages = result.Messages;
+                    await ScrollToBottomAsync();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error fetching messages for circle {CircleId}", CircleId);
+            errorMessage = "Could not load message history.";
+        }
+    }
+
+    private async Task LoadOlderMessages()
+    {
+        if (isLoadingOlder || !hasMoreMessages) return;
+        isLoadingOlder = true;
+        try
+        {
+            await LoadMessagesAsync(currentPage + 1, appendOlder: true);
+        }
+        finally
+        {
+            isLoadingOlder = false;
+        }
+    }
+
+    private async Task LoadPresenceAsync()
+    {
+        try
+        {
+            presenceList = await ApiClient.GetCirclePresenceAsync(CircleId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not fetch presence for circle {CircleId}", CircleId);
+        }
+    }
+
+    private async Task InitializeSignalRAsync()
+    {
+        try
+        {
+            var bestieAuth = AuthStateProvider as BestieAuthenticationStateProvider;
+            var token = bestieAuth?.AccessToken;
+
+            var hubUrl = $"{ApiClient.ApiBaseUrl.TrimEnd('/')}/chathub";
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options =>
+                {
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                })
+                .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) })
+                .Build();
+
+            // Register Real-Time Events
+            hubConnection.On<CircleChatMessageDto>("ReceiveMessage", (msg) =>
+            {
+                if (msg.CircleId == CircleId)
+                {
+                    if (!messages.Any(m => m.Id == msg.Id))
+                    {
+                        messages.Add(msg);
+                        InvokeAsync(StateHasChanged);
+                        _ = ScrollToBottomAsync();
+                    }
+                }
+            });
+
+            hubConnection.On<CircleChatMessageDto>("MessageUpdated", (updated) =>
+            {
+                if (updated.CircleId == CircleId)
+                {
+                    var idx = messages.FindIndex(m => m.Id == updated.Id);
+                    if (idx >= 0)
+                    {
+                        messages[idx] = updated;
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+            });
+
+            hubConnection.On<CircleMessageDeletedEventDto>("MessageDeleted", (del) =>
+            {
+                if (del.CircleId == CircleId)
+                {
+                    var existing = messages.FirstOrDefault(m => m.Id == del.MessageId);
+                    if (existing != null)
+                    {
+                        existing.IsDeleted = true;
+                        existing.Content = "🌸 This message was deleted";
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+            });
+
+            hubConnection.On<CircleMemberPresenceEventDto>("UserOnline", (presence) =>
+            {
+                var existing = presenceList.FirstOrDefault(p => p.UserId == presence.UserId);
+                if (existing != null)
+                {
+                    existing.IsOnline = true;
+                }
+                else
+                {
+                    presenceList.Add(presence);
+                }
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On<CircleMemberPresenceEventDto>("UserOffline", (presence) =>
+            {
+                var existing = presenceList.FirstOrDefault(p => p.UserId == presence.UserId);
+                if (existing != null)
+                {
+                    existing.IsOnline = false;
+                }
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.Reconnecting += (error) =>
+            {
+                isHubConnected = false;
+                InvokeAsync(StateHasChanged);
+                return Task.CompletedTask;
+            };
+
+            hubConnection.Reconnected += async (connectionId) =>
+            {
+                isHubConnected = true;
+                Logger.LogInformation("SignalR Reconnected: {ConnectionId}. Rejoining circle group {CircleId}", connectionId, CircleId);
+                await hubConnection.InvokeAsync("JoinCircle", CircleId);
+                // Refresh latest messages after reconnect to load any missed messages
+                await LoadMessagesAsync(1, appendOlder: false);
+                await InvokeAsync(StateHasChanged);
+            };
+
+            await hubConnection.StartAsync();
+            isHubConnected = true;
+
+            // Join the private circle group on the server
+            await hubConnection.InvokeAsync("JoinCircle", CircleId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to connect to SignalR hub for circle {CircleId}", CircleId);
+            isHubConnected = false;
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newMessageText) || isSending) return;
+
+        var text = newMessageText.Trim();
+        isSending = true;
+        errorMessage = null;
+
+        try
+        {
+            var sent = await ApiClient.SendCircleMessageAsync(CircleId, text);
+            if (sent != null)
+            {
+                newMessageText = string.Empty;
+                if (!messages.Any(m => m.Id == sent.Id))
+                {
+                    messages.Add(sent);
+                }
+                await ScrollToBottomAsync();
+            }
+            else
+            {
+                errorMessage = "Failed to send message. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending message");
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private void StartEdit(CircleChatMessageDto msg)
+    {
+        editingMessageId = msg.Id;
+        editingContent = msg.Content ?? string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        editingMessageId = null;
+        editingContent = string.Empty;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (!editingMessageId.HasValue || string.IsNullOrWhiteSpace(editingContent)) return;
+
+        isSubmittingEdit = true;
+        try
+        {
+            var updated = await ApiClient.EditCircleMessageAsync(CircleId, editingMessageId.Value, editingContent);
+            if (updated != null)
+            {
+                var idx = messages.FindIndex(m => m.Id == updated.Id);
+                if (idx >= 0)
+                {
+                    messages[idx] = updated;
+                }
+                editingMessageId = null;
+                editingContent = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to edit message");
+            errorMessage = "Failed to edit message.";
+        }
+        finally
+        {
+            isSubmittingEdit = false;
+        }
+    }
+
+    private async Task DeleteMessageAsync(int messageId)
+    {
+        try
+        {
+            var ok = await ApiClient.DeleteCircleMessageAsync(CircleId, messageId);
+            if (ok)
+            {
+                var existing = messages.FirstOrDefault(m => m.Id == messageId);
+                if (existing != null)
+                {
+                    existing.IsDeleted = true;
+                    existing.Content = "🌸 This message was deleted";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete message {MessageId}", messageId);
+            errorMessage = "Could not delete message.";
+        }
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "var el = document.getElementById('chat-messages-box'); if (el) el.scrollTop = el.scrollHeight;");
+        }
+        catch { }
+    }
+
+    private string FormatDateDivider(DateTime dt)
+    {
+        var today = DateTime.Today;
+        if (dt.Date == today) return "Today";
+        if (dt.Date == today.AddDays(-1)) return "Yesterday";
+        return dt.ToString("MMMM d, yyyy");
+    }
+
+    private void GoBackToCircles() => Nav.NavigateTo("/circles");
+    private void OpenCircleRoster() => showRosterDrawer = !showRosterDrawer;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+        {
+            try
+            {
+                if (hubConnection.State == HubConnectionState.Connected)
+                {
+                    await hubConnection.InvokeAsync("LeaveCircle", CircleId);
+                }
+                await hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Error disposing HubConnection");
+            }
+        }
+    }
+}

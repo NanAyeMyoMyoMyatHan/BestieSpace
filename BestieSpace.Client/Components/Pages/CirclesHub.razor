@@ -1,0 +1,1489 @@
+@page "/circles"
+@page "/circles/{CircleId:int}"
+@rendermode InteractiveServer
+
+@using System.Security.Claims
+@using BestieSpace.Shared.DTOs
+@using BestieSpace.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IBestieApiClient ApiClient
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject ILogger<CirclesHub> Logger
+
+<PageTitle>Bestie Circles 👑🌸 - BestieSpace</PageTitle>
+
+<div class="circles-page">
+    <!-- HERO HEADER -->
+    <header class="circles-header">
+        <div class="header-badge">👑 Private Bestie Circles</div>
+        <h1>Your Friendship Circles & Groups</h1>
+        <p class="subtitle">
+            Gather your closest besties into private circles of up to 9 members! Share exclusive memories, roster updates, and real-time private group chats.
+        </p>
+        <div class="header-actions">
+            <button class="btn-create-circle" @onclick="OpenCreateCircleModal">
+                <span>➕</span> Create New Circle
+            </button>
+            <button class="btn-invites-tab @(activeTab == "invitations" ? "active" : "")" @onclick="@(() => activeTab = "invitations")">
+                <span>💌</span> Pending Invitations
+                @if (incomingInvitations.Count > 0)
+                {
+                    <span class="invite-badge">@incomingInvitations.Count</span>
+                }
+            </button>
+            <button class="btn-invites-tab @(activeTab == "circles" ? "active" : "")" @onclick="@(() => activeTab = "circles")">
+                <span>🌸</span> My Circles (@myCircles.Count)
+            </button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(statusFeedback))
+    {
+        <div class="status-banner @(feedbackIsError ? "error" : "success")">
+            <span>@(feedbackIsError ? "⚠️" : "🌸") @statusFeedback</span>
+            <button class="btn-close-banner" @onclick="@(() => statusFeedback = null)">✕</button>
+        </div>
+    }
+
+    <!-- TAB 1: INVITATIONS -->
+    @if (activeTab == "invitations")
+    {
+        <section class="circles-section">
+            <div class="section-title-row">
+                <h2>💌 Incoming Circle Invitations</h2>
+                <button class="btn-link-sm" @onclick="LoadIncomingInvitationsAsync">🔄 Refresh</button>
+            </div>
+
+            @if (isLoadingInvites)
+            {
+                <div class="loading-state">🌸 Loading invitations...</div>
+            }
+            else if (incomingInvitations.Count == 0)
+            {
+                <div class="empty-state-card">
+                    <div class="empty-icon">📬</div>
+                    <h3>No pending circle invitations!</h3>
+                    <p>When friends invite you into their private Bestie Circle, their cute invitations will appear here.</p>
+                </div>
+            }
+            else
+            {
+                <div class="invitations-grid">
+                    @foreach (var inv in incomingInvitations)
+                    {
+                        <div class="invitation-card">
+                            <div class="inv-card-header">
+                                <span class="inv-icon">@(string.IsNullOrWhiteSpace(inv.CircleIcon) ? "🌸" : inv.CircleIcon)</span>
+                                <div>
+                                    <h4 class="inv-circle-name">@inv.CircleName</h4>
+                                    <span class="inv-invited-by">Invited by <strong>@inv.InvitedByDisplayName</strong></span>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(inv.CircleDescription))
+                            {
+                                <p class="inv-desc">@inv.CircleDescription</p>
+                            }
+                            <div class="inv-meta">
+                                <span>Sent @inv.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</span>
+                            </div>
+                            <div class="inv-actions">
+                                <button class="btn-accept-inv" @onclick="@(() => AcceptInvitationAsync(inv.InvitationId))">
+                                    🌸 Accept & Join
+                                </button>
+                                <button class="btn-decline-inv" @onclick="@(() => DeclineInvitationAsync(inv.InvitationId))">
+                                    ✕ Decline
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    <!-- TAB 2: MY CIRCLES -->
+    @if (activeTab == "circles")
+    {
+        <section class="circles-section">
+            <div class="section-title-row">
+                <h2>👑 My Bestie Circles (@myCircles.Count)</h2>
+                <button class="btn-link-sm" @onclick="LoadMyCirclesAsync">🔄 Refresh</button>
+            </div>
+
+            @if (isLoadingCircles)
+            {
+                <div class="loading-state">🌸 Gathering your circles...</div>
+            }
+            else if (myCircles.Count == 0)
+            {
+                <div class="empty-state-card">
+                    <div class="empty-icon">🧸✨</div>
+                    <h3>You haven't joined any Bestie Circles yet</h3>
+                    <p>Create your very own secret circle and invite your besties, or check pending invitations!</p>
+                    <button class="btn-create-circle mt-3" @onclick="OpenCreateCircleModal">
+                        <span>➕</span> Create Your First Circle
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="circles-grid">
+                    @foreach (var c in myCircles)
+                    {
+                        <div class="circle-card">
+                            <div class="circle-card-top">
+                                <div class="circle-icon-badge">
+                                    <span>@(string.IsNullOrWhiteSpace(c.CircleIcon) ? "🌸" : c.CircleIcon)</span>
+                                </div>
+                                <div class="circle-card-title-group">
+                                    <h3 class="circle-card-name">@c.CircleName</h3>
+                                    <div class="circle-badge-row">
+                                        <span class="circle-role-badge">@c.MyRoleName</span>
+                                        <span class="circle-capacity-badge">@c.MemberCount / 9 Besties</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="circle-card-desc">
+                                @(string.IsNullOrWhiteSpace(c.Description) ? "A private cozy sanctuary for best friends." : c.Description)
+                            </p>
+
+                            <div class="circle-card-footer">
+                                <button class="btn-card-chat" @onclick="@(() => OpenCircleChat(c.CircleId))">
+                                    💬 Open Chat
+                                </button>
+                                <button class="btn-card-manage" @onclick="@(() => OpenCircleDetailsModal(c.CircleId))">
+                                    ⚙️ Manage
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    <!-- MODAL 1: CREATE CIRCLE -->
+    @if (showCreateModal)
+    {
+        <div class="modal-backdrop" @onclick="CloseCreateCircleModal">
+            <div class="modal-card" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>➕ Create a Bestie Circle</h3>
+                    <button class="btn-modal-close" @onclick="CloseCreateCircleModal">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Circle Icon Sticker</label>
+                        <div class="icon-picker-row">
+                            @foreach (var icon in stickerChoices)
+                            {
+                                <button type="button" 
+                                        class="icon-picker-btn @(newCircleModel.CircleIcon == icon ? "selected" : "")"
+                                        @onclick="@(() => newCircleModel.CircleIcon = icon)">
+                                    @icon
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Circle Name *</label>
+                        <input type="text" class="input-text" placeholder="e.g. The Pinky Promise Squad 🌸" 
+                               @bind="newCircleModel.CircleName" maxlength="100" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description (Optional)</label>
+                        <textarea class="input-textarea" placeholder="What is this cute club about?" 
+                                  @bind="newCircleModel.Description" maxlength="500" rows="3"></textarea>
+                    </div>
+
+                    <p class="limit-note">
+                        💡 <strong>Note:</strong> You will become the Circle Owner. Circles have a maximum of 9 members total to keep things intimate and cozy!
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-secondary" @onclick="CloseCreateCircleModal">Cancel</button>
+                    <button class="btn-primary" disabled="@(isSubmittingCreate || string.IsNullOrWhiteSpace(newCircleModel.CircleName))" @onclick="CreateCircleAsync">
+                        @if (isSubmittingCreate)
+                        {
+                            <span>🌸 Creating...</span>
+                        }
+                        else
+                        {
+                            <span>🌸 Create Circle</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 2: CIRCLE DETAILS & ROSTER -->
+    @if (showDetailsModal && selectedCircle != null)
+    {
+        <div class="modal-backdrop" @onclick="CloseCircleDetailsModal">
+            <div class="modal-card wide" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <div class="modal-title-with-icon">
+                        <span class="title-icon">@(selectedCircle.CircleIcon ?? "🌸")</span>
+                        <div>
+                            <h3>@selectedCircle.CircleName</h3>
+                            <span class="modal-subtitle">@selectedCircleMembers.Count / 9 Members • Created @selectedCircle.CreatedAt.ToString("MMM d, yyyy")</span>
+                        </div>
+                    </div>
+                    <button class="btn-modal-close" @onclick="CloseCircleDetailsModal">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Actions top bar -->
+                    <div class="details-top-actions">
+                        <button class="btn-action-chat" @onclick="@(() => OpenCircleChat(selectedCircle.CircleId))">
+                            💬 Enter Real-Time Chat Room
+                        </button>
+
+                        @if (canInviteToSelectedCircle)
+                        {
+                            <button class="btn-action-invite" disabled="@(selectedCircleMembers.Count >= 9)" @onclick="OpenInviteFriendsModal">
+                                @if (selectedCircleMembers.Count >= 9)
+                                {
+                                    <span>🔒 Circle Full (9/9)</span>
+                                }
+                                else
+                                {
+                                    <span>💌 Invite Friends (@(9 - selectedCircleMembers.Count) spots left)</span>
+                                }
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Member roster list -->
+                    <h4 class="roster-heading">👑 Member Roster</h4>
+                    <div class="member-roster-table">
+                        @foreach (var member in selectedCircleMembers)
+                        {
+                            var isMe = member.UserId == currentUserId;
+                            var isThisMemberOwner = member.RoleName == "CircleOwner" || member.RoleName == "Owner";
+
+                            <div class="member-row">
+                                <div class="member-left">
+                                    <span class="member-avatar">@(member.UserAvatarSticker ?? "🌸")</span>
+                                    <div>
+                                        <div class="member-name-row">
+                                            <strong>@member.UserDisplayName</strong>
+                                            @if (isMe)
+                                            {
+                                                <span class="tag-you">(You)</span>
+                                            }
+                                        </div>
+                                        <span class="member-username">@@@member.Username • Joined @member.JoinedAt.ToString("MMM d, yyyy")</span>
+                                    </div>
+                                </div>
+
+                                <div class="member-right">
+                                    <span class="role-pill-badge @member.RoleName.ToLowerInvariant()">@member.RoleName</span>
+
+                                    <!-- Member actions if current user is owner/admin -->
+                                    @if (canManageRoster && !isThisMemberOwner && !isMe)
+                                    {
+                                        <div class="member-admin-controls">
+                                            @if (isCurrentCircleOwner)
+                                            {
+                                                <!-- Role switcher dropdown -->
+                                                <select class="select-role-sm" value="@member.RoleName" @onchange="@((ChangeEventArgs e) => ChangeMemberRoleAsync(member.UserId, e.Value?.ToString()))">
+                                                    <option value="CircleMember">CircleMember</option>
+                                                    <option value="CircleAdmin">CircleAdmin</option>
+                                                </select>
+                                                <button class="btn-tiny-ctrl transfer" title="Transfer Ownership to this member" @onclick="@(() => TransferOwnershipAsync(member.UserId))">
+                                                    👑
+                                                </button>
+                                            }
+
+                                            <button class="btn-tiny-ctrl remove" title="Remove member" @onclick="@(() => RemoveMemberAsync(member.UserId))">
+                                                ✕
+                                            </button>
+                                        </div>
+                                    }
+
+                                    @if (isMe && !isThisMemberOwner)
+                                    {
+                                        <button class="btn-leave-sm" @onclick="LeaveCircleAsync">
+                                            Leave Circle
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Owner-only Circle Settings & Disband -->
+                    @if (isCurrentCircleOwner)
+                    {
+                        <div class="circle-danger-zone">
+                            <h4>⚙️ Circle Settings & Disband</h4>
+                            <p>As the Circle Owner, you can disband or delete this circle. This will deactivate the circle and archive all chat history.</p>
+                            <button class="btn-disband" @onclick="DisbandCircleAsync">
+                                🗑️ Disband Circle
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-secondary" @onclick="CloseCircleDetailsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- MODAL 3: INVITE FRIENDS -->
+    @if (showInviteModal && selectedCircle != null)
+    {
+        <div class="modal-backdrop" @onclick="@(() => showInviteModal = false)">
+            <div class="modal-card" @onclick:stopPropagation>
+                <div class="modal-header">
+                    <h3>💌 Invite Friends to @selectedCircle.CircleName</h3>
+                    <button class="btn-modal-close" @onclick="@(() => showInviteModal = false)">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="invite-modal-desc">
+                        Only your accepted bestie friends who aren't already members can be invited.
+                    </p>
+
+                    @if (isLoadingFriends)
+                    {
+                        <div class="loading-state">🌸 Loading friends list...</div>
+                    }
+                    else if (eligibleFriends.Count == 0)
+                    {
+                        <div class="empty-state-card sm">
+                            <p>No eligible friends to invite! Either all your friends are already in this circle or you haven't added friends yet.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="eligible-friends-list">
+                            @foreach (var friend in eligibleFriends)
+                            {
+                                <div class="friend-invite-row">
+                                    <div class="friend-info-left">
+                                        <span class="friend-sticker">@(friend.AvatarSticker ?? "🌸")</span>
+                                        <div>
+                                            <strong>@friend.DisplayName</strong>
+                                            <span class="friend-sub">@@@friend.Username</span>
+                                        </div>
+                                    </div>
+                                    <button class="btn-send-invite" 
+                                            disabled="@(isSendingInvite || pendingInviteFriendIds.Contains(friend.UserId))"
+                                            @onclick="@(() => SendInvitationAsync(friend.UserId))">
+                                        @if (pendingInviteFriendIds.Contains(friend.UserId))
+                                        {
+                                            <span>✓ Invited</span>
+                                        }
+                                        else
+                                        {
+                                            <span>💌 Invite</span>
+                                        }
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn-secondary" @onclick="@(() => showInviteModal = false)">Done</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .circles-page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 16px 80px 16px;
+    }
+
+    .circles-header {
+        background: linear-gradient(135deg, #FFF0F5 0%, #FFE5EC 100%);
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 28px;
+        padding: 36px 30px;
+        text-align: center;
+        margin-bottom: 28px;
+        box-shadow: 0 12px 32px rgba(255, 143, 171, 0.18);
+    }
+    .header-badge {
+        display: inline-block;
+        background: #ffffff;
+        color: var(--btn-strawberry-dark, #F72585);
+        font-weight: 700;
+        font-size: 0.82rem;
+        padding: 4px 14px;
+        border-radius: 20px;
+        border: 1px solid var(--card-blush-border, #FFC2D1);
+        margin-bottom: 12px;
+    }
+    .circles-header h1 {
+        font-size: 2.1rem;
+        color: var(--text-cocoa, #4A3B3C);
+        margin-bottom: 8px;
+    }
+    .subtitle {
+        color: var(--text-cocoa-light, #7E6566);
+        max-width: 680px;
+        margin: 0 auto 24px auto;
+        line-height: 1.5;
+        font-size: 1rem;
+    }
+    .header-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .btn-create-circle {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
+        color: #fff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 20px;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 0.95rem;
+        box-shadow: 0 4px 14px rgba(251, 111, 146, 0.35);
+        transition: all 0.2s;
+    }
+    .btn-create-circle:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+    }
+    .btn-invites-tab {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        color: var(--text-cocoa, #4A3B3C);
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+    .btn-invites-tab.active {
+        background: var(--card-blush, #FFE5EC);
+        border-color: var(--btn-strawberry, #FF8FAB);
+        color: var(--btn-strawberry-dark, #F72585);
+    }
+    .invite-badge {
+        background: #ef4444;
+        color: #fff;
+        font-size: 0.72rem;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-weight: 800;
+    }
+
+    .status-banner {
+        padding: 12px 18px;
+        border-radius: 16px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 600;
+        font-size: 0.92rem;
+    }
+    .status-banner.success {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+    }
+    .status-banner.error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+    .btn-close-banner {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    .circles-section {
+        margin-top: 10px;
+    }
+    .section-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+    }
+    .section-title-row h2 {
+        font-size: 1.4rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .btn-link-sm {
+        background: none;
+        border: none;
+        color: var(--btn-strawberry-dark, #F72585);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    /* Grid */
+    .circles-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+        gap: 20px;
+    }
+    .circle-card {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 24px;
+        padding: 20px;
+        box-shadow: 0 8px 24px rgba(255, 143, 171, 0.12);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 14px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .circle-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(255, 143, 171, 0.22);
+    }
+    .circle-card-top {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .circle-icon-badge {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--card-blush-light, #FFF0F5);
+        border: 2px solid var(--btn-strawberry, #FF8FAB);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+    .circle-card-title-group {
+        flex: 1;
+    }
+    .circle-card-name {
+        font-size: 1.15rem;
+        color: var(--text-cocoa, #4A3B3C);
+        margin-bottom: 4px;
+    }
+    .circle-badge-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .circle-role-badge {
+        font-size: 0.72rem;
+        background: var(--card-blush, #FFE5EC);
+        color: var(--btn-strawberry-dark, #F72585);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 700;
+    }
+    .circle-capacity-badge {
+        font-size: 0.72rem;
+        background: #f3f4f6;
+        color: var(--text-cocoa-light, #7E6566);
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .circle-card-desc {
+        font-size: 0.9rem;
+        color: var(--text-cocoa-light, #7E6566);
+        line-height: 1.4;
+        margin: 0;
+        flex: 1;
+    }
+    .circle-card-footer {
+        display: flex;
+        gap: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #f9eef2;
+    }
+    .btn-card-chat {
+        flex: 2;
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
+        color: #fff;
+        border: none;
+        padding: 9px 14px;
+        border-radius: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 12px rgba(251, 111, 146, 0.25);
+    }
+    .btn-card-manage {
+        flex: 1;
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        color: var(--text-cocoa, #4A3B3C);
+        padding: 9px 12px;
+        border-radius: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    /* Invitations Grid */
+    .invitations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+    }
+    .invitation-card {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 20px;
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    }
+    .inv-card-header {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    .inv-icon {
+        font-size: 32px;
+    }
+    .inv-circle-name {
+        font-size: 1.05rem;
+        color: var(--text-cocoa, #4A3B3C);
+        margin: 0;
+    }
+    .inv-invited-by {
+        font-size: 0.8rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .inv-desc {
+        font-size: 0.85rem;
+        color: var(--text-cocoa-light, #7E6566);
+        margin-bottom: 10px;
+    }
+    .inv-meta {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-bottom: 12px;
+    }
+    .inv-actions {
+        display: flex;
+        gap: 8px;
+    }
+    .btn-accept-inv {
+        flex: 1;
+        background: #4ade80;
+        color: #fff;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 14px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+    .btn-decline-inv {
+        background: #f3f4f6;
+        color: #4b5563;
+        border: 1px solid #d1d5db;
+        padding: 8px 12px;
+        border-radius: 14px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(74, 59, 60, 0.45);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 16px;
+    }
+    .modal-card {
+        background: #ffffff;
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 28px;
+        width: 100%;
+        max-width: 520px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-card.wide {
+        max-width: 680px;
+    }
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #f3e8ee;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.25rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .btn-modal-close {
+        background: none;
+        border: none;
+        font-size: 20px;
+        color: #999;
+        cursor: pointer;
+    }
+    .modal-body {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #f3e8ee;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .form-group label {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .icon-picker-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .icon-picker-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #e5e7eb;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+    }
+    .icon-picker-btn.selected {
+        border-color: var(--btn-strawberry, #FF8FAB);
+        background: var(--card-blush, #FFE5EC);
+        transform: scale(1.15);
+    }
+    .input-text, .input-textarea {
+        border: 2px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 14px;
+        padding: 10px 14px;
+        font-family: inherit;
+        font-size: 0.95rem;
+        outline: none;
+    }
+    .input-text:focus, .input-textarea:focus {
+        border-color: var(--btn-strawberry, #FF8FAB);
+    }
+    .limit-note {
+        font-size: 0.82rem;
+        color: var(--text-cocoa-light, #7E6566);
+        background: #fffbeb;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid #fef3c7;
+    }
+    .btn-primary {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 16px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 16px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    /* Details Modal specifics */
+    .modal-title-with-icon {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .title-icon {
+        font-size: 34px;
+    }
+    .modal-subtitle {
+        font-size: 0.82rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .details-top-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .btn-action-chat {
+        background: linear-gradient(135deg, var(--btn-strawberry, #FF8FAB) 0%, var(--btn-strawberry-hover, #FB6F92) 100%);
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        flex: 1;
+    }
+    .btn-action-invite {
+        background: #ffffff;
+        border: 2px solid var(--btn-strawberry, #FF8FAB);
+        color: var(--btn-strawberry-dark, #F72585);
+        padding: 10px 18px;
+        border-radius: 16px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+    .btn-action-invite:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .roster-heading {
+        margin: 10px 0 6px 0;
+        font-size: 1.05rem;
+        color: var(--text-cocoa, #4A3B3C);
+    }
+    .member-roster-table {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .member-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #FFFDF9;
+        border: 1px solid var(--card-blush-border, #FFC2D1);
+        border-radius: 16px;
+    }
+    .member-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .member-avatar {
+        font-size: 24px;
+    }
+    .member-name-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .tag-you {
+        font-size: 0.72rem;
+        color: var(--btn-strawberry-dark, #F72585);
+        font-weight: 700;
+    }
+    .member-username {
+        font-size: 0.75rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .member-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .role-pill-badge {
+        font-size: 0.72rem;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 700;
+        background: #f3f4f6;
+    }
+    .role-pill-badge.circleowner {
+        background: #fef08a;
+        color: #854d0e;
+    }
+    .role-pill-badge.circleadmin {
+        background: #e0e7ff;
+        color: #3730a3;
+    }
+    .member-admin-controls {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+    .select-role-sm {
+        font-size: 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 2px 4px;
+    }
+    .btn-tiny-ctrl {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        width: 24px;
+        height: 24px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+    }
+    .btn-tiny-ctrl.remove:hover {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    .btn-leave-sm {
+        background: none;
+        border: 1px solid #f87171;
+        color: #ef4444;
+        padding: 3px 10px;
+        border-radius: 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .circle-danger-zone {
+        margin-top: 16px;
+        padding: 14px;
+        background: #fff5f5;
+        border: 1px solid #fed7d7;
+        border-radius: 16px;
+    }
+    .circle-danger-zone h4 {
+        margin: 0 0 4px 0;
+        font-size: 0.95rem;
+        color: #c53030;
+    }
+    .circle-danger-zone p {
+        font-size: 0.8rem;
+        color: #742a2a;
+        margin: 0 0 10px 0;
+    }
+    .btn-disband {
+        background: #e53e3e;
+        color: #fff;
+        border: none;
+        padding: 6px 14px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    /* Invite friends list */
+    .invite-modal-desc {
+        font-size: 0.85rem;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .eligible-friends-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+    .friend-invite-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #FFFDF9;
+        border: 1px solid #f3e8ee;
+        border-radius: 14px;
+    }
+    .friend-info-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .friend-sticker {
+        font-size: 22px;
+    }
+    .friend-sub {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        display: block;
+    }
+    .btn-send-invite {
+        background: var(--card-blush, #FFE5EC);
+        border: 1.5px solid var(--btn-strawberry, #FF8FAB);
+        color: var(--btn-strawberry-dark, #F72585);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+
+    .loading-state, .empty-state-card {
+        text-align: center;
+        padding: 40px 20px;
+        background: #fff;
+        border: 2px dashed var(--card-blush-border, #FFC2D1);
+        border-radius: 20px;
+        color: var(--text-cocoa-light, #7E6566);
+    }
+    .empty-icon {
+        font-size: 40px;
+        margin-bottom: 8px;
+    }
+    .mt-3 {
+        margin-top: 14px;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public int? CircleId { get; set; }
+
+    private string activeTab = "circles";
+    private int currentUserId = 0;
+    private bool isLoadingCircles = true;
+    private bool isLoadingInvites = false;
+    private bool isLoadingFriends = false;
+
+    private List<CircleDto> myCircles = new();
+    private List<CircleInvitationDto> incomingInvitations = new();
+
+    private string? statusFeedback;
+    private bool feedbackIsError = false;
+
+    // Create Modal
+    private bool showCreateModal = false;
+    private bool isSubmittingCreate = false;
+    private CreateCircleRequestDto newCircleModel = new() { CircleIcon = "🌸" };
+    private readonly string[] stickerChoices = { "🌸", "🎀", "🍓", "🧸", "👑", "💌", "✨", "⭐", "💫", "🐱", "🧁", "🍡" };
+
+    // Details Modal
+    private bool showDetailsModal = false;
+    private CircleDetailDto? selectedCircle;
+    private List<CircleMemberDto> selectedCircleMembers = new();
+    private bool isCurrentCircleOwner => selectedCircle != null && selectedCircle.OwnerUserId == currentUserId;
+    private bool canManageRoster => isCurrentCircleOwner || (selectedCircleMembers.Any(m => m.UserId == currentUserId && m.RoleName == "CircleAdmin"));
+    private bool canInviteToSelectedCircle => canManageRoster || selectedCircleMembers.Any(m => m.UserId == currentUserId);
+
+    // Invite Modal
+    private bool showInviteModal = false;
+    private List<CircleEligibleFriend> eligibleFriends = new();
+    private HashSet<int> pendingInviteFriendIds = new();
+    private bool isSendingInvite = false;
+
+    public class CircleEligibleFriend
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string? AvatarSticker { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentUserIdAsync();
+        await LoadMyCirclesAsync();
+        await LoadIncomingInvitationsAsync();
+
+        if (CircleId.HasValue && CircleId.Value > 0)
+        {
+            await OpenCircleDetailsModal(CircleId.Value);
+        }
+    }
+
+    private async Task LoadCurrentUserIdAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            var idClaim = auth.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                          ?? auth.User.FindFirst("sub")?.Value;
+            int.TryParse(idClaim, out currentUserId);
+        }
+    }
+
+    private async Task LoadMyCirclesAsync()
+    {
+        isLoadingCircles = true;
+        try
+        {
+            myCircles = await ApiClient.GetMyCirclesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load my circles");
+        }
+        finally
+        {
+            isLoadingCircles = false;
+        }
+    }
+
+    private async Task LoadIncomingInvitationsAsync()
+    {
+        isLoadingInvites = true;
+        try
+        {
+            incomingInvitations = await ApiClient.GetIncomingCircleInvitationsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load incoming circle invitations");
+        }
+        finally
+        {
+            isLoadingInvites = false;
+        }
+    }
+
+    private void OpenCreateCircleModal()
+    {
+        newCircleModel = new CreateCircleRequestDto { CircleIcon = "🌸" };
+        showCreateModal = true;
+    }
+
+    private void CloseCreateCircleModal()
+    {
+        showCreateModal = false;
+    }
+
+    private async Task CreateCircleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newCircleModel.CircleName)) return;
+
+        isSubmittingCreate = true;
+        try
+        {
+            var created = await ApiClient.CreateCircleAsync(newCircleModel);
+            if (created != null)
+            {
+                showCreateModal = false;
+                ShowFeedback($"Circle '{created.CircleName}' created successfully! 🌸", isError: false);
+                await LoadMyCirclesAsync();
+                await OpenCircleDetailsModal(created.CircleId);
+            }
+            else
+            {
+                ShowFeedback("Could not create circle. Please try again.", isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating circle");
+            ShowFeedback(ex.Message, isError: true);
+        }
+        finally
+        {
+            isSubmittingCreate = false;
+        }
+    }
+
+    private async Task OpenCircleDetailsModal(int circleId)
+    {
+        try
+        {
+            selectedCircle = await ApiClient.GetCircleDetailsAsync(circleId);
+            if (selectedCircle != null)
+            {
+                selectedCircleMembers = await ApiClient.GetCircleMembersAsync(circleId);
+                showDetailsModal = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load circle {CircleId} details", circleId);
+            ShowFeedback("Could not open circle details.", isError: true);
+        }
+    }
+
+    private void CloseCircleDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedCircle = null;
+        selectedCircleMembers.Clear();
+    }
+
+    private void OpenCircleChat(int circleId)
+    {
+        Nav.NavigateTo($"/circles/{circleId}/chat");
+    }
+
+    private async Task AcceptInvitationAsync(int invitationId)
+    {
+        try
+        {
+            var res = await ApiClient.AcceptCircleInvitationAsync(invitationId);
+            if (res.IsSuccess)
+            {
+                ShowFeedback("Accepted invitation! Welcome to your new circle 🌸", isError: false);
+                await LoadIncomingInvitationsAsync();
+                await LoadMyCirclesAsync();
+                activeTab = "circles";
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task DeclineInvitationAsync(int invitationId)
+    {
+        try
+        {
+            var res = await ApiClient.RejectCircleInvitationAsync(invitationId);
+            if (res.IsSuccess)
+            {
+                ShowFeedback("Invitation declined.", isError: false);
+                await LoadIncomingInvitationsAsync();
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task OpenInviteFriendsModal()
+    {
+        if (selectedCircle == null) return;
+        showInviteModal = true;
+        isLoadingFriends = true;
+        pendingInviteFriendIds.Clear();
+
+        try
+        {
+            var friendships = await ApiClient.GetFriendsListAsync();
+            var existingMemberIds = selectedCircleMembers.Select(m => m.UserId).ToHashSet();
+            eligibleFriends = friendships
+                .Select(f => f.RequesterUserId == currentUserId
+                    ? new CircleEligibleFriend { UserId = f.AddresseeUserId, Username = f.AddresseeUsername, DisplayName = f.AddresseeDisplayName, AvatarSticker = f.AddresseeAvatarSticker }
+                    : new CircleEligibleFriend { UserId = f.RequesterUserId, Username = f.RequesterUsername, DisplayName = f.RequesterDisplayName, AvatarSticker = f.RequesterAvatarSticker })
+                .Where(f => !existingMemberIds.Contains(f.UserId))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load friends for invitation");
+        }
+        finally
+        {
+            isLoadingFriends = false;
+        }
+    }
+
+    private async Task SendInvitationAsync(int targetUserId)
+    {
+        if (selectedCircle == null || isSendingInvite) return;
+
+        isSendingInvite = true;
+        try
+        {
+            var res = await ApiClient.SendCircleInvitationAsync(new SendCircleInvitationRequestDto
+            {
+                CircleId = selectedCircle.CircleId,
+                InviteeUserId = targetUserId
+            });
+
+            if (res.IsSuccess)
+            {
+                pendingInviteFriendIds.Add(targetUserId);
+                ShowFeedback("Invitation sent! 💌", isError: false);
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+        finally
+        {
+            isSendingInvite = false;
+        }
+    }
+
+    private async Task ChangeMemberRoleAsync(int targetUserId, string? newRole)
+    {
+        if (selectedCircle == null || string.IsNullOrWhiteSpace(newRole)) return;
+
+        try
+        {
+            var res = await ApiClient.ChangeCircleMemberRoleAsync(selectedCircle.CircleId, new ChangeMemberRoleRequestDto
+            {
+                TargetUserId = targetUserId,
+                NewRoleName = newRole
+            });
+
+            if (res.IsSuccess)
+            {
+                ShowFeedback($"Member role updated to {newRole}!", isError: false);
+                selectedCircleMembers = await ApiClient.GetCircleMembersAsync(selectedCircle.CircleId);
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task TransferOwnershipAsync(int newOwnerUserId)
+    {
+        if (selectedCircle == null) return;
+
+        try
+        {
+            var res = await ApiClient.TransferCircleOwnershipAsync(selectedCircle.CircleId, new TransferCircleOwnershipRequestDto
+            {
+                NewOwnerUserId = newOwnerUserId
+            });
+
+            if (res.IsSuccess)
+            {
+                ShowFeedback("Circle ownership transferred successfully! 👑", isError: false);
+                await OpenCircleDetailsModal(selectedCircle.CircleId);
+                await LoadMyCirclesAsync();
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task RemoveMemberAsync(int targetUserId)
+    {
+        if (selectedCircle == null) return;
+
+        try
+        {
+            var res = await ApiClient.RemoveCircleMemberAsync(selectedCircle.CircleId, targetUserId);
+            if (res.IsSuccess)
+            {
+                ShowFeedback("Member removed from circle.", isError: false);
+                selectedCircleMembers = await ApiClient.GetCircleMembersAsync(selectedCircle.CircleId);
+                await LoadMyCirclesAsync();
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task LeaveCircleAsync()
+    {
+        if (selectedCircle == null) return;
+
+        try
+        {
+            var res = await ApiClient.LeaveCircleAsync(selectedCircle.CircleId);
+            if (res.IsSuccess)
+            {
+                CloseCircleDetailsModal();
+                ShowFeedback("You have left the circle.", isError: false);
+                await LoadMyCirclesAsync();
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private async Task DisbandCircleAsync()
+    {
+        if (selectedCircle == null) return;
+
+        try
+        {
+            var res = await ApiClient.DeleteCircleAsync(selectedCircle.CircleId);
+            if (res.IsSuccess)
+            {
+                CloseCircleDetailsModal();
+                ShowFeedback("Circle disbanded.", isError: false);
+                await LoadMyCirclesAsync();
+            }
+            else
+            {
+                ShowFeedback(res.Message, isError: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowFeedback(ex.Message, isError: true);
+        }
+    }
+
+    private void ShowFeedback(string msg, bool isError)
+    {
+        statusFeedback = msg;
+        feedbackIsError = isError;
+    }
+}

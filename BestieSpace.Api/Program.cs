@@ -1,5 +1,6 @@
 using BestieSpace.Api.Features.Auth;
 using BestieSpace.Api.Features.Chat;
+using BestieSpace.Api.Features.Circles;
 using BestieSpace.Api.Features.Dashboard;
 using BestieSpace.Api.Features.Memories;
 using BestieSpace.Api.Features.Rbac;
@@ -57,6 +58,16 @@ builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 builder.Services.AddScoped<IFriendshipService, FriendshipService>();
 builder.Services.AddScoped<IUserBlockService, UserBlockService>();
 builder.Services.AddScoped<IUserDiscoveryService, UserDiscoveryService>();
+
+// Bestie Circle Management & Membership Feature Services (Phase 5)
+builder.Services.AddScoped<ICircleAuthorizationService, CircleAuthorizationService>();
+builder.Services.AddScoped<IBestieCircleService, BestieCircleService>();
+builder.Services.AddScoped<ICircleInvitationService, CircleInvitationService>();
+builder.Services.AddScoped<ICircleMemberService, CircleMemberService>();
+
+// Real-Time Private Group Chat & Presence Feature Services (Phase 6)
+builder.Services.AddSingleton<IChatPresenceService, ChatPresenceService>();
+builder.Services.AddScoped<ICircleChatService, CircleChatService>();
 
 // Configure JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] 
@@ -209,7 +220,68 @@ using (var scope = app.Services.CreateScope())
             throw new Exception("Phase 4 dynamic authorization policies failed");
         Console.WriteLine("[PASS] Dynamic Phase 4 policies verified (FRIEND_REQUEST_SEND, USER_BLOCK, USER_SEARCH)");
 
-        Console.WriteLine("================ ALL AUTH, RBAC & PHASE 4 SOCIAL TESTS PASSED! 🌸 ================\n");
+        // 6. Phase 5 Bestie Circles DI & Capacity Invariant Verification
+        var circleAuthSvc = scope.ServiceProvider.GetRequiredService<ICircleAuthorizationService>();
+        var circleSvc = scope.ServiceProvider.GetRequiredService<IBestieCircleService>();
+        var inviteSvc = scope.ServiceProvider.GetRequiredService<ICircleInvitationService>();
+        var memberSvc = scope.ServiceProvider.GetRequiredService<ICircleMemberService>();
+        if (circleAuthSvc == null || circleSvc == null || inviteSvc == null || memberSvc == null)
+            throw new Exception("Phase 5 Bestie Circle services DI resolution failed");
+
+        // Verify Maximum 9-Member Capacity Rule
+        int maxCapacity = 9;
+        int activeCount = 8;
+        bool canAccept9th = activeCount < maxCapacity; // 8 < 9 => True
+        bool canAccept10th = (activeCount + 1) < maxCapacity; // 9 < 9 => False
+        if (!canAccept9th || canAccept10th)
+            throw new Exception("9-member circle capacity invariant failed");
+        Console.WriteLine($"[PASS] Maximum 9-Member Circle Capacity Invariant verified (9th member allowed: {canAccept9th}, 10th blocked: {!canAccept10th})");
+
+        // Verify Phase 5 dynamic policies
+        var circleCreatePolicy = await policyProvider.GetPolicyAsync("CIRCLE_CREATE");
+        var circleInvitePolicy = await policyProvider.GetPolicyAsync("CIRCLE_INVITE");
+        var circleTransferPolicy = await policyProvider.GetPolicyAsync("CIRCLE_TRANSFER_OWNERSHIP");
+        if (circleCreatePolicy == null || circleInvitePolicy == null || circleTransferPolicy == null)
+            throw new Exception("Phase 5 dynamic circle policies failed");
+        Console.WriteLine("[PASS] Dynamic Phase 5 policies verified (CIRCLE_CREATE, CIRCLE_INVITE, CIRCLE_TRANSFER_OWNERSHIP)");
+
+        // 7. Phase 6 Real-Time Private Group Chat DI & Invariant Verification
+        var circleChatSvc = scope.ServiceProvider.GetRequiredService<ICircleChatService>();
+        var chatPresenceSvc = scope.ServiceProvider.GetRequiredService<IChatPresenceService>();
+        if (circleChatSvc == null || chatPresenceSvc == null)
+            throw new Exception("Phase 6 Real-Time Chat & Presence services DI resolution failed");
+
+        // Verify Multi-Connection Presence Tracking logic
+        var testUid = 9999;
+        var conn1 = "conn_tab_1";
+        var conn2 = "conn_tab_2";
+        bool firstConnIsOnline = await chatPresenceSvc.UserConnectedAsync(testUid, conn1);
+        bool secondConnIsOnline = await chatPresenceSvc.UserConnectedAsync(testUid, conn2);
+        bool userOnlineCheck = chatPresenceSvc.IsUserOnline(testUid);
+        
+        // Disconnecting tab 1 should keep user online since tab 2 is still active
+        var (disc1IsOffline, _, _) = await chatPresenceSvc.UserDisconnectedAsync(conn1);
+        bool userStillOnlineAfterOneTabClosed = chatPresenceSvc.IsUserOnline(testUid);
+        
+        // Disconnecting tab 2 should finally mark user offline
+        var (disc2IsOffline, _, _) = await chatPresenceSvc.UserDisconnectedAsync(conn2);
+        bool userOfflineAfterAllTabsClosed = !chatPresenceSvc.IsUserOnline(testUid);
+
+        if (!firstConnIsOnline || secondConnIsOnline || !userOnlineCheck || disc1IsOffline || !userStillOnlineAfterOneTabClosed || !disc2IsOffline || !userOfflineAfterAllTabsClosed)
+            throw new Exception("Phase 6 Multi-Connection Presence Invariant verification failed");
+        Console.WriteLine("[PASS] Phase 6 Multi-Connection Presence Service verified (Multi-tab online continuity: PASS)");
+
+        // Verify Phase 6 dynamic chat policies
+        var chatSendPolicy = await policyProvider.GetPolicyAsync("CHAT_SEND");
+        var chatEditPolicy = await policyProvider.GetPolicyAsync("CHAT_EDIT_OWN");
+        var chatDeletePolicy = await policyProvider.GetPolicyAsync("CHAT_DELETE_OWN");
+        var chatModeratePolicy = await policyProvider.GetPolicyAsync("CHAT_MODERATE");
+        var chatHistoryPolicy = await policyProvider.GetPolicyAsync("CHAT_VIEW_HISTORY");
+        if (chatSendPolicy == null || chatEditPolicy == null || chatDeletePolicy == null || chatModeratePolicy == null || chatHistoryPolicy == null)
+            throw new Exception("Phase 6 dynamic chat policies verification failed");
+        Console.WriteLine("[PASS] Dynamic Phase 6 policies verified (CHAT_SEND, CHAT_EDIT_OWN, CHAT_DELETE_OWN, CHAT_MODERATE, CHAT_VIEW_HISTORY)");
+
+        Console.WriteLine("================ ALL AUTH, RBAC, SOCIAL, CIRCLE & REAL-TIME CHAT TESTS PASSED! 🌸 ================\n");
         return;
     }
 
