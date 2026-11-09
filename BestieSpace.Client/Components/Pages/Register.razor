@@ -19,16 +19,6 @@
             <p class="auth-subtitle">Create your personal account to share memories & chat forever ✨</p>
         </div>
 
-        <!-- Mode Tabs: Sign In vs Register -->
-        <div class="auth-tab-bar">
-            <a href="/login" class="auth-tab-btn" style="text-decoration: none;">
-                🔑 Sign In
-            </a>
-            <button type="button" class="auth-tab-btn active">
-                ✨ Register Account
-            </button>
-        </div>
-
         @if (!string.IsNullOrWhiteSpace(errorMessage))
         {
             <div class="auth-error-banner">
