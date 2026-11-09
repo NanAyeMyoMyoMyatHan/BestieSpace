@@ -16,7 +16,7 @@
 
         <div class="auth-header">
             <div class="auth-logo-badge">🍓</div>
-            <h1 class="auth-title">Welcome to BestieSpace</h1>
+            <h1 class="auth-title" tabindex="-1">Welcome to BestieSpace</h1>
             <p class="auth-subtitle">Enter your secret code or PIN to open our cozy clubhouse 💖</p>
         </div>
 
@@ -195,6 +195,12 @@
     font-size: 1.8rem;
     color: #4A3B3C;
     margin-bottom: 0.3rem;
+    outline: none !important;
+}
+.auth-title:focus,
+.auth-title:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 .auth-subtitle {
     font-size: 0.95rem;

@@ -30,6 +30,36 @@
     padding: 0;
 }
 
+/* Eradicate default browser black focus outlines & auto-select rectangles */
+*:focus,
+*:focus-visible {
+    outline: none !important;
+}
+
+h1, h2, h3, h4, h5, h6,
+h1:focus, h2:focus, h3:focus, h4:focus, h5:focus, h6:focus,
+h1:focus-visible, h2:focus-visible, h3:focus-visible,
+.auth-title, .auth-title:focus, .auth-title:focus-visible,
+.login-title, .login-title:focus, .login-title:focus-visible,
+.welcome-title, .welcome-title:focus, .welcome-title:focus-visible,
+.auth-card, .login-card, .welcome-card {
+    outline: none !important;
+    outline-color: transparent !important;
+    box-shadow: none !important;
+    border-color: transparent;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+button:focus, button:focus-visible,
+a:focus, a:focus-visible,
+.auth-tab-btn:focus, .auth-tab-btn:focus-visible,
+.login-tab-btn:focus, .login-tab-btn:focus-visible,
+.keypad-btn:focus, .keypad-btn:focus-visible {
+    outline: none !important;
+    outline-color: transparent !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
 body {
     font-family: 'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--bg-cream);

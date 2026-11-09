@@ -15,7 +15,7 @@
 
         <div class="auth-header">
             <div class="auth-logo-badge">🌸</div>
-            <h1 class="auth-title">Become a Bestie!</h1>
+            <h1 class="auth-title" tabindex="-1">Become a Bestie!</h1>
             <p class="auth-subtitle">Create your personal account to share memories & chat forever ✨</p>
         </div>
 
@@ -220,6 +220,12 @@
     font-size: 1.8rem;
     color: #4A3B3C;
     margin-bottom: 0.3rem;
+    outline: none !important;
+}
+.auth-title:focus,
+.auth-title:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
 }
 .auth-subtitle {
     font-size: 0.95rem;
