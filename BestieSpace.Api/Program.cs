@@ -22,7 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Configure SQL Server DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
     ?? Environment.GetEnvironmentVariable("SQL_SERVER_CONNECTION_STRING")
-    ?? "Server=(localdb)\\mssqllocaldb;Database=BestieSpaceDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;";
+    ?? "Server=.;Database=BestieSpaceDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<BestieDbContext>(options =>
     options.UseSqlServer(connectionString, sqlOptions =>

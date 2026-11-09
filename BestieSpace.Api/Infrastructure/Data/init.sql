@@ -4,6 +4,10 @@
 -- Requirements: Idempotent, safe to run multiple times, preserves existing records.
 -- ==============================================================================
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+GO
+
 -- 1. AppStats (Global miss-you meter & heartfelt letter)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'AppStats')
 BEGIN
