@@ -1,0 +1,1817 @@
+@page "/friends"
+@page "/friends/{InitialTab}"
+@page "/profile"
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
+@using System.Threading
+@inject NavigationManager Navigation
+@inject BestieAuthenticationStateProvider AuthProvider
+@inject IBestieApiClient ApiClient
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Bestie Clubhouse • Friends & Profile 🌸 | BestieSpace</PageTitle>
+
+<div class="friends-hub-container">
+    <!-- Top Header Ribbon -->
+    <div class="hub-header-card">
+        <div class="hub-brand">
+            <div class="brand-icon">👭</div>
+            <div>
+                <h1 class="hub-title">Bestie Social & Friendship Hub</h1>
+                <p class="hub-subtitle">Find your people, manage connections & customize your cozy profile 🌸✨</p>
+            </div>
+        </div>
+
+        <div class="hub-top-actions">
+            <button class="kawaii-btn btn-secondary" @onclick="GoBackToClubhouse">
+                🏠 Back to Clubhouse
+            </button>
+            <button class="kawaii-btn btn-primary" @onclick="RefreshActiveTabDataAsync">
+                🔄 Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Notifications -->
+    @if (!string.IsNullOrWhiteSpace(globalSuccessMessage))
+    {
+        <div class="social-alert alert-success">
+            <span class="alert-icon">✨</span>
+            <span>@globalSuccessMessage</span>
+            <button class="alert-close" @onclick='() => globalSuccessMessage = null'>✕</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(globalErrorMessage))
+    {
+        <div class="social-alert alert-error">
+            <span class="alert-icon">🥺</span>
+            <span>@globalErrorMessage</span>
+            <button class="alert-close" @onclick='() => globalErrorMessage = null'>✕</button>
+        </div>
+    }
+
+    <!-- Tab Bar -->
+    <div class="hub-tab-bar">
+        <button class="hub-tab-btn @(activeTab == "profile" ? "active" : "")" @onclick='() => SwitchTab("profile")'>
+            🌸 My Profile
+        </button>
+        <button class="hub-tab-btn @(activeTab == "discover" ? "active" : "")" @onclick='() => SwitchTab("discover")'>
+            🔍 Discover Besties
+        </button>
+        <button class="hub-tab-btn @(activeTab == "friends" ? "active" : "")" @onclick='() => SwitchTab("friends")'>
+            👭 My Friends @(myFriends.Count > 0 ? $"({myFriends.Count})" : "")
+        </button>
+        <button class="hub-tab-btn @(activeTab == "incoming" ? "active" : "")" @onclick='() => SwitchTab("incoming")'>
+            💌 Incoming Requests @(incomingRequests.Count > 0 ? $"({incomingRequests.Count})" : "")
+        </button>
+        <button class="hub-tab-btn @(activeTab == "sent" ? "active" : "")" @onclick='() => SwitchTab("sent")'>
+            🚀 Sent Requests @(outgoingRequests.Count > 0 ? $"({outgoingRequests.Count})" : "")
+        </button>
+        <button class="hub-tab-btn @(activeTab == "blocked" ? "active" : "")" @onclick='() => SwitchTab("blocked")'>
+            🚫 Blocked Users @(blockedUsers.Count > 0 ? $"({blockedUsers.Count})" : "")
+        </button>
+    </div>
+
+    @if (isLoadingTab)
+    {
+        <div class="hub-loading">
+            <div class="loading-bow">🎀</div>
+            <p>Fetching cozy bestie updates...</p>
+        </div>
+    }
+    else
+    {
+        <!-- =================================================================== -->
+        <!-- TAB A: MY PROFILE -->
+        <!-- =================================================================== -->
+        @if (activeTab == "profile")
+        {
+            <div class="tab-pane profile-pane">
+                @if (myProfile != null)
+                {
+                    <div class="profile-card">
+                        <div class="profile-banner">
+                            <div class="avatar-container">
+                                @if (!string.IsNullOrWhiteSpace(myProfile.ProfilePicture))
+                                {
+                                    <img src="@myProfile.ProfilePicture" alt="@myProfile.DisplayName" class="profile-avatar-img" />
+                                }
+                                else
+                                {
+                                    <div class="profile-avatar-sticker">@myProfile.AvatarSticker</div>
+                                }
+
+                                <label class="avatar-upload-btn" title="Upload new photo">
+                                    📷
+                                    <InputFile OnChange="HandleProfilePictureUpload" style="display:none;" accept=".jpg,.jpeg,.png,.webp,.gif" />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="profile-info-body">
+                            <div class="profile-main-names">
+                                <h2 class="profile-display-name">@myProfile.DisplayName</h2>
+                                <span class="profile-username">@@@myProfile.Username</span>
+                            </div>
+
+                            <p class="profile-bio">
+                                @(string.IsNullOrWhiteSpace(myProfile.Bio) ? "No bio yet! Click 'Edit Profile' below to share what makes you smile 🍓✨" : myProfile.Bio)
+                            </p>
+
+                            <div class="profile-stats-bar">
+                                <div class="stat-pill">
+                                    <span class="stat-num">@myProfile.FriendCount</span>
+                                    <span class="stat-lbl">Besties 👭</span>
+                                </div>
+                                <div class="stat-pill">
+                                    <span class="stat-num">🌸</span>
+                                    <span class="stat-lbl">Sticker: @myProfile.AvatarSticker</span>
+                                </div>
+                                <div class="stat-pill">
+                                    <span class="stat-num">Member Since</span>
+                                    <span class="stat-lbl">@myProfile.CreatedAt.ToString("MMM yyyy")</span>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(myProfile.Email))
+                            {
+                                <div class="profile-email-badge">
+                                    <span>📧 @myProfile.Email</span>
+                                    <span class="badge-private">🔒 Private to you</span>
+                                </div>
+                            }
+
+                            <div class="profile-actions-row">
+                                <button class="kawaii-btn btn-primary" @onclick="OpenEditProfileModal">
+                                    ✏️ Edit Profile
+                                </button>
+                                <button class="kawaii-btn btn-secondary" @onclick='() => SwitchTab("discover")'>
+                                    🔍 Find Besties
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- TAB B: DISCOVER BESTIES -->
+        <!-- =================================================================== -->
+        @if (activeTab == "discover")
+        {
+            <div class="tab-pane">
+                <!-- Search & Filters -->
+                <div class="discover-search-bar">
+                    <div class="search-input-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" 
+                               placeholder="Search besties by username or display name..." 
+                               value="@searchQuery"
+                               @oninput="HandleSearchInput" />
+                        @if (!string.IsNullOrWhiteSpace(searchQuery))
+                        {
+                            <button class="search-clear-btn" @onclick="ClearSearch">✕</button>
+                        }
+                    </div>
+                </div>
+
+                <!-- Suggested Besties Carousel / Section (shown when no active search) -->
+                @if (string.IsNullOrWhiteSpace(searchQuery) && suggestedUsers.Any())
+                {
+                    <div class="suggested-section">
+                        <div class="section-title-row">
+                            <h3 class="section-title">✨ Suggested Clubhouse Besties</h3>
+                            <span class="section-hint">Cute friends you might love chatting with</span>
+                        </div>
+
+                        <div class="user-cards-grid">
+                            @foreach (var u in suggestedUsers)
+                            {
+                                <div class="bestie-card">
+                                    <div class="card-avatar-wrap">
+                                        @if (!string.IsNullOrWhiteSpace(u.ProfilePicture))
+                                        {
+                                            <img src="@u.ProfilePicture" alt="@u.DisplayName" class="card-avatar-img" />
+                                        }
+                                        else
+                                        {
+                                            <div class="card-avatar-sticker">@u.AvatarSticker</div>
+                                        }
+                                        @if (u.IsOnline)
+                                        {
+                                            <span class="online-indicator" title="Online now"></span>
+                                        }
+                                    </div>
+
+                                    <h4 class="card-display-name">@u.DisplayName</h4>
+                                    <span class="card-username">@@@u.Username</span>
+                                    <p class="card-bio">@(string.IsNullOrWhiteSpace(u.Bio) ? "Ready to make new memories! 🌸" : u.Bio)</p>
+
+                                    <div class="card-actions">
+                                        @if (u.FriendshipStatus == "Accepted")
+                                        {
+                                            <span class="pill-already-friends">💖 Already Besties</span>
+                                        }
+                                        else if (u.FriendshipStatus == "PendingSent")
+                                        {
+                                            <span class="pill-pending-sent">💌 Request Sent</span>
+                                        }
+                                        else if (u.FriendshipStatus == "PendingReceived")
+                                        {
+                                            <button class="kawaii-btn btn-sm btn-primary" @onclick="() => AcceptFriendshipAsync(u.ActiveFriendshipId ?? 0)">
+                                                ✅ Accept
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="kawaii-btn btn-sm btn-primary" @onclick="() => SendFriendRequestAsync(u.UserId)">
+                                                ➕ Add Friend
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Search Results Grid -->
+                <div class="search-results-section">
+                    <div class="section-title-row">
+                        <h3 class="section-title">
+                            @(string.IsNullOrWhiteSpace(searchQuery) ? "All BestieSpace Members" : $"Search Results for \"{searchQuery}\"")
+                            <span class="count-badge">(@discoveryResult.TotalCount)</span>
+                        </h3>
+                    </div>
+
+                    @if (!discoveryResult.Items.Any())
+                    {
+                        <div class="empty-state-box">
+                            <span class="empty-icon">🧸</span>
+                            <h4>No besties found</h4>
+                            <p>Try searching with another name or check back as more friends join!</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="user-cards-grid">
+                            @foreach (var u in discoveryResult.Items)
+                            {
+                                <div class="bestie-card">
+                                    <div class="card-avatar-wrap">
+                                        @if (!string.IsNullOrWhiteSpace(u.ProfilePicture))
+                                        {
+                                            <img src="@u.ProfilePicture" alt="@u.DisplayName" class="card-avatar-img" />
+                                        }
+                                        else
+                                        {
+                                            <div class="card-avatar-sticker">@u.AvatarSticker</div>
+                                        }
+                                        @if (u.IsOnline)
+                                        {
+                                            <span class="online-indicator" title="Online now"></span>
+                                        }
+                                    </div>
+
+                                    <h4 class="card-display-name">@u.DisplayName</h4>
+                                    <span class="card-username">@@@u.Username</span>
+                                    <p class="card-bio">@(string.IsNullOrWhiteSpace(u.Bio) ? "Spreading kindness and pastel smiles ✨" : u.Bio)</p>
+
+                                    <div class="card-actions">
+                                        @if (u.FriendshipStatus == "Accepted")
+                                        {
+                                            <span class="pill-already-friends">💖 Bestie</span>
+                                        }
+                                        else if (u.FriendshipStatus == "PendingSent")
+                                        {
+                                            <span class="pill-pending-sent">💌 Pending</span>
+                                        }
+                                        else if (u.FriendshipStatus == "PendingReceived")
+                                        {
+                                            <button class="kawaii-btn btn-sm btn-primary" @onclick="() => AcceptFriendshipAsync(u.ActiveFriendshipId ?? 0)">
+                                                ✅ Accept
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="kawaii-btn btn-sm btn-primary" @onclick="() => SendFriendRequestAsync(u.UserId)">
+                                                ➕ Add Friend
+                                            </button>
+                                        }
+
+                                        <button class="btn-block-subtle" title="Block user" @onclick="() => ConfirmBlockUser(u.UserId, u.Username)">
+                                            🚫
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Server-Side Pagination -->
+                        @if (discoveryResult.TotalPages > 1)
+                        {
+                            <div class="pagination-bar">
+                                <button class="page-btn" disabled="@(!discoveryResult.HasPreviousPage)" @onclick="() => ChangePage(currentPage - 1)">
+                                    ◀ Prev
+                                </button>
+                                <span class="page-info">Page @discoveryResult.PageNumber of @discoveryResult.TotalPages</span>
+                                <button class="page-btn" disabled="@(!discoveryResult.HasNextPage)" @onclick="() => ChangePage(currentPage + 1)">
+                                    Next ▶
+                                </button>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- TAB C: MY FRIENDS -->
+        <!-- =================================================================== -->
+        @if (activeTab == "friends")
+        {
+            <div class="tab-pane">
+                <div class="pane-top-bar">
+                    <div class="search-mini">
+                        <span>🔍</span>
+                        <input type="text" placeholder="Filter friends by name..." @bind="friendsFilter" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                @if (!FilteredFriends.Any())
+                {
+                    <div class="empty-state-box">
+                        <span class="empty-icon">🌸</span>
+                        <h4>No besties in this list yet</h4>
+                        <p>Find friends in the Discover tab and send them a cute invite!</p>
+                        <button class="kawaii-btn btn-primary" @onclick='() => SwitchTab("discover")'>Discover Besties 🔍</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="friends-list-grid">
+                        @foreach (var f in FilteredFriends)
+                        {
+                            var fUserId = f.FriendUserId(currentUserId);
+                            var fName = f.FriendDisplayName(currentUserId);
+                            var fUser = f.FriendUsername(currentUserId);
+                            var fPfp = f.FriendProfilePicture(currentUserId);
+                            var fSticker = f.FriendAvatarSticker(currentUserId);
+
+                            <div class="friend-item-card">
+                                <div class="friend-item-avatar">
+                                    @if (!string.IsNullOrWhiteSpace(fPfp))
+                                    {
+                                        <img src="@fPfp" alt="@fName" class="item-img" />
+                                    }
+                                    else
+                                    {
+                                        <span class="item-sticker">@fSticker</span>
+                                    }
+                                </div>
+
+                                <div class="friend-item-details">
+                                    <h4 class="item-name">@fName</h4>
+                                    <span class="item-user">@@@fUser</span>
+                                    <span class="item-date">Besties since @f.CreatedAt.ToString("MMM d, yyyy")</span>
+                                </div>
+
+                                <div class="friend-item-actions">
+                                    <button class="kawaii-btn btn-sm btn-outline" @onclick="GoBackToClubhouse">
+                                        💬 Chat
+                                    </button>
+                                    <button class="kawaii-btn btn-sm btn-delete" @onclick="() => ConfirmRemoveFriend(f.FriendshipId, fName)">
+                                        🗑️ Unfriend
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- TAB D: INCOMING REQUESTS -->
+        <!-- =================================================================== -->
+        @if (activeTab == "incoming")
+        {
+            <div class="tab-pane">
+                @if (!incomingRequests.Any())
+                {
+                    <div class="empty-state-box">
+                        <span class="empty-icon">💌</span>
+                        <h4>Your mailbox is all caught up!</h4>
+                        <p>No pending friend requests at the moment.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="requests-grid">
+                        @foreach (var req in incomingRequests)
+                        {
+                            <div class="request-card incoming">
+                                <div class="req-avatar">
+                                    @if (!string.IsNullOrWhiteSpace(req.RequesterProfilePicture))
+                                    {
+                                        <img src="@req.RequesterProfilePicture" alt="@req.RequesterDisplayName" class="item-img" />
+                                    }
+                                    else
+                                    {
+                                        <span class="item-sticker">@req.RequesterAvatarSticker</span>
+                                    }
+                                </div>
+
+                                <div class="req-info">
+                                    <h4 class="req-name">@req.RequesterDisplayName</h4>
+                                    <span class="req-username">@@@req.RequesterUsername</span>
+                                    <span class="req-date">Sent @req.CreatedAt.ToString("MMM d, h:mm tt")</span>
+                                </div>
+
+                                <div class="req-actions">
+                                    <button class="kawaii-btn btn-sm btn-primary" @onclick="() => AcceptFriendshipAsync(req.FriendshipId)">
+                                        💖 Accept
+                                    </button>
+                                    <button class="kawaii-btn btn-sm btn-secondary" @onclick="() => RejectFriendshipAsync(req.FriendshipId)">
+                                        ✕ Decline
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- TAB E: SENT REQUESTS -->
+        <!-- =================================================================== -->
+        @if (activeTab == "sent")
+        {
+            <div class="tab-pane">
+                @if (!outgoingRequests.Any())
+                {
+                    <div class="empty-state-box">
+                        <span class="empty-icon">🚀</span>
+                        <h4>No outgoing requests</h4>
+                        <p>You haven't sent any pending requests. Browse besties in Discover!</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="requests-grid">
+                        @foreach (var req in outgoingRequests)
+                        {
+                            <div class="request-card outgoing">
+                                <div class="req-avatar">
+                                    @if (!string.IsNullOrWhiteSpace(req.AddresseeProfilePicture))
+                                    {
+                                        <img src="@req.AddresseeProfilePicture" alt="@req.AddresseeDisplayName" class="item-img" />
+                                    }
+                                    else
+                                    {
+                                        <span class="item-sticker">@req.AddresseeAvatarSticker</span>
+                                    }
+                                </div>
+
+                                <div class="req-info">
+                                    <h4 class="req-name">@req.AddresseeDisplayName</h4>
+                                    <span class="req-username">@@@req.AddresseeUsername</span>
+                                    <span class="req-date">Waiting for reply • @req.CreatedAt.ToString("MMM d")</span>
+                                </div>
+
+                                <div class="req-actions">
+                                    <button class="kawaii-btn btn-sm btn-secondary" @onclick="() => CancelFriendshipAsync(req.FriendshipId)">
+                                        🗑️ Cancel Request
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        <!-- =================================================================== -->
+        <!-- TAB F: BLOCKED USERS -->
+        <!-- =================================================================== -->
+        @if (activeTab == "blocked")
+        {
+            <div class="tab-pane">
+                @if (!blockedUsers.Any())
+                {
+                    <div class="empty-state-box">
+                        <span class="empty-icon">🕊️</span>
+                        <h4>No blocked users</h4>
+                        <p>Your clubhouse environment is peaceful and safe!</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="blocked-grid">
+                        @foreach (var b in blockedUsers)
+                        {
+                            <div class="blocked-card">
+                                <div class="req-avatar">
+                                    @if (!string.IsNullOrWhiteSpace(b.BlockedProfilePicture))
+                                    {
+                                        <img src="@b.BlockedProfilePicture" alt="@b.BlockedDisplayName" class="item-img" />
+                                    }
+                                    else
+                                    {
+                                        <span class="item-sticker">@b.BlockedAvatarSticker</span>
+                                    }
+                                </div>
+
+                                <div class="req-info">
+                                    <h4 class="req-name">@b.BlockedDisplayName</h4>
+                                    <span class="req-username">@@@b.BlockedUsername</span>
+                                    <span class="req-date">Blocked on @b.CreatedAt.ToString("MMM d, yyyy")</span>
+                                </div>
+
+                                <div class="req-actions">
+                                    <button class="kawaii-btn btn-sm btn-secondary" @onclick="() => UnblockUserAsync(b.BlockedUserId)">
+                                        🔓 Unblock
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT PROFILE -->
+<!-- ========================================================================= -->
+@if (showEditProfileModal && editModel != null)
+{
+    <div class="modal-backdrop" @onclick="CloseEditProfileModal">
+        <div class="kawaii-modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>🌸 Edit Cozy Profile</h3>
+                <button class="close-btn" @onclick="CloseEditProfileModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Display Nickname *</label>
+                    <input type="text" maxlength="50" @bind="editModel.DisplayName" />
+                </div>
+
+                <div class="form-group">
+                    <label>Avatar Sticker</label>
+                    <div class="sticker-selector">
+                        @foreach (var sticker in AvailableStickers)
+                        {
+                            <button type="button" 
+                                    class="sticker-pill @(editModel.AvatarSticker == sticker ? "selected" : "")" 
+                                    @onclick="() => editModel.AvatarSticker = sticker">
+                                @sticker
+                            </button>
+                        }
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Bio / Personal Note</label>
+                    <textarea rows="3" maxlength="300" placeholder="A little note about you..." @bind="editModel.Bio"></textarea>
+                    <span class="char-count">@((editModel.Bio?.Length ?? 0))/300</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="kawaii-btn btn-secondary" @onclick="CloseEditProfileModal">Cancel</button>
+                <button class="kawaii-btn btn-primary" @onclick="SaveProfileAsync" disabled="@isSavingProfile">
+                    @(isSavingProfile ? "Saving..." : "✨ Save Profile")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================================================= -->
+<!-- CONFIRMATION MODAL -->
+<!-- ========================================================================= -->
+@if (showConfirmModal)
+{
+    <div class="modal-backdrop" @onclick="CloseConfirmModal">
+        <div class="kawaii-modal confirm-modal" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h3>@confirmTitle</h3>
+                <button class="close-btn" @onclick="CloseConfirmModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>@confirmMessage</p>
+            </div>
+            <div class="modal-footer">
+                <button class="kawaii-btn btn-secondary" @onclick="CloseConfirmModal">Cancel</button>
+                <button class="kawaii-btn btn-delete" @onclick="ExecuteConfirmedActionAsync">
+                    Confirm 🎀
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string? InitialTab { get; set; }
+
+    private string activeTab = "discover";
+    private bool isLoadingTab = true;
+    private int currentUserId = 0;
+    private string? globalSuccessMessage;
+    private string? globalErrorMessage;
+
+    // Profile Data
+    private UserProfileDto? myProfile;
+    private bool showEditProfileModal = false;
+    private UpdateUserProfileRequestDto? editModel;
+    private bool isSavingProfile = false;
+
+    // Discovery Data
+    private string searchQuery = string.Empty;
+    private int currentPage = 1;
+    private PagedResultDto<UserDiscoveryCardDto> discoveryResult = new();
+    private List<UserDiscoveryCardDto> suggestedUsers = new();
+    private CancellationTokenSource? searchCts;
+
+    // Friends & Lists Data
+    private List<FriendshipDto> myFriends = new();
+    private string friendsFilter = string.Empty;
+    private List<FriendshipDto> incomingRequests = new();
+    private List<FriendshipDto> outgoingRequests = new();
+    private List<UserBlockDto> blockedUsers = new();
+
+    // Confirmation Modal
+    private bool showConfirmModal = false;
+    private string confirmTitle = "Confirm Action";
+    private string confirmMessage = "Are you sure you want to proceed?";
+    private Func<Task>? confirmAction;
+
+    private static readonly string[] AvailableStickers = { "🌸", "🎀", "🍓", "🧸", "✨", "🐰", "🧁", "💖", "🌙", "🍭" };
+
+    private IEnumerable<FriendshipDto> FilteredFriends =>
+        string.IsNullOrWhiteSpace(friendsFilter)
+            ? myFriends
+            : myFriends.Where(f =>
+                f.FriendDisplayName(currentUserId).Contains(friendsFilter, StringComparison.OrdinalIgnoreCase) ||
+                f.FriendUsername(currentUserId).Contains(friendsFilter, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthProvider.GetAuthenticationStateAsync();
+        if (authState.User?.Identity?.IsAuthenticated != true)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        var sub = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (int.TryParse(sub, out var parsedId))
+        {
+            currentUserId = parsedId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(InitialTab))
+        {
+            activeTab = InitialTab.ToLowerInvariant();
+        }
+        else if (Navigation.Uri.EndsWith("/profile", StringComparison.OrdinalIgnoreCase))
+        {
+            activeTab = "profile";
+        }
+
+        await LoadTabDataAsync(activeTab);
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        activeTab = tab;
+        globalSuccessMessage = null;
+        globalErrorMessage = null;
+        await LoadTabDataAsync(tab);
+    }
+
+    private async Task RefreshActiveTabDataAsync()
+    {
+        await LoadTabDataAsync(activeTab);
+    }
+
+    private async Task LoadTabDataAsync(string tab)
+    {
+        isLoadingTab = true;
+        try
+        {
+            switch (tab)
+            {
+                case "profile":
+                    myProfile = await ApiClient.GetMyProfileAsync();
+                    break;
+
+                case "discover":
+                    var discTask = ApiClient.DiscoverUsersAsync(searchQuery, currentPage, 12);
+                    var suggTask = ApiClient.GetSuggestedUsersAsync(6);
+                    await Task.WhenAll(discTask, suggTask);
+                    discoveryResult = await discTask;
+                    suggestedUsers = await suggTask;
+                    break;
+
+                case "friends":
+                    myFriends = await ApiClient.GetFriendsListAsync();
+                    break;
+
+                case "incoming":
+                    incomingRequests = await ApiClient.GetIncomingFriendRequestsAsync();
+                    break;
+
+                case "sent":
+                    outgoingRequests = await ApiClient.GetOutgoingFriendRequestsAsync();
+                    break;
+
+                case "blocked":
+                    blockedUsers = await ApiClient.GetBlockedUsersAsync();
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error loading data: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingTab = false;
+        }
+    }
+
+    private void GoBackToClubhouse()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    // =========================================================================
+    // PROFILE MANAGEMENT
+    // =========================================================================
+
+    private void OpenEditProfileModal()
+    {
+        if (myProfile == null) return;
+        editModel = new UpdateUserProfileRequestDto
+        {
+            DisplayName = myProfile.DisplayName,
+            Bio = myProfile.Bio,
+            AvatarSticker = myProfile.AvatarSticker
+        };
+        showEditProfileModal = true;
+    }
+
+    private void CloseEditProfileModal()
+    {
+        showEditProfileModal = false;
+        editModel = null;
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (editModel == null) return;
+        isSavingProfile = true;
+        try
+        {
+            var updated = await ApiClient.UpdateMyProfileAsync(editModel);
+            if (updated != null)
+            {
+                myProfile = updated;
+                globalSuccessMessage = "✨ Profile updated successfully!";
+                CloseEditProfileModal();
+            }
+            else
+            {
+                globalErrorMessage = "Could not update profile. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Error saving profile: {ex.Message}";
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task HandleProfilePictureUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        try
+        {
+            using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(stream);
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            content.Add(streamContent, "file", file.Name);
+
+            var newUrl = await ApiClient.UploadProfilePictureAsync(content);
+            if (!string.IsNullOrWhiteSpace(newUrl))
+            {
+                if (myProfile != null) myProfile.ProfilePicture = newUrl;
+                globalSuccessMessage = "✨ Profile picture updated!";
+            }
+            else
+            {
+                globalErrorMessage = "Failed to upload photo. Ensure it is PNG, JPG, or WEBP under 5MB.";
+            }
+        }
+        catch (Exception ex)
+        {
+            globalErrorMessage = $"Upload error: {ex.Message}";
+        }
+    }
+
+    // =========================================================================
+    // SEARCH & DISCOVERY
+    // =========================================================================
+
+    private void HandleSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? string.Empty;
+        currentPage = 1;
+
+        searchCts?.Cancel();
+        searchCts = new CancellationTokenSource();
+        var token = searchCts.Token;
+
+        Task.Delay(350, token).ContinueWith(async t =>
+        {
+            if (!t.IsCanceled)
+            {
+                await InvokeAsync(async () =>
+                {
+                    discoveryResult = await ApiClient.DiscoverUsersAsync(searchQuery, currentPage, 12);
+                    StateHasChanged();
+                });
+            }
+        });
+    }
+
+    private async Task ClearSearch()
+    {
+        searchQuery = string.Empty;
+        currentPage = 1;
+        await LoadTabDataAsync("discover");
+    }
+
+    private async Task ChangePage(int newPage)
+    {
+        currentPage = newPage;
+        discoveryResult = await ApiClient.DiscoverUsersAsync(searchQuery, currentPage, 12);
+    }
+
+    // =========================================================================
+    // FRIENDSHIP ACTIONS
+    // =========================================================================
+
+    private async Task SendFriendRequestAsync(int targetUserId)
+    {
+        var res = await ApiClient.SendFriendRequestAsync(targetUserId);
+        if (res.IsSuccess)
+        {
+            globalSuccessMessage = res.Message;
+            await LoadTabDataAsync(activeTab);
+        }
+        else
+        {
+            globalErrorMessage = res.Message;
+        }
+    }
+
+    private async Task AcceptFriendshipAsync(int friendshipId)
+    {
+        var res = await ApiClient.AcceptFriendRequestAsync(friendshipId);
+        if (res.IsSuccess)
+        {
+            globalSuccessMessage = res.Message;
+            await LoadTabDataAsync(activeTab);
+        }
+        else
+        {
+            globalErrorMessage = res.Message;
+        }
+    }
+
+    private async Task RejectFriendshipAsync(int friendshipId)
+    {
+        var res = await ApiClient.RejectFriendRequestAsync(friendshipId);
+        if (res.IsSuccess)
+        {
+            globalSuccessMessage = res.Message;
+            await LoadTabDataAsync(activeTab);
+        }
+        else
+        {
+            globalErrorMessage = res.Message;
+        }
+    }
+
+    private async Task CancelFriendshipAsync(int friendshipId)
+    {
+        var res = await ApiClient.CancelFriendRequestAsync(friendshipId);
+        if (res.IsSuccess)
+        {
+            globalSuccessMessage = res.Message;
+            await LoadTabDataAsync(activeTab);
+        }
+        else
+        {
+            globalErrorMessage = res.Message;
+        }
+    }
+
+    private void ConfirmRemoveFriend(int friendshipId, string friendName)
+    {
+        confirmTitle = "Remove Bestie 💔";
+        confirmMessage = $"Are you sure you want to remove {friendName} from your besties? You will have to send a new friend request to reconnect.";
+        confirmAction = async () =>
+        {
+            var res = await ApiClient.RemoveFriendAsync(friendshipId);
+            if (res.IsSuccess)
+            {
+                globalSuccessMessage = res.Message;
+                await LoadTabDataAsync("friends");
+            }
+            else
+            {
+                globalErrorMessage = res.Message;
+            }
+        };
+        showConfirmModal = true;
+    }
+
+    // =========================================================================
+    // BLOCKING ACTIONS
+    // =========================================================================
+
+    private void ConfirmBlockUser(int targetUserId, string targetUsername)
+    {
+        confirmTitle = "Block User 🚫";
+        confirmMessage = $"Are you sure you want to block @{targetUsername}? They will no longer be able to message you, view your discovery card, or send friend requests.";
+        confirmAction = async () =>
+        {
+            var res = await ApiClient.BlockUserAsync(targetUserId);
+            if (res.IsSuccess)
+            {
+                globalSuccessMessage = res.Message;
+                await LoadTabDataAsync(activeTab);
+            }
+            else
+            {
+                globalErrorMessage = res.Message;
+            }
+        };
+        showConfirmModal = true;
+    }
+
+    private async Task UnblockUserAsync(int targetUserId)
+    {
+        var res = await ApiClient.UnblockUserAsync(targetUserId);
+        if (res.IsSuccess)
+        {
+            globalSuccessMessage = res.Message;
+            await LoadTabDataAsync("blocked");
+        }
+        else
+        {
+            globalErrorMessage = res.Message;
+        }
+    }
+
+    private void CloseConfirmModal()
+    {
+        showConfirmModal = false;
+        confirmAction = null;
+    }
+
+    private async Task ExecuteConfirmedActionAsync()
+    {
+        if (confirmAction != null)
+        {
+            await confirmAction();
+        }
+        CloseConfirmModal();
+    }
+}
+
+<style>
+.friends-hub-container {
+    max-width: 1200px;
+    margin: 20px auto 60px;
+    padding: 0 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.hub-header-card {
+    background: linear-gradient(135deg, #fff5f8 0%, #fff 100%);
+    border: 2px solid #ffd1dc;
+    border-radius: 24px;
+    padding: 24px 32px;
+    box-shadow: 0 8px 24px rgba(255, 140, 160, 0.12);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.hub-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.brand-icon {
+    font-size: 42px;
+    background: #ffe5ec;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(255, 133, 161, 0.2);
+}
+
+.hub-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.hub-subtitle {
+    font-size: 14px;
+    color: #8c6a78;
+    margin: 4px 0 0;
+}
+
+.hub-top-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.kawaii-btn {
+    padding: 10px 20px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kawaii-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #ff85a1 0%, #ff5c8a 100%);
+    color: white;
+}
+
+.btn-secondary {
+    background: #f7e8ee;
+    color: #633b4e;
+}
+
+.btn-outline {
+    background: white;
+    border: 1.5px solid #ff85a1;
+    color: #ff5c8a;
+}
+
+.btn-delete {
+    background: #ffe5ec;
+    border: 1.5px solid #ff4d6d;
+    color: #ff4d6d;
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 10px;
+}
+
+.social-alert {
+    padding: 14px 20px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.alert-success {
+    background: #e8f9ee;
+    border: 1.5px solid #a3e6b5;
+    color: #1e6b36;
+}
+
+.alert-error {
+    background: #ffe5ec;
+    border: 1.5px solid #ff85a1;
+    color: #a82441;
+}
+
+.alert-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.hub-tab-bar {
+    display: flex;
+    gap: 10px;
+    border-bottom: 2px solid #ffd1dc;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+}
+
+.hub-tab-btn {
+    padding: 10px 18px;
+    border-radius: 16px;
+    border: 2px solid transparent;
+    background: white;
+    color: #7a5464;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.hub-tab-btn.active {
+    background: #ff85a1;
+    color: white;
+    box-shadow: 0 4px 12px rgba(255, 133, 161, 0.35);
+}
+
+.tab-pane {
+    animation: fadeIn 0.3s ease;
+}
+
+@@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hub-loading {
+    text-align: center;
+    padding: 60px 0;
+    font-size: 16px;
+    color: #8c6a78;
+}
+
+.loading-bow {
+    font-size: 36px;
+    animation: spin 1s infinite linear;
+    margin-bottom: 12px;
+}
+
+@@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* PROFILE CARD */
+.profile-card {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 28px;
+    overflow: hidden;
+    max-width: 680px;
+    margin: 0 auto;
+    box-shadow: 0 10px 30px rgba(255, 140, 160, 0.1);
+}
+
+.profile-banner {
+    background: linear-gradient(135deg, #ffd1dc 0%, #ffcbf2 100%);
+    height: 140px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+.avatar-container {
+    position: absolute;
+    bottom: -45px;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 4px solid white;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    background: #fff0f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.profile-avatar-sticker {
+    font-size: 48px;
+}
+
+.avatar-upload-btn {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #ff85a1;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.profile-info-body {
+    padding: 60px 32px 32px;
+    text-align: center;
+}
+
+.profile-display-name {
+    font-size: 24px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.profile-username {
+    font-size: 14px;
+    color: #8c6a78;
+}
+
+.profile-bio {
+    font-size: 14px;
+    color: #555;
+    margin: 16px auto;
+    max-width: 480px;
+    line-height: 1.5;
+}
+
+.profile-stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.stat-pill {
+    background: #fff0f5;
+    border: 1.5px solid #ffccd5;
+    padding: 8px 18px;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-num {
+    font-size: 16px;
+    font-weight: 800;
+    color: #d63384;
+}
+
+.stat-lbl {
+    font-size: 11px;
+    color: #7a5464;
+    font-weight: 600;
+}
+
+.profile-email-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    padding: 6px 14px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #495057;
+    margin-bottom: 20px;
+}
+
+.badge-private {
+    font-size: 10px;
+    background: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+
+.profile-actions-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* SEARCH & DISCOVER */
+.discover-search-bar {
+    margin-bottom: 24px;
+}
+
+.search-input-wrap {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 2px solid #ffd1dc;
+    border-radius: 20px;
+    padding: 10px 18px;
+    gap: 12px;
+    box-shadow: 0 4px 16px rgba(255, 140, 160, 0.08);
+}
+
+.search-input-wrap input {
+    border: none;
+    outline: none;
+    font-size: 15px;
+    width: 100%;
+}
+
+.search-clear-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #8c6a78;
+}
+
+.suggested-section {
+    background: #fffdfd;
+    border: 2px dashed #ffccd5;
+    border-radius: 24px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+.section-title-row {
+    margin-bottom: 16px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.section-hint {
+    font-size: 12px;
+    color: #8c6a78;
+}
+
+.count-badge {
+    font-size: 14px;
+    color: #ff5c8a;
+}
+
+/* CARDS GRID */
+.user-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 18px;
+}
+
+.bestie-card {
+    background: white;
+    border: 2px solid #ffe5ec;
+    border-radius: 22px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease;
+}
+
+.bestie-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(255, 140, 160, 0.15);
+}
+
+.card-avatar-wrap {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 12px;
+    position: relative;
+    border-radius: 50%;
+    background: #ffe5ec;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.card-avatar-sticker {
+    font-size: 36px;
+}
+
+.online-indicator {
+    width: 12px;
+    height: 12px;
+    background: #40c057;
+    border: 2px solid white;
+    border-radius: 50%;
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+}
+
+.card-display-name {
+    font-size: 16px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.card-username {
+    font-size: 12px;
+    color: #8c6a78;
+}
+
+.card-bio {
+    font-size: 12px;
+    color: #666;
+    margin: 10px 0 16px;
+    line-height: 1.4;
+    height: 34px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.btn-block-subtle {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.4;
+}
+
+.btn-block-subtle:hover {
+    opacity: 1;
+}
+
+.pill-already-friends {
+    background: #e8f9ee;
+    color: #2b8a3e;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 12px;
+}
+
+.pill-pending-sent {
+    background: #fff3cd;
+    color: #856404;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 12px;
+}
+
+/* FRIENDS LIST */
+.friends-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.friend-item-card {
+    background: white;
+    border: 1.5px solid #ffe5ec;
+    border-radius: 18px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.friend-item-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #ffe5ec;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.item-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.item-sticker {
+    font-size: 26px;
+}
+
+.friend-item-details {
+    flex-grow: 1;
+}
+
+.item-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.item-user {
+    font-size: 12px;
+    color: #8c6a78;
+    display: block;
+}
+
+.item-date {
+    font-size: 11px;
+    color: #adb5bd;
+}
+
+.friend-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* REQUESTS */
+.requests-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.request-card {
+    background: white;
+    border: 1.5px solid #ffe5ec;
+    border-radius: 18px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.req-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #ffe5ec;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.req-info {
+    flex-grow: 1;
+}
+
+.req-name {
+    font-size: 15px;
+    font-weight: 800;
+    color: #4a2d3c;
+    margin: 0;
+}
+
+.req-username {
+    font-size: 12px;
+    color: #8c6a78;
+    display: block;
+}
+
+.req-date {
+    font-size: 11px;
+    color: #adb5bd;
+}
+
+.req-actions {
+    display: flex;
+    gap: 6px;
+}
+
+/* EMPTY STATES */
+.empty-state-box {
+    text-align: center;
+    padding: 50px 20px;
+    background: white;
+    border: 2px dashed #ffd1dc;
+    border-radius: 24px;
+    margin: 20px 0;
+}
+
+.empty-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.empty-state-box h4 {
+    font-size: 18px;
+    color: #4a2d3c;
+    margin: 0 0 6px;
+}
+
+.empty-state-box p {
+    font-size: 13px;
+    color: #8c6a78;
+    margin-bottom: 16px;
+}
+
+/* PAGINATION */
+.pagination-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    margin-top: 30px;
+}
+
+.page-btn {
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #ffd1dc;
+    background: white;
+    color: #ff5c8a;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-info {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7a5464;
+}
+
+/* MODAL */
+.modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.kawaii-modal {
+    background: white;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    padding: 24px;
+    border: 2px solid #ffd1dc;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #4a2d3c;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4a2d3c;
+    margin-bottom: 6px;
+}
+
+.form-group input, .form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1.5px solid #ffd1dc;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group input:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: #ff85a1;
+    box-shadow: 0 0 0 3px rgba(255, 133, 161, 0.2);
+}
+
+.sticker-selector {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sticker-pill {
+    font-size: 20px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    border: 1.5px solid #ffd1dc;
+    background: #fffdfd;
+    cursor: pointer;
+}
+
+.sticker-pill.selected {
+    border-color: #ff85a1;
+    background: #ffe5ec;
+    box-shadow: 0 2px 8px rgba(255, 133, 161, 0.3);
+}
+
+.char-count {
+    font-size: 11px;
+    color: #adb5bd;
+    display: block;
+    text-align: right;
+    margin-top: 4px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.blocked-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.blocked-card {
+    background: #fffcfc;
+    border: 1.5px solid #ffe3e3;
+    border-radius: 18px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+</style>

@@ -70,6 +70,8 @@ BEGIN
         -- Preserved fields from initial Kawaii clubhouse implementation
         [Password] NVARCHAR(100) NOT NULL CONSTRAINT [DF_Users_Password] DEFAULT '',
         [DisplayName] NVARCHAR(100) NOT NULL CONSTRAINT [DF_Users_DisplayName] DEFAULT '',
+        [ProfilePicture] NVARCHAR(1000) NULL,
+        [Bio] NVARCHAR(1000) NULL,
         [RoleKey] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Users_RoleKey] DEFAULT 'User',
         [AvatarSticker] NVARCHAR(50) NOT NULL CONSTRAINT [DF_Users_AvatarSticker] DEFAULT '🌸',
         [PasswordHint] NVARCHAR(255) NULL,
@@ -83,6 +85,13 @@ BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX [IX_Users_Username] ON [dbo].[Users]([Username] ASC);
     CREATE UNIQUE NONCLUSTERED INDEX [IX_Users_NormalizedUsername] ON [dbo].[Users]([NormalizedUsername] ASC);
     CREATE NONCLUSTERED INDEX [IX_Users_NormalizedEmail] ON [dbo].[Users]([NormalizedEmail] ASC) WHERE [NormalizedEmail] IS NOT NULL;
+END
+ELSE
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'ProfilePicture')
+        ALTER TABLE [dbo].[Users] ADD [ProfilePicture] NVARCHAR(1000) NULL;
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'Bio')
+        ALTER TABLE [dbo].[Users] ADD [Bio] NVARCHAR(1000) NULL;
 END
 GO
 
@@ -431,6 +440,31 @@ IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'SECRE
 
 IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'SYSTEM_INFO_VIEW')
     INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('SYSTEM_INFO_VIEW', 'View system statistics, metrics, and audit logs');
+
+-- Phase 4 Permissions (Profiles, Social Discovery, and Friendships)
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'PROFILE_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('PROFILE_VIEW', 'View own and other users public profiles');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'PROFILE_UPDATE')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('PROFILE_UPDATE', 'Update own user profile details, bio, and picture');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_SEARCH')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_SEARCH', 'Search and discover users in the clubhouse');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'FRIEND_REQUEST_REJECT')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('FRIEND_REQUEST_REJECT', 'Decline or reject incoming friend requests');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'FRIEND_REQUEST_CANCEL')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('FRIEND_REQUEST_CANCEL', 'Cancel outgoing pending friend requests');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_BLOCK')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_BLOCK', 'Block other users from social interactions');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'USER_UNBLOCK')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('USER_UNBLOCK', 'Unblock previously blocked users');
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Permissions] WHERE [PermissionCode] = 'BLOCKED_USERS_VIEW')
+    INSERT INTO [dbo].[Permissions] ([PermissionCode], [Description]) VALUES ('BLOCKED_USERS_VIEW', 'View own list of blocked accounts');
 GO
 
 -- Seed RolePermissions (Grant ALL permissions to SuperAdmin role)
@@ -458,7 +492,8 @@ BEGIN
         'USER_VIEW', 'USER_UPDATE', 'USER_MANAGE', 'ROLE_VIEW', 'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE',
         'PERMISSION_VIEW', 'PERMISSION_ASSIGN', 'USER_ROLE_MANAGE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT',
         'FRIEND_REMOVE', 'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CIRCLE_UPDATE', 'CIRCLE_DELETE', 'CIRCLE_MEMBER_MANAGE',
-        'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW'
+        'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'MEMORY_UPDATE', 'MEMORY_DELETE', 'SECRET_NOTE_MANAGE', 'SYSTEM_INFO_VIEW',
+        'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -476,7 +511,8 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE'
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 
@@ -494,7 +530,8 @@ BEGIN
     FROM [dbo].[Permissions] p
     WHERE p.[PermissionCode] IN (
         'USER_VIEW', 'USER_UPDATE', 'FRIEND_REQUEST_SEND', 'FRIEND_REQUEST_ACCEPT', 'FRIEND_REMOVE',
-        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE'
+        'CIRCLE_CREATE', 'CIRCLE_VIEW', 'CHAT_SEND', 'CHAT_READ', 'MEMORY_CREATE', 'SECRET_NOTE_MANAGE',
+        'PROFILE_VIEW', 'PROFILE_UPDATE', 'USER_SEARCH', 'FRIEND_REQUEST_REJECT', 'FRIEND_REQUEST_CANCEL', 'USER_BLOCK', 'USER_UNBLOCK', 'BLOCKED_USERS_VIEW'
     )
     AND NOT EXISTS (
         SELECT 1 FROM [dbo].[RolePermissions] rp 

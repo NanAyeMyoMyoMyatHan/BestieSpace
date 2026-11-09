@@ -43,6 +43,11 @@ public class User
 
     public string DisplayName { get; set; } = string.Empty;
 
+    // Phase 4: User Profiles
+    public string? ProfilePicture { get; set; }
+
+    public string? Bio { get; set; }
+
     public string RoleKey { get; set; } = string.Empty; // "Bestie", "Me", "Admin", etc.
 
     public string AvatarSticker { get; set; } = "🌸";

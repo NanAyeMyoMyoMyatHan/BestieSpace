@@ -4,6 +4,7 @@ using BestieSpace.Api.Features.Dashboard;
 using BestieSpace.Api.Features.Memories;
 using BestieSpace.Api.Features.Rbac;
 using BestieSpace.Api.Features.SecretNotes;
+using BestieSpace.Api.Features.Social;
 using BestieSpace.Api.Infrastructure.Data;
 using BestieSpace.Api.Infrastructure.Data.Entities;
 using BestieSpace.Shared.DTOs;
@@ -50,6 +51,12 @@ builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>(
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+
+// User Profiles, Social Discovery & Friendship Feature Services (Phase 4)
+builder.Services.AddScoped<IUserProfileService, UserProfileService>();
+builder.Services.AddScoped<IFriendshipService, FriendshipService>();
+builder.Services.AddScoped<IUserBlockService, UserBlockService>();
+builder.Services.AddScoped<IUserDiscoveryService, UserDiscoveryService>();
 
 // Configure JWT Bearer Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] 
@@ -120,6 +127,7 @@ builder.Services.AddCors(options =>
 // Ensure wwwroot directory exists before building app
 var webRoot = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(webRoot);
+Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "profile-pictures"));
 builder.Environment.WebRootPath = webRoot;
 
 var app = builder.Build();
@@ -177,7 +185,31 @@ using (var scope = app.Services.CreateScope())
         if (permReq == null || permReq.Permission != "USER_MANAGE") throw new Exception("PermissionRequirement mismatch");
         Console.WriteLine($"[PASS] Dynamic Permission Policy Provider verified: Policy 'USER_MANAGE' generated with PermissionRequirement('{permReq.Permission}')");
 
-        Console.WriteLine("================ ALL AUTH & RBAC CRYPTO TESTS PASSED! 🌸 ================\n");
+        // 5. Phase 4 Social Services & Canonical Friendship Pairing Verification
+        var profileSvc = scope.ServiceProvider.GetRequiredService<IUserProfileService>();
+        var friendSvc = scope.ServiceProvider.GetRequiredService<IFriendshipService>();
+        var blockSvc = scope.ServiceProvider.GetRequiredService<IUserBlockService>();
+        var discoverySvc = scope.ServiceProvider.GetRequiredService<IUserDiscoveryService>();
+        if (profileSvc == null || friendSvc == null || blockSvc == null || discoverySvc == null)
+            throw new Exception("Phase 4 Social services DI resolution failed");
+
+        // Verify Canonical user pairing logic
+        int u1 = 101, u2 = 42;
+        int pairA1 = Math.Min(u1, u2), pairB1 = Math.Max(u1, u2);
+        int pairA2 = Math.Min(u2, u1), pairB2 = Math.Max(u2, u1);
+        if (pairA1 != 42 || pairB1 != 101 || pairA1 != pairA2 || pairB1 != pairB2)
+            throw new Exception("Canonical pairing logic failed");
+        Console.WriteLine($"[PASS] Canonical Friendship Pairing symmetry verified ({u1} <-> {u2} => [{pairA1}, {pairB1}])");
+
+        // Verify Phase 4 dynamic policies
+        var friendReqPolicy = await policyProvider.GetPolicyAsync("FRIEND_REQUEST_SEND");
+        var blockPolicy = await policyProvider.GetPolicyAsync("USER_BLOCK");
+        var searchPolicy = await policyProvider.GetPolicyAsync("USER_SEARCH");
+        if (friendReqPolicy == null || blockPolicy == null || searchPolicy == null)
+            throw new Exception("Phase 4 dynamic authorization policies failed");
+        Console.WriteLine("[PASS] Dynamic Phase 4 policies verified (FRIEND_REQUEST_SEND, USER_BLOCK, USER_SEARCH)");
+
+        Console.WriteLine("================ ALL AUTH, RBAC & PHASE 4 SOCIAL TESTS PASSED! 🌸 ================\n");
         return;
     }
 

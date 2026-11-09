@@ -116,6 +116,8 @@ public partial class BestieDbContext : DbContext
             // Existing Kawaii auth fields (preserved)
             entity.Property(e => e.Password).IsRequired().HasMaxLength(100).HasDefaultValue(string.Empty);
             entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(100).HasDefaultValue(string.Empty);
+            entity.Property(e => e.ProfilePicture).HasMaxLength(1000);
+            entity.Property(e => e.Bio).HasMaxLength(1000);
             entity.Property(e => e.RoleKey).IsRequired().HasMaxLength(50).HasDefaultValue("User");
             entity.Property(e => e.AvatarSticker).IsRequired().HasMaxLength(50).HasDefaultValue("🌸");
             entity.Property(e => e.PasswordHint).HasMaxLength(255);

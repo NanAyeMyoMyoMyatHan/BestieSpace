@@ -39,6 +39,26 @@ public interface IBestieApiClient
     Task<UserRoleDto?> GetUserRolesDetailAsync(int userId);
     Task<RbacOperationResultDto> AssignRoleToUserAsync(int userId, int roleId);
     Task<RbacOperationResultDto> RemoveRoleFromUserAsync(int userId, int roleId);
+
+    // User Profiles, Social Discovery & Friendships (Phase 4)
+    Task<UserProfileDto?> GetMyProfileAsync();
+    Task<UserProfileDto?> GetProfileByIdAsync(int userId);
+    Task<UserProfileDto?> GetProfileByUsernameAsync(string username);
+    Task<UserProfileDto?> UpdateMyProfileAsync(UpdateUserProfileRequestDto request);
+    Task<string?> UploadProfilePictureAsync(MultipartFormDataContent content);
+    Task<SocialOperationResultDto> SendFriendRequestAsync(int targetUserId);
+    Task<SocialOperationResultDto> AcceptFriendRequestAsync(int friendshipId);
+    Task<SocialOperationResultDto> RejectFriendRequestAsync(int friendshipId);
+    Task<SocialOperationResultDto> CancelFriendRequestAsync(int friendshipId);
+    Task<SocialOperationResultDto> RemoveFriendAsync(int friendshipId);
+    Task<List<FriendshipDto>> GetIncomingFriendRequestsAsync();
+    Task<List<FriendshipDto>> GetOutgoingFriendRequestsAsync();
+    Task<List<FriendshipDto>> GetFriendsListAsync(string? query = null);
+    Task<SocialOperationResultDto> BlockUserAsync(int targetUserId);
+    Task<SocialOperationResultDto> UnblockUserAsync(int targetUserId);
+    Task<List<UserBlockDto>> GetBlockedUsersAsync();
+    Task<PagedResultDto<UserDiscoveryCardDto>> DiscoverUsersAsync(string? query = null, int pageNumber = 1, int pageSize = 10);
+    Task<List<UserDiscoveryCardDto>> GetSuggestedUsersAsync(int limit = 6);
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -607,6 +627,287 @@ public class BestieApiClient : IBestieApiClient
         {
             _logger.LogError(ex, "Error removing role {RoleId} from user {UserId}", roleId, userId);
             return new RbacOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    // =========================================================================
+    // PHASE 4: USER PROFILES, SOCIAL DISCOVERY & FRIENDSHIPS
+    // =========================================================================
+
+    public async Task<UserProfileDto?> GetMyProfileAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<UserProfileDto>("/api/userprofile/me");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get own profile.");
+            return null;
+        }
+    }
+
+    public async Task<UserProfileDto?> GetProfileByIdAsync(int userId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<UserProfileDto>($"/api/userprofile/{userId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get profile for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    public async Task<UserProfileDto?> GetProfileByUsernameAsync(string username)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<UserProfileDto>($"/api/userprofile/by-username/{Uri.EscapeDataString(username)}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get profile for username {Username}", username);
+            return null;
+        }
+    }
+
+    public async Task<UserProfileDto?> UpdateMyProfileAsync(UpdateUserProfileRequestDto request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync("/api/userprofile/me", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<UserProfileDto>();
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update profile.");
+            return null;
+        }
+    }
+
+    public async Task<string?> UploadProfilePictureAsync(MultipartFormDataContent content)
+    {
+        try
+        {
+            var res = await _http.PostAsync("/api/userprofile/me/picture", content);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                if (json.TryGetProperty("profilePictureUrl", out var prop))
+                {
+                    return prop.GetString();
+                }
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload profile picture.");
+            return null;
+        }
+    }
+
+    public async Task<SocialOperationResultDto> SendFriendRequestAsync(int targetUserId)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync("/api/friendship/request", new SendFriendRequestDto { TargetUserId = targetUserId });
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending friend request to user {UserId}", targetUserId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<SocialOperationResultDto> AcceptFriendRequestAsync(int friendshipId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/friendship/{friendshipId}/accept", null);
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting friend request {FriendshipId}", friendshipId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<SocialOperationResultDto> RejectFriendRequestAsync(int friendshipId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/friendship/{friendshipId}/reject", null);
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error rejecting friend request {FriendshipId}", friendshipId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<SocialOperationResultDto> CancelFriendRequestAsync(int friendshipId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/friendship/{friendshipId}/cancel");
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error cancelling friend request {FriendshipId}", friendshipId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<SocialOperationResultDto> RemoveFriendAsync(int friendshipId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/friendship/{friendshipId}/remove");
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing friend for friendship {FriendshipId}", friendshipId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<List<FriendshipDto>> GetIncomingFriendRequestsAsync()
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<FriendshipDto>>("/api/friendship/incoming");
+            return list ?? new List<FriendshipDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load incoming friend requests.");
+            return new List<FriendshipDto>();
+        }
+    }
+
+    public async Task<List<FriendshipDto>> GetOutgoingFriendRequestsAsync()
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<FriendshipDto>>("/api/friendship/outgoing");
+            return list ?? new List<FriendshipDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load outgoing friend requests.");
+            return new List<FriendshipDto>();
+        }
+    }
+
+    public async Task<List<FriendshipDto>> GetFriendsListAsync(string? query = null)
+    {
+        try
+        {
+            var url = string.IsNullOrWhiteSpace(query)
+                ? "/api/friendship/friends"
+                : $"/api/friendship/friends?query={Uri.EscapeDataString(query)}";
+
+            var list = await _http.GetFromJsonAsync<List<FriendshipDto>>(url);
+            return list ?? new List<FriendshipDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load friends list.");
+            return new List<FriendshipDto>();
+        }
+    }
+
+    public async Task<SocialOperationResultDto> BlockUserAsync(int targetUserId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"/api/userblock/{targetUserId}", null);
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to block user {UserId}", targetUserId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<SocialOperationResultDto> UnblockUserAsync(int targetUserId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"/api/userblock/{targetUserId}");
+            var result = await res.Content.ReadFromJsonAsync<SocialOperationResultDto>();
+            return result ?? new SocialOperationResultDto { IsSuccess = false, Message = "No response from server." };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to unblock user {UserId}", targetUserId);
+            return new SocialOperationResultDto { IsSuccess = false, Message = ex.Message };
+        }
+    }
+
+    public async Task<List<UserBlockDto>> GetBlockedUsersAsync()
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<UserBlockDto>>("/api/userblock");
+            return list ?? new List<UserBlockDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load blocked users list.");
+            return new List<UserBlockDto>();
+        }
+    }
+
+    public async Task<PagedResultDto<UserDiscoveryCardDto>> DiscoverUsersAsync(string? query = null, int pageNumber = 1, int pageSize = 10)
+    {
+        try
+        {
+            var url = $"/api/userdiscovery?pageNumber={pageNumber}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                url += $"&query={Uri.EscapeDataString(query)}";
+            }
+            var result = await _http.GetFromJsonAsync<PagedResultDto<UserDiscoveryCardDto>>(url);
+            return result ?? new PagedResultDto<UserDiscoveryCardDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to discover users.");
+            return new PagedResultDto<UserDiscoveryCardDto>();
+        }
+    }
+
+    public async Task<List<UserDiscoveryCardDto>> GetSuggestedUsersAsync(int limit = 6)
+    {
+        try
+        {
+            var list = await _http.GetFromJsonAsync<List<UserDiscoveryCardDto>>($"/api/userdiscovery/suggested?limit={limit}");
+            return list ?? new List<UserDiscoveryCardDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load suggested users.");
+            return new List<UserDiscoveryCardDto>();
         }
     }
 

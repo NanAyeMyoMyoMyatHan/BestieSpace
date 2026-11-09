@@ -82,6 +82,12 @@ public class PermissionService : IPermissionService
 
         if (upper.StartsWith("USER_ROLE_") || upper.StartsWith("ROLE_") || upper.StartsWith("PERMISSION_"))
             return "Roles & Permissions";
+        if (upper.StartsWith("PROFILE_"))
+            return "User Profiles";
+        if (upper.StartsWith("BLOCKED_") || upper == "USER_BLOCK" || upper == "USER_UNBLOCK")
+            return "Block Management";
+        if (upper.StartsWith("USER_SEARCH"))
+            return "User Discovery";
         if (upper.StartsWith("USER_"))
             return "User Management";
         if (upper.StartsWith("FRIEND_"))

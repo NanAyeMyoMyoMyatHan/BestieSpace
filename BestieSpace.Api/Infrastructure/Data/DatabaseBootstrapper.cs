@@ -431,7 +431,15 @@ public static class DatabaseBootstrapper
             new() { PermissionCode = "MEMORY_UPDATE", Description = "Edit Polaroid memory captions and stickers" },
             new() { PermissionCode = "MEMORY_DELETE", Description = "Delete Polaroid memories from the gallery" },
             new() { PermissionCode = "SECRET_NOTE_MANAGE", Description = "Read, unlock, and manage secret envelope notes" },
-            new() { PermissionCode = "SYSTEM_INFO_VIEW", Description = "View system statistics, metrics, and audit logs" }
+            new() { PermissionCode = "SYSTEM_INFO_VIEW", Description = "View system statistics, metrics, and audit logs" },
+            new() { PermissionCode = "PROFILE_VIEW", Description = "View own and other users public profiles" },
+            new() { PermissionCode = "PROFILE_UPDATE", Description = "Update own user profile details, bio, and picture" },
+            new() { PermissionCode = "USER_SEARCH", Description = "Search and discover users in the clubhouse" },
+            new() { PermissionCode = "FRIEND_REQUEST_REJECT", Description = "Decline or reject incoming friend requests" },
+            new() { PermissionCode = "FRIEND_REQUEST_CANCEL", Description = "Cancel outgoing pending friend requests" },
+            new() { PermissionCode = "USER_BLOCK", Description = "Block other users from social interactions" },
+            new() { PermissionCode = "USER_UNBLOCK", Description = "Unblock previously blocked users" },
+            new() { PermissionCode = "BLOCKED_USERS_VIEW", Description = "View own list of blocked accounts" }
         };
 
         foreach (var p in permsToSeed)
@@ -471,7 +479,8 @@ public static class DatabaseBootstrapper
                 "USER_VIEW", "USER_UPDATE", "USER_MANAGE", "ROLE_VIEW", "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE",
                 "PERMISSION_VIEW", "PERMISSION_ASSIGN", "USER_ROLE_MANAGE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT",
                 "FRIEND_REMOVE", "CIRCLE_CREATE", "CIRCLE_VIEW", "CIRCLE_UPDATE", "CIRCLE_DELETE", "CIRCLE_MEMBER_MANAGE",
-                "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW"
+                "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "MEMORY_UPDATE", "MEMORY_DELETE", "SECRET_NOTE_MANAGE", "SYSTEM_INFO_VIEW",
+                "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
 
             var existingAdminPermIds = await context.RolePermissions
@@ -495,7 +504,8 @@ public static class DatabaseBootstrapper
             var userCodes = new HashSet<string>
             {
                 "USER_VIEW", "USER_UPDATE", "FRIEND_REQUEST_SEND", "FRIEND_REQUEST_ACCEPT", "FRIEND_REMOVE",
-                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "SECRET_NOTE_MANAGE"
+                "CIRCLE_CREATE", "CIRCLE_VIEW", "CHAT_SEND", "CHAT_READ", "MEMORY_CREATE", "SECRET_NOTE_MANAGE",
+                "PROFILE_VIEW", "PROFILE_UPDATE", "USER_SEARCH", "FRIEND_REQUEST_REJECT", "FRIEND_REQUEST_CANCEL", "USER_BLOCK", "USER_UNBLOCK", "BLOCKED_USERS_VIEW"
             };
 
             var existingUserPermIds = await context.RolePermissions

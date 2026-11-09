@@ -1992,6 +1992,30 @@ body {
     text-decoration: none;
 }
 
+.btn-friends-shortcut {
+    background: linear-gradient(135deg, #FFE5EC, #FFD1DC);
+    border: 1.5px solid #FF8FAB;
+    border-radius: var(--radius-pill);
+    padding: 5px 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #D63384;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    transition: var(--transition-bounce);
+}
+
+.btn-friends-shortcut:hover {
+    background: #FF8FAB;
+    color: #FFFFFF;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 143, 171, 0.4);
+    text-decoration: none;
+}
+
 .vip-ticket-modal-card {
     background: #FFFDF9;
     border-radius: 32px;
