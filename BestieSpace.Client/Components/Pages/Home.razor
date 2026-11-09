@@ -28,7 +28,13 @@
                 Enter your 4-digit strawberry PIN or secret password to unlock our cozy world 💕
             </p>
 
-            <!-- Login Tabs: PIN Pad vs Password -->
+            <!-- Prominent Register CTA Banner -->
+            <div class="login-register-banner">
+                <span>🌸 New to BestieSpace?</span>
+                <a href="/register" class="btn-register-link">Register Account Here ✨</a>
+            </div>
+
+            <!-- Login Tabs: PIN Pad vs Password vs Register -->
             <div class="login-tabs-nav">
                 <button type="button" class="login-tab-btn @(activeLoginTab == "pin" ? "active" : "")" 
                         @onclick='() => { activeLoginTab = "pin"; loginErrorMessage = null; }'>
@@ -36,8 +42,11 @@
                 </button>
                 <button type="button" class="login-tab-btn @(activeLoginTab == "password" ? "active" : "")" 
                         @onclick='() => { activeLoginTab = "password"; loginErrorMessage = null; }'>
-                    <span>🔑</span> Secret Password
+                    <span>🔑</span> Password
                 </button>
+                <a href="/register" class="login-tab-btn register-tab-btn" title="Create a new account">
+                    <span>✨</span> Register
+                </a>
             </div>
 
             @if (!string.IsNullOrWhiteSpace(loginErrorMessage))
@@ -98,7 +107,7 @@
                     </div>
 
                     <div class="pin-hint-tag">
-                        <span>Tap 4 digits to unlock automatically (Bestie: 3000 • Me: 4040) ✨</span>
+                        <span>Tap your 4-digit secret PIN to unlock automatically ✨</span>
                     </div>
                 </div>
             }
@@ -156,8 +165,8 @@
                         <span>View VIP Pass</span>
                     </button>
                     <button type="button" class="login-hint-trigger" @onclick="ToggleHintBox">
-                        <span>💌</span>
-                        <span>Credentials Hint</span>
+                        <span>💡</span>
+                        <span>Need Help Signing In?</span>
                     </button>
                 </div>
 
@@ -165,26 +174,19 @@
                 {
                     <div class="login-hint-box">
                         <div class="login-hint-title">
-                            <span>✨ VIP Member Credentials:</span>
+                            <span>✨ Account Sign In Information:</span>
                         </div>
-                        <div style="margin-top: 4px; line-height: 1.5; font-size: 0.88rem;">
-                            🌸 <strong>Bestie:</strong> <code>strawberry_bestie</code> • PIN: <strong>3000</strong> • Pass: <em>missyou3000!</em><br />
-                            🎀 <strong>Creator:</strong> <code>mochi_maker</code> • PIN: <strong>4040</strong> • Pass: <em>bestie4ever!</em>
-                        </div>
-                        <div class="quick-fill-row">
-                            <button type="button" class="quick-fill-btn" @onclick="QuickFillBestie">
-                                🌸 Quick PIN 3000 (Bestie)
-                            </button>
-                            <button type="button" class="quick-fill-btn" @onclick="QuickFillCreator">
-                                🎀 Quick PIN 4040 (Me)
-                            </button>
+                        <div style="margin-top: 6px; line-height: 1.5; font-size: 0.88rem; color: #5C4A4C;">
+                            You can sign in using your registered <strong>Username or Email</strong> and secret password, or enter your 4-digit PIN! 🌸<br />
+                            If you don't have an account yet, <a href="/register" style="color: #FB6F92; font-weight: 700;">click here to register</a> and create your custom bestie profile! 💕
                         </div>
                     </div>
                 }
 
                 <div style="text-align: center; margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255, 143, 171, 0.4);">
-                    <a href="/register" style="color: #FB6F92; font-weight: 600; text-decoration: none; font-size: 0.92rem;">
-                        ✨ New bestie? Click here to register your account! 🌸
+                    <a href="/register" style="color: #FB6F92; font-weight: 700; text-decoration: none; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>✨</span>
+                        <span>Don't have an account yet? Click here to Register! 🌸</span>
                     </a>
                 </div>
             </div>
@@ -909,8 +911,8 @@
                         <div class="vip-info-val">strawberry_bestie</div>
                     </div>
                     <div class="vip-info-cell">
-                        <div class="vip-info-label">Secret Password</div>
-                        <div class="vip-info-val">missyou3000!</div>
+                        <div class="vip-info-label">Access Level</div>
+                        <div class="vip-info-val">Clubhouse VIP 💖</div>
                     </div>
                     <div class="vip-info-cell">
                         <div class="vip-info-label">Quick PIN</div>

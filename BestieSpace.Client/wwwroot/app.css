@@ -1768,6 +1768,36 @@ body {
 /* =========================================================
    FEATURE 1: STRAWBERRY PIN PAD UNLOCK
    ========================================================= */
+.login-register-banner {
+    background: #FFF0F5;
+    border: 1px dashed #FF8FAB;
+    border-radius: 14px;
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #4A3B3C;
+}
+
+.btn-register-link {
+    color: #FB6F92;
+    font-weight: 700;
+    text-decoration: none;
+    background: #ffffff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid #FFC2D1;
+    transition: all 0.2s ease;
+}
+
+.btn-register-link:hover {
+    background: #FF8FAB;
+    color: #fff;
+    transform: scale(1.03);
+}
+
 .login-tabs-nav {
     display: flex;
     background: rgba(255, 255, 255, 0.7);
@@ -1793,6 +1823,20 @@ body {
     align-items: center;
     justify-content: center;
     gap: 6px;
+    text-decoration: none;
+}
+
+.login-tab-btn:hover {
+    color: #FB6F92;
+}
+
+.login-tab-btn.register-tab-btn {
+    color: #F72585;
+    background: #FFF0F5;
+}
+
+.login-tab-btn.register-tab-btn:hover {
+    background: #FFE5EC;
 }
 
 .login-tab-btn.active {

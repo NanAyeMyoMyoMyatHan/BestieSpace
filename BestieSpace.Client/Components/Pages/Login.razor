@@ -20,7 +20,7 @@
             <p class="auth-subtitle">Enter your secret code or PIN to open our cozy clubhouse 💖</p>
         </div>
 
-        <!-- Mode Tabs: Password vs PIN -->
+        <!-- Mode Tabs: Password vs PIN vs Register -->
         <div class="auth-tab-bar">
             <button type="button" 
                     class="auth-tab-btn @(activeTab == "password" ? "active" : "")" 
@@ -32,6 +32,9 @@
                     @onclick='() => SetTab("pin")'>
                 🍓 Strawberry PIN
             </button>
+            <a href="/register" class="auth-tab-btn" style="text-decoration: none;">
+                ✨ Register
+            </a>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(errorMessage))
