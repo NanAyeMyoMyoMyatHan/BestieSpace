@@ -11,6 +11,12 @@ public class RegisterRequestDto
     public string? ConfirmPassword { get; set; }
     public string? DisplayName { get; set; }
     public string? AvatarSticker { get; set; } = "🌸";
+    public string QuickPin { get; set; } = "3000";
+    public string? Pin
+    {
+        get => QuickPin;
+        set => QuickPin = value ?? "3000";
+    }
 }
 
 public class LoginRequestDto

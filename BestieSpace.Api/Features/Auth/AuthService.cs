@@ -86,6 +86,19 @@ public class AuthService : IAuthService
             return Fail("Passwords do not match! Please check both fields 🥺");
         }
 
+        var cleanPin = (request.QuickPin ?? request.Pin ?? "3000").Trim();
+        if (!string.IsNullOrEmpty(cleanPin))
+        {
+            if (!Regex.IsMatch(cleanPin, @"^\d{4}$"))
+            {
+                return Fail("Strawberry PIN must be exactly 4 digits (e.g. 1234) 🍓");
+            }
+        }
+        else
+        {
+            cleanPin = "3000";
+        }
+
         var normalizedUsername = cleanUsername.ToUpperInvariant();
         var normalizedEmail = cleanEmail.ToUpperInvariant();
 
@@ -128,7 +141,7 @@ public class AuthService : IAuthService
             RoleKey = "User",
             AvatarSticker = avatarSticker,
             PasswordHint = "Your secret personal password 🌸",
-            QuickPin = "3000",
+            QuickPin = cleanPin,
             IsOnline = true,
             LastSeenAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,

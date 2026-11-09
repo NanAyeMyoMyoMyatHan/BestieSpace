@@ -425,7 +425,7 @@
                     </div>
                     <div class="vip-info-cell">
                         <div class="vip-info-label">Quick PIN</div>
-                        <div class="vip-info-val vip-pin-highlight">3 0 0 0 🍓</div>
+                        <div class="vip-info-val vip-pin-highlight">@(string.Join(" ", (currentUserSession?.QuickPin ?? "3000").ToCharArray())) 🍓</div>
                     </div>
                 </div>
 
@@ -876,7 +876,7 @@
             var invite = "🍓✨ --- OFFICIAL VIP PASS: BESTIE CLUBHOUSE --- ✨🍓\n"
                        + $"🌸 Member: {currentUserSession?.DisplayName ?? "Sweet Bestie 🌸"}\n"
                        + $"🍓 Nickname: {currentUserSession?.Username ?? "strawberry_bestie"}\n"
-                       + "🎀 4-Digit Quick-PIN: 3000 🍓\n"
+                       + $"🎀 4-Digit Quick-PIN: {currentUserSession?.QuickPin ?? "3000"} 🍓\n"
                        + "💌 Welcome to our cozy clubhouse! 💕";
             await JSRuntime.InvokeVoidAsync("bestieTicket.copyText", invite);
             isTicketCopied = true;

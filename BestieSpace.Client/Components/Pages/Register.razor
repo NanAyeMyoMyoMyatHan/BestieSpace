@@ -134,6 +134,26 @@
                 </div>
             </div>
 
+            <!-- 4-Digit Strawberry Quick PIN -->
+            <div class="auth-form-group">
+                <label class="auth-label">4-Digit Strawberry PIN *</label>
+                <div class="auth-input-wrapper">
+                    <span class="auth-input-icon">🍓</span>
+                    <input type="@(showPin ? "text" : "password")" 
+                           class="auth-input" 
+                           placeholder="e.g. 1234 (4 digits)" 
+                           @bind="registerModel.QuickPin" 
+                           required 
+                           maxlength="4" 
+                           pattern="\d{4}" 
+                           inputmode="numeric" />
+                    <button type="button" class="auth-eye-btn" @onclick="() => showPin = !showPin" title="Show/Hide PIN">
+                        @(showPin ? "🙈" : "👁️")
+                    </button>
+                </div>
+                <small class="auth-hint">4 digits used to quickly unlock the clubhouse using the cute Strawberry PIN Pad 🍓✨</small>
+            </div>
+
             <div class="auth-actions">
                 <button type="submit" class="auth-submit-btn" disabled="@isLoading">
                     @if (isLoading)
@@ -396,6 +416,7 @@
     private bool isLoading = false;
     private bool isWiggling = false;
     private bool showPassword = false;
+    private bool showPin = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -416,6 +437,14 @@
         if (registerModel.Password != registerModel.ConfirmPassword)
         {
             errorMessage = "Passwords do not match! Please check both fields 🥺";
+            TriggerWiggle();
+            isLoading = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(registerModel.QuickPin) || !System.Text.RegularExpressions.Regex.IsMatch(registerModel.QuickPin.Trim(), @"^\d{4}$"))
+        {
+            errorMessage = "Please enter a 4-digit secret PIN (e.g. 1234) for your Strawberry PIN Pad! 🍓";
             TriggerWiggle();
             isLoading = false;
             return;
