@@ -6,15 +6,18 @@
 @inject BestieAuthenticationStateProvider BestieAuth
 @inject NavigationManager Navigation
 
-<header class="kawaii-navbar-container">
-    <div class="kawaii-navbar">
-        <!-- Brand Logo -->
+<header class="scrapbook-navbar-container">
+    <div class="scrapbook-navbar-card">
+        <!-- Decorative Scrapbook Detail 1: Top-left washi tape -->
+        <div class="scrapbook-tape-tl" aria-hidden="true"></div>
+
+        <!-- Brand Logo (Left) -->
         <NavLink href="" class="navbar-brand" Match="NavLinkMatch.All">
             <span class="brand-strawberry-icon">🍓</span>
             <span class="brand-name">Bestie<span class="brand-name-highlight">Space</span> 🌸</span>
         </NavLink>
 
-        <!-- Desktop Navigation Menu -->
+        <!-- Desktop Navigation Items (Center) -->
         <nav class="navbar-links">
             <NavLink class="nav-link-item" href="" Match="NavLinkMatch.All">
                 <span class="nav-icon">🏠</span>
@@ -22,7 +25,7 @@
             </NavLink>
 
             <NavLink class="nav-link-item" href="photos">
-                <span class="nav-icon">📸</span>
+                <span class="nav-icon">📷</span>
                 <span class="nav-text">Photos</span>
             </NavLink>
 
@@ -59,7 +62,7 @@
             }
         </nav>
 
-        <!-- Right Side Utility: Notifications & User Session -->
+        <!-- Utility Actions (Right: Notifications, User Profile, Sign Out) -->
         <div class="navbar-actions">
             <AuthorizeView>
                 <Authorized>
@@ -67,11 +70,11 @@
 
                     <a href="/friends" class="user-profile-pill" title="View Profile & Friends">
                         <span class="user-avatar-sticker">@(userSession?.AvatarSticker ?? "🎀")</span>
-                        <span class="user-display-name">@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "Bestie")</span>
+                        <span class="user-display-name">@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "pinky")</span>
                     </a>
 
                     <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutAsync" title="Sign Out or Switch Account">
-                        <span>🔒</span>
+                        <span class="logout-icon">🔒</span>
                         <span class="logout-text">Sign Out</span>
                     </button>
                 </Authorized>
@@ -90,48 +93,69 @@
                 <span>@(isMobileMenuOpen ? "✕" : "☰")</span>
             </button>
         </div>
+
+        <!-- Decorative Scrapbook Detail 2: Bottom-right smiling pink heart sticker -->
+        <div class="scrapbook-heart-br" aria-hidden="true" title="Bestie Love 💕">
+            <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- White sticker die-cut border -->
+                <path d="M50 89C50 89 10 63 10 36C10 20 23 11 36 11C43.5 11 47.5 15.5 50 19.5C52.5 15.5 56.5 11 64 11C77 11 90 20 90 36C90 63 50 89 50 89Z" fill="#FFFFFF" filter="drop-shadow(0px 3px 6px rgba(251,111,146,0.35))" />
+                <!-- Pastel pink heart body -->
+                <path d="M50 83C50 83 17 59 17 36C17 24 26 17 36 17C43 17 47 21 50 25C53 21 57 17 64 17C74 17 83 24 83 36C83 59 50 83 50 83Z" fill="#FFAFCC" stroke="#FF8FAB" stroke-width="2.5" />
+                <!-- Blushing pink cheeks -->
+                <ellipse cx="33" cy="46" rx="5" ry="3.5" fill="#FF6584" opacity="0.65" />
+                <ellipse cx="67" cy="46" rx="5" ry="3.5" fill="#FF6584" opacity="0.65" />
+                <!-- Cute happy closed eyes ^ ^ -->
+                <path d="M29 39C31 35 36 35 38 39" stroke="#4A3B3C" stroke-width="3.5" stroke-linecap="round" />
+                <path d="M62 39C64 35 69 35 71 39" stroke="#4A3B3C" stroke-width="3.5" stroke-linecap="round" />
+                <!-- Sweet smiling mouth -->
+                <path d="M45 46C47 50 53 50 55 46" stroke="#4A3B3C" stroke-width="3" stroke-linecap="round" />
+            </svg>
+        </div>
     </div>
 
-    <!-- Mobile Navigation Drawer / Dropdown -->
+    <!-- Mobile Navigation Drawer / Dropdown (Scrapbook Diary Card Style) -->
     @if (isMobileMenuOpen)
     {
         <div class="mobile-nav-drawer" @onclick="CloseMobileMenu">
             <div class="mobile-nav-content" @onclick:stopPropagation="true">
+                <!-- Washi tape on mobile card -->
+                <div class="mobile-washi-tape" aria-hidden="true"></div>
+
                 <div class="mobile-nav-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="brand-strawberry-icon">🍓</span>
                         <span class="brand-name">BestieSpace 🌸</span>
                     </div>
-                    <button class="mobile-close-btn" @onclick="CloseMobileMenu">✕</button>
+                    <button class="mobile-close-btn" @onclick="CloseMobileMenu" aria-label="Close menu">✕</button>
                 </div>
 
                 <div class="mobile-nav-links">
                     <NavLink class="mobile-link" href="" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
-                        <span>🏠 Home Dashboard</span>
+                        <span class="mobile-link-text">🏠 Home</span>
                     </NavLink>
                     <NavLink class="mobile-link" href="photos" @onclick="CloseMobileMenu">
-                        <span>📸 Polaroid Photos</span>
+                        <span class="mobile-link-text">📷 Photos</span>
                     </NavLink>
                     <NavLink class="mobile-link" href="notes" @onclick="CloseMobileMenu">
-                        <span>✉️ Secret Notes</span>
+                        <span class="mobile-link-text">✉️ Notes</span>
                     </NavLink>
                     <NavLink class="mobile-link" href="chat" @onclick="CloseMobileMenu">
-                        <span>💬 Clubhouse & Circle Chat</span>
+                        <span class="mobile-link-text">💬 Chat</span>
                         @if (unreadChatCount > 0)
                         {
                             <span class="nav-unread-dot">@unreadChatCount</span>
                         }
                     </NavLink>
                     <NavLink class="mobile-link" href="circles" @onclick="CloseMobileMenu">
-                        <span>👑 Bestie Circles</span>
+                        <span class="mobile-link-text">👑 Circles</span>
                     </NavLink>
                     <NavLink class="mobile-link" href="friends" @onclick="CloseMobileMenu">
-                        <span>👭 Friends & Profile</span>
+                        <span class="mobile-link-text">👭 Friends</span>
                     </NavLink>
                     @if (isAdmin)
                     {
                         <NavLink class="mobile-link admin-link" href="admin/rbac" @onclick="CloseMobileMenu">
-                            <span>🛡️ Dynamic RBAC Admin</span>
+                            <span class="mobile-link-text">🛡️ Dynamic RBAC Admin</span>
                         </NavLink>
                     }
                 </div>
@@ -141,10 +165,10 @@
                         <Authorized>
                             <div class="mobile-user-info">
                                 <span>@(userSession?.AvatarSticker ?? "🎀")</span>
-                                <span>Signed in as <strong>@(userSession?.DisplayName ?? context.User.Identity?.Name)</strong></span>
+                                <span>Signed in as <strong>@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "pinky")</strong></span>
                             </div>
                             <button type="button" class="btn-mobile-logout" @onclick="HandleLogoutAsync">
-                                <span>🔒 Sign Out / Switch Account</span>
+                                <span>🔒 Sign Out</span>
                             </button>
                         </Authorized>
                         <NotAuthorized>
@@ -165,40 +189,112 @@
 </header>
 
 <style>
-.kawaii-navbar-container {
+/* =========================================================
+   1. FLOATING SCRAPBOOK NAVBAR CONTAINER
+   ========================================================= */
+.scrapbook-navbar-container {
     position: sticky;
-    top: 0;
+    top: 14px;
     left: 0;
     width: 100%;
     z-index: 1000;
-    background: rgba(255, 253, 249, 0.94);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 2px solid #FFC2D1;
-    box-shadow: 0 4px 20px rgba(255, 143, 171, 0.18);
-    font-family: 'Fredoka', 'Quicksand', sans-serif;
+    padding: 0 20px;
+    pointer-events: none;
+    font-family: 'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.kawaii-navbar {
-    max-width: 1280px;
+/* Scrapbook Layered Paper Card */
+.scrapbook-navbar-card {
+    pointer-events: auto;
+    max-width: 1220px;
     margin: 0 auto;
-    padding: 10px 24px;
+    background: #FFFFFF;
+    border: 2.5px solid #FFC2D1;
+    border-radius: 50px;
+    padding: 8px 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+    position: relative;
+    /* Soft layered paper-card shadow effect */
+    box-shadow: 
+        0 4px 0 #FFE5EC,
+        0 10px 28px rgba(255, 143, 171, 0.22),
+        0 2px 8px rgba(251, 111, 146, 0.12);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* Brand */
+/* Subtle Pink Dashed Inner Border (Handmade Stitched Scrapbook look) */
+.scrapbook-navbar-card::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    right: 5px;
+    bottom: 5px;
+    border: 1.5px dashed #FFB6C1;
+    border-radius: 42px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* =========================================================
+   2. SCRAPBOOK DECORATIVE ELEMENTS (Tape & Heart Sticker)
+   ========================================================= */
+/* Top-left translucent washi tape */
+.scrapbook-tape-tl {
+    position: absolute;
+    top: -9px;
+    left: 22px;
+    width: 48px;
+    height: 18px;
+    background: rgba(255, 182, 193, 0.72);
+    border: 1px dashed rgba(251, 111, 146, 0.45);
+    border-radius: 2px;
+    transform: rotate(-24deg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Bottom-right smiling pink heart sticker */
+.scrapbook-heart-br {
+    position: absolute;
+    bottom: -14px;
+    right: -8px;
+    pointer-events: none;
+    z-index: 10;
+    transform: rotate(12deg);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: gentleHeartFloat 4s ease-in-out infinite;
+}
+
+@@keyframes gentleHeartFloat {
+    0%, 100% { transform: rotate(12deg) translateY(0); }
+    50% { transform: rotate(15deg) translateY(-3px); }
+}
+
+/* Ensure navbar interactive children sit cleanly above inner border */
+.navbar-brand,
+.navbar-links,
+.navbar-actions {
+    position: relative;
+    z-index: 2;
+}
+
+/* =========================================================
+   3. BRAND LOGO (Left)
+   ========================================================= */
 .navbar-brand {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     text-decoration: none;
     font-size: 1.45rem;
     font-weight: 700;
     color: #4A3B3C;
-    transition: transform 0.2s ease;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
     user-select: none;
 }
 
@@ -208,13 +304,13 @@
 
 .brand-strawberry-icon {
     font-size: 1.6rem;
-    animation: gentleWiggle 3s infinite ease-in-out;
+    animation: gentleWiggle 3.5s infinite ease-in-out;
 }
 
 @@keyframes gentleWiggle {
     0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-8deg); }
-    75% { transform: rotate(8deg); }
+    25% { transform: rotate(-7deg); }
+    75% { transform: rotate(7deg); }
 }
 
 .brand-name {
@@ -225,54 +321,81 @@
     color: #FB6F92;
 }
 
-/* Nav Links */
+/* =========================================================
+   4. NAVIGATION LINKS (Center)
+   ========================================================= */
 .navbar-links {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 .nav-link-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
+    padding: 7px 16px;
     border-radius: 9999px;
+    border: 1.5px solid transparent;
+    background: transparent;
     text-decoration: none;
     font-size: 0.95rem;
     font-weight: 600;
-    color: #5C4A4C;
+    color: #4A3B3C;
     position: relative;
-    transition: all 0.2s ease;
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    user-select: none;
 }
 
-.nav-link-item:hover {
-    background: #FFF0F5;
+.nav-icon {
+    font-size: 1.05rem;
+}
+
+/* Hover lift and scale animation */
+.nav-link-item:hover:not(.active) {
+    transform: translateY(-2px) scale(1.03);
+    background: #FFF5F7;
+    border-color: #FFDEE7;
     color: #FB6F92;
-    transform: translateY(-1px);
 }
 
+/* Active Navigation Item: Cute Outlined Pink Pill (Matches Photo) */
 .nav-link-item.active {
-    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
-    color: #FFFFFF !important;
-    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.35);
+    background: #FFF0F5;
+    border: 1.5px solid #FF8FAB;
+    color: #FB6F92 !important;
+    border-radius: 9999px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(255, 143, 171, 0.22);
 }
 
+.nav-link-item.active:hover {
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 12px rgba(255, 143, 171, 0.32);
+}
+
+/* Admin Link Styling */
 .nav-link-item.admin-link {
     color: #7B2CBF;
 }
 
-.nav-link-item.admin-link:hover {
-    background: #F3E8FF;
+.nav-link-item.admin-link:hover:not(.active) {
+    background: #F8F0FF;
+    border-color: #E2C7FF;
     color: #6A1B9A;
 }
 
 .nav-link-item.admin-link.active {
-    background: linear-gradient(135deg, #9D4EDD 0%, #7B2CBF 100%);
-    color: #FFFFFF !important;
+    background: #F5EAFF;
+    border-color: #9D4EDD;
+    color: #6A1B9A !important;
+    box-shadow: 0 2px 8px rgba(157, 78, 221, 0.2);
 }
 
+/* Live Unread Indicator Dot */
 .nav-unread-dot {
     background: #FF0055;
     color: #FFFFFF;
@@ -284,31 +407,37 @@
     line-height: 1.2;
 }
 
-/* Right Side Actions */
+/* =========================================================
+   5. RIGHT ACTIONS: NOTIFICATIONS, PROFILE, SIGN OUT
+   ========================================================= */
 .navbar-actions {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
+/* User Profile Pill */
 .user-profile-pill {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #FFF0F5;
+    background: #FFFDF9;
     border: 1.5px solid #FFC2D1;
     border-radius: 9999px;
-    padding: 5px 12px;
+    padding: 6px 14px;
     text-decoration: none;
-    color: #4A3B3C;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: background-color 0.2s, transform 0.2s;
+    color: #FB6F92;
+    font-weight: 700;
+    font-size: 0.92rem;
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
 }
 
 .user-profile-pill:hover {
-    background: #FFE5EC;
-    transform: translateY(-1px);
+    background: #FFF0F5;
+    border-color: #FB6F92;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(255, 143, 171, 0.25);
 }
 
 .user-avatar-sticker {
@@ -322,79 +451,99 @@
     white-space: nowrap;
 }
 
+/* Sign Out Outlined Pill Button */
 .btn-navbar-logout {
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    color: #7E6566;
-    border-radius: 9999px;
-    padding: 6px 12px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
+    gap: 6px;
+    background: #FFFDF9;
+    border: 1.5px solid #FFC2D1;
+    border-radius: 9999px;
+    padding: 6px 16px;
+    color: #FB6F92;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
 }
 
 .btn-navbar-logout:hover {
     background: #FFE5EC;
-    color: #FB6F92;
     border-color: #FB6F92;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.28);
 }
 
+/* Not Authorized Action Pills */
 .btn-navbar-login {
-    background: #FFFFFF;
-    border: 2px solid #FFC2D1;
-    color: #FB6F92;
-    font-weight: 700;
-    font-size: 0.9rem;
-    padding: 7px 16px;
-    border-radius: 9999px;
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    transition: background 0.2s;
+    background: #FFFDF9;
+    border: 1.5px solid #FFC2D1;
+    color: #FB6F92;
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 6px 15px;
+    border-radius: 9999px;
+    text-decoration: none;
+    transition: all 0.22s ease;
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
 }
 
 .btn-navbar-login:hover {
     background: #FFF0F5;
+    border-color: #FB6F92;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(255, 143, 171, 0.22);
 }
 
 .btn-navbar-register {
-    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
-    color: #FFFFFF;
-    font-weight: 700;
-    font-size: 0.9rem;
-    padding: 7px 18px;
-    border-radius: 9999px;
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.35);
-    transition: transform 0.2s, box-shadow 0.2s;
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 0.92rem;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    text-decoration: none;
+    border: 1.5px solid #FB6F92;
+    transition: all 0.22s ease;
+    box-shadow: 0 3px 10px rgba(251, 111, 146, 0.35);
 }
 
 .btn-navbar-register:hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(251, 111, 146, 0.45);
 }
 
+/* Mobile Hamburger Button */
 .navbar-hamburger {
     display: none;
-    background: #FFF0F5;
-    border: 2px solid #FFC2D1;
-    border-radius: 12px;
-    padding: 6px 12px;
-    font-size: 1.3rem;
+    background: #FFFDF9;
+    border: 1.5px solid #FFC2D1;
+    border-radius: 14px;
+    padding: 6px 14px;
+    font-size: 1.25rem;
     color: #FB6F92;
     cursor: pointer;
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
+    transition: all 0.2s ease;
 }
 
-/* Mobile responsive */
-@@media (max-width: 900px) {
+.navbar-hamburger:hover {
+    background: #FFF0F5;
+    border-color: #FB6F92;
+    transform: scale(1.05);
+}
+
+/* =========================================================
+   6. RESPONSIVE DESIGN (Desktop / Tablet / Mobile)
+   ========================================================= */
+@@media (max-width: 992px) {
     .navbar-links {
         display: none;
     }
@@ -404,33 +553,88 @@
     }
 
     .navbar-hamburger {
-        display: block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .scrapbook-navbar-card {
+        padding: 8px 18px;
     }
 }
 
-/* Mobile Nav Drawer */
+@@media (max-width: 576px) {
+    .scrapbook-navbar-container {
+        top: 8px;
+        padding: 0 10px;
+    }
+
+    .scrapbook-navbar-card {
+        border-radius: 36px;
+        padding: 6px 14px;
+    }
+
+    .scrapbook-navbar-card::before {
+        border-radius: 30px;
+    }
+
+    .brand-name {
+        font-size: 1.25rem;
+    }
+
+    .user-display-name {
+        display: none;
+    }
+
+    .user-profile-pill {
+        padding: 6px 10px;
+    }
+
+    .scrapbook-tape-tl {
+        left: 12px;
+        width: 36px;
+        height: 14px;
+    }
+
+    .scrapbook-heart-br {
+        right: -4px;
+        bottom: -10px;
+    }
+
+    .scrapbook-heart-br svg {
+        width: 28px;
+        height: 28px;
+    }
+}
+
+/* =========================================================
+   7. MOBILE SCRAPBOOK DRAWER
+   ========================================================= */
 .mobile-nav-drawer {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(74, 59, 60, 0.4);
-    backdrop-filter: blur(4px);
+    background: rgba(74, 59, 60, 0.45);
+    backdrop-filter: blur(5px);
     z-index: 10001;
     display: flex;
     justify-content: flex-end;
+    pointer-events: auto;
 }
 
 .mobile-nav-content {
     background: #FFFDF9;
-    width: 290px;
+    border-left: 3px solid #FFC2D1;
+    width: 300px;
     height: 100%;
-    padding: 24px 20px;
-    box-shadow: -6px 0 24px rgba(74, 59, 60, 0.2);
+    padding: 26px 22px;
+    box-shadow: -8px 0 28px rgba(74, 59, 60, 0.25);
     display: flex;
     flex-direction: column;
-    animation: slideInRight 0.25s ease-out;
+    position: relative;
+    animation: slideInRight 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @@keyframes slideInRight {
@@ -438,13 +642,43 @@
     to { transform: translateX(0); }
 }
 
+/* Stitched dashed inner border on mobile drawer */
+.mobile-nav-content::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 1.5px dashed #FFDEE7;
+    border-radius: 18px;
+    pointer-events: none;
+}
+
+.mobile-washi-tape {
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1deg);
+    width: 80px;
+    height: 16px;
+    background: rgba(255, 182, 193, 0.72);
+    border: 1px dashed rgba(251, 111, 146, 0.4);
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+    pointer-events: none;
+    z-index: 5;
+}
+
 .mobile-nav-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 16px;
+    padding-bottom: 14px;
     border-bottom: 2px solid #FFDEE7;
     margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
 }
 
 .mobile-close-btn {
@@ -454,8 +688,19 @@
     height: 32px;
     border-radius: 50%;
     font-size: 1rem;
+    font-weight: 700;
     color: #FB6F92;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.mobile-close-btn:hover {
+    transform: rotate(90deg) scale(1.1);
+    background: #FB6F92;
+    color: #FFFFFF;
 }
 
 .mobile-nav-links {
@@ -464,29 +709,44 @@
     gap: 8px;
     flex: 1;
     overflow-y: auto;
+    position: relative;
+    z-index: 2;
 }
 
 .mobile-link {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    border-radius: 14px;
+    padding: 11px 16px;
+    border-radius: 9999px;
+    border: 1.5px solid transparent;
     text-decoration: none;
     color: #4A3B3C;
     font-weight: 600;
     font-size: 1rem;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
 }
 
-.mobile-link:hover, .mobile-link.active {
-    background: #FFE5EC;
+.mobile-link:hover {
+    background: #FFF5F7;
+    border-color: #FFDEE7;
     color: #FB6F92;
+    transform: translateX(4px);
+}
+
+.mobile-link.active {
+    background: #FFF0F5;
+    border-color: #FF8FAB;
+    color: #FB6F92 !important;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(255, 143, 171, 0.2);
 }
 
 .mobile-auth-footer {
     padding-top: 16px;
     border-top: 2px solid #FFDEE7;
+    position: relative;
+    z-index: 2;
 }
 
 .mobile-user-info {
@@ -500,13 +760,21 @@
 
 .btn-mobile-logout {
     width: 100%;
-    background: #FFE5EC;
+    background: #FFFDF9;
     border: 1.5px solid #FFC2D1;
     color: #FB6F92;
     font-weight: 700;
     padding: 10px;
-    border-radius: 12px;
+    border-radius: 9999px;
     cursor: pointer;
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
+    transition: all 0.2s ease;
+}
+
+.btn-mobile-logout:hover {
+    background: #FFE5EC;
+    border-color: #FB6F92;
+    transform: translateY(-1px);
 }
 
 .mobile-auth-buttons {
