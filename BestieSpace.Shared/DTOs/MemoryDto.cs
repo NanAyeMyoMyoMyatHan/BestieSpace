@@ -18,3 +18,10 @@ public class CreateMemoryRequest
     public string StickerType { get; set; } = "heart";
     public DateTime? MemoryDate { get; set; }
 }
+
+public class UpdateMemoryRequest
+{
+    public string Caption { get; set; } = string.Empty;
+    public string StickerType { get; set; } = "heart";
+    public DateTime? MemoryDate { get; set; }
+}

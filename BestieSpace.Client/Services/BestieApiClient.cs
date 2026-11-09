@@ -12,7 +12,17 @@ public interface IBestieApiClient
     Task<DashboardDto> GetDashboardAsync();
     Task<MissYouResponse?> IncrementMissYouAsync();
     Task<MemoryDto?> AddMemoryAsync(MultipartFormDataContent content);
+    Task<MemoryDto?> UpdateMemoryAsync(int id, MultipartFormDataContent content);
+    Task<bool> DeleteMemoryAsync(int id);
+    Task<List<MemoryDto>> GetAllMemoriesAsync();
+    Task<MemoryDto?> GetMemoryByIdAsync(int id);
+
+    Task<List<SecretNoteDto>> GetAllNotesAsync();
+    Task<SecretNoteDto?> GetNoteByIdAsync(int id);
+    Task<SecretNoteDto?> CreateNoteAsync(CreateSecretNoteRequest request);
+    Task<SecretNoteDto?> UpdateNoteAsync(int id, UpdateSecretNoteRequest request);
     Task<SecretNoteDto?> UnlockNoteAsync(int id);
+    Task<bool> DeleteNoteAsync(int id);
     Task<List<ChatMessageDto>> GetChatMessagesAsync(string? viewer = null);
     Task<ChatMessageDto?> SendTextOrStickerAsync(SendTextOrStickerRequest request);
     Task<ChatMessageDto?> UploadPhotoAsync(MultipartFormDataContent content);
@@ -203,6 +213,139 @@ public class BestieApiClient : IBestieApiClient
             _logger.LogError(ex, "Failed to unlock note ID {Id}", id);
         }
         return null;
+    }
+
+    public async Task<List<SecretNoteDto>> GetAllNotesAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<SecretNoteDto>>($"{_baseUrl}/api/notes");
+            return res ?? new List<SecretNoteDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get secret notes");
+            return new List<SecretNoteDto>();
+        }
+    }
+
+    public async Task<SecretNoteDto?> GetNoteByIdAsync(int id)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<SecretNoteDto>($"{_baseUrl}/api/notes/{id}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get secret note {Id}", id);
+            return null;
+        }
+    }
+
+    public async Task<SecretNoteDto?> CreateNoteAsync(CreateSecretNoteRequest request)
+    {
+        try
+        {
+            var res = await _http.PostAsJsonAsync($"{_baseUrl}/api/notes", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<SecretNoteDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create secret note");
+        }
+        return null;
+    }
+
+    public async Task<SecretNoteDto?> UpdateNoteAsync(int id, UpdateSecretNoteRequest request)
+    {
+        try
+        {
+            var res = await _http.PutAsJsonAsync($"{_baseUrl}/api/notes/{id}", request);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<SecretNoteDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update secret note {Id}", id);
+        }
+        return null;
+    }
+
+    public async Task<bool> DeleteNoteAsync(int id)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"{_baseUrl}/api/notes/{id}");
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete secret note {Id}", id);
+            return false;
+        }
+    }
+
+    public async Task<List<MemoryDto>> GetAllMemoriesAsync()
+    {
+        try
+        {
+            var res = await _http.GetFromJsonAsync<List<MemoryDto>>($"{_baseUrl}/api/memories");
+            return res ?? new List<MemoryDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get memories");
+            return new List<MemoryDto>();
+        }
+    }
+
+    public async Task<MemoryDto?> GetMemoryByIdAsync(int id)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<MemoryDto>($"{_baseUrl}/api/memories/{id}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get memory {Id}", id);
+            return null;
+        }
+    }
+
+    public async Task<MemoryDto?> UpdateMemoryAsync(int id, MultipartFormDataContent content)
+    {
+        try
+        {
+            var res = await _http.PutAsync($"{_baseUrl}/api/memories/{id}", content);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<MemoryDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update memory {Id}", id);
+        }
+        return null;
+    }
+
+    public async Task<bool> DeleteMemoryAsync(int id)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"{_baseUrl}/api/memories/{id}");
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete memory {Id}", id);
+            return false;
+        }
     }
 
     public async Task<List<ChatMessageDto>> GetChatMessagesAsync(string? viewer = null)

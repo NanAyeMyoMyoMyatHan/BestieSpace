@@ -54,9 +54,15 @@
 
                 <div class="polaroid-frame" 
                      style="transform: rotate(@(angle)deg);"
-                     @onclick="() => OpenLightbox(GetFullMediaUrl(memory.ImageUrl), memory.Caption)">
+                     @onclick="() => OpenLightbox(memory)">
                     <div class="polaroid-washi"></div>
                     <div class="polaroid-corner-sticker">@stickerEmoji</div>
+                    <button type="button" class="btn-polaroid-edit" 
+                            @onclick:stopPropagation="true" 
+                            @onclick="() => OpenEditMemoryModal(memory)" 
+                            title="Edit memory caption, date, sticker, or photo">
+                        ✏️ Edit
+                    </button>
                     <div class="polaroid-img-wrapper">
                         <img src="@GetFullMediaUrl(memory.ImageUrl)" alt="@memory.Caption" class="polaroid-img" loading="lazy" />
                     </div>
@@ -108,20 +114,24 @@
                 <label class="form-label">Corner Sticker</label>
                 <div class="sticker-select-group">
                     <div class="sticker-pill-radio @(newPhotoSticker == "bow" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "bow")">
+                         @onclick='@(() => newPhotoSticker = "bow")'>
                         <span>🎀</span> Bow
                     </div>
                     <div class="sticker-pill-radio @(newPhotoSticker == "bear" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "bear")">
+                         @onclick='@(() => newPhotoSticker = "bear")'>
                         <span>🧸</span> Bear
                     </div>
                     <div class="sticker-pill-radio @(newPhotoSticker == "sparkle" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "sparkle")">
+                         @onclick='@(() => newPhotoSticker = "sparkle")'>
                         <span>✨</span> Sparkle
                     </div>
                     <div class="sticker-pill-radio @(newPhotoSticker == "heart" ? "selected" : "")" 
-                         @onclick="@(() => newPhotoSticker = "heart")">
+                         @onclick='@(() => newPhotoSticker = "heart")'>
                         <span>💖</span> Heart
+                    </div>
+                    <div class="sticker-pill-radio @(newPhotoSticker == "flower" ? "selected" : "")" 
+                         @onclick='@(() => newPhotoSticker = "flower")'>
+                        <span>🌸</span> Flower
                     </div>
                 </div>
             </div>
@@ -143,18 +153,115 @@
 }
 
 <!-- =========================================================
-     MODAL 2: PHOTO LIGHTBOX
+     MODAL 2: EDIT PHOTO MEMORY
      ========================================================= -->
-@if (showLightboxModal)
+@if (showEditPhotoModal && editingMemory != null)
+{
+    <div class="kawaii-modal-backdrop" @onclick="() => showEditPhotoModal = false">
+        <div class="kawaii-modal-card" @onclick:stopPropagation="true">
+            <button class="modal-close-btn" @onclick="() => showEditPhotoModal = false">✕</button>
+
+            <div class="modal-header-icon">✏️📸</div>
+            <h2 class="modal-title">Edit Polaroid Memory</h2>
+            <p class="modal-subtitle">Update caption, date, corner sticker, or replace the photo!</p>
+
+            @if (!string.IsNullOrWhiteSpace(editErrorMessage))
+            {
+                <div class="form-error-banner">
+                    <span>🥺 @editErrorMessage</span>
+                </div>
+            }
+
+            <div class="edit-current-preview">
+                <img src="@GetFullMediaUrl(editingMemory.ImageUrl)" alt="Current preview" class="preview-mini-polaroid" />
+                <span class="preview-note">Current Photo</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Replace Photo (Optional)</label>
+                <InputFile OnChange="HandleEditFileSelected" accept="image/*" class="form-control-kawaii" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Heartfelt Caption *</label>
+                <input type="text" class="form-control-kawaii" placeholder="e.g., That golden hour picnic with cookies 🍪" 
+                       @bind="editCaption" maxlength="200" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Memory Date</label>
+                <input type="date" class="form-control-kawaii" @bind="editDate" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Corner Sticker</label>
+                <div class="sticker-select-group">
+                    <div class="sticker-pill-radio @(editSticker == "bow" ? "selected" : "")" 
+                         @onclick='@(() => editSticker = "bow")'>
+                        <span>🎀</span> Bow
+                    </div>
+                    <div class="sticker-pill-radio @(editSticker == "bear" ? "selected" : "")" 
+                         @onclick='@(() => editSticker = "bear")'>
+                        <span>🧸</span> Bear
+                    </div>
+                    <div class="sticker-pill-radio @(editSticker == "sparkle" ? "selected" : "")" 
+                         @onclick='@(() => editSticker = "sparkle")'>
+                        <span>✨</span> Sparkle
+                    </div>
+                    <div class="sticker-pill-radio @(editSticker == "heart" ? "selected" : "")" 
+                         @onclick='@(() => editSticker = "heart")'>
+                        <span>💖</span> Heart
+                    </div>
+                    <div class="sticker-pill-radio @(editSticker == "flower" ? "selected" : "")" 
+                         @onclick='@(() => editSticker = "flower")'>
+                        <span>🌸</span> Flower
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-button-row">
+                <button type="button" class="btn-delete-kawaii" @onclick="DeleteCurrentMemory" disabled="@isSavingEdit">
+                    <span>🗑️ Delete Memory</span>
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn-kawaii-secondary" @onclick="() => showEditPhotoModal = false">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn-kawaii-primary" @onclick="SubmitEditMemory" disabled="@(isSavingEdit || string.IsNullOrWhiteSpace(editCaption))">
+                        @if (isSavingEdit)
+                        {
+                            <span>Saving... 🌸</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes ✨</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =========================================================
+     MODAL 3: PHOTO LIGHTBOX
+     ========================================================= -->
+@if (showLightboxModal && activeLightboxMemory != null)
 {
     <div class="kawaii-modal-backdrop" @onclick="() => showLightboxModal = false">
         <div class="lightbox-card" @onclick:stopPropagation="true">
             <button class="modal-close-btn" style="top: 10px; right: 10px;" @onclick="() => showLightboxModal = false">✕</button>
-            <img src="@activeLightboxUrl" alt="@activeLightboxCaption" class="lightbox-img" />
-            @if (!string.IsNullOrWhiteSpace(activeLightboxCaption))
+            <img src="@GetFullMediaUrl(activeLightboxMemory.ImageUrl)" alt="@activeLightboxMemory.Caption" class="lightbox-img" />
+            @if (!string.IsNullOrWhiteSpace(activeLightboxMemory.Caption))
             {
-                <div class="lightbox-caption-box">@activeLightboxCaption</div>
+                <div class="lightbox-caption-box">@activeLightboxMemory.Caption</div>
             }
+            <div class="lightbox-footer-actions">
+                <span class="lightbox-date">📅 @activeLightboxMemory.MemoryDate.ToString("MMMM dd, yyyy")</span>
+                <button type="button" class="btn-kawaii-secondary" @onclick="() => { showLightboxModal = false; OpenEditMemoryModal(activeLightboxMemory); }">
+                    ✏️ Edit Memory
+                </button>
+            </div>
         </div>
     </div>
 }
@@ -223,6 +330,112 @@
     margin-bottom: 8px;
 }
 
+.btn-polaroid-edit {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: #FFF0F5;
+    border: 1.5px solid #FFC2D1;
+    color: #FF5D8F;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.25);
+    transition: all 0.2s ease;
+    z-index: 6;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-polaroid-edit:hover {
+    background: #FF5D8F;
+    color: #ffffff;
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px rgba(255, 93, 143, 0.4);
+}
+
+.edit-current-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.preview-mini-polaroid {
+    max-width: 140px;
+    max-height: 140px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 3px solid #FFCCD5;
+    box-shadow: 0 4px 12px rgba(255, 143, 171, 0.25);
+}
+
+.preview-note {
+    font-size: 0.8rem;
+    color: #9C8283;
+    margin-top: 4px;
+}
+
+.modal-button-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    gap: 12px;
+}
+
+.btn-delete-kawaii {
+    background: #FFF1F0;
+    border: 1.5px solid #FFA39E;
+    color: #CF1322;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-delete-kawaii:hover {
+    background: #FF4D4F;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.btn-kawaii-secondary {
+    background: #FFF5F7;
+    border: 1.5px solid #FFCCD5;
+    color: #7E6566;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-kawaii-secondary:hover {
+    background: #FFE5EC;
+    color: #4A3B3C;
+}
+
+.lightbox-footer-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding: 0 4px;
+}
+
+.lightbox-date {
+    color: #FFE5EC;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
 .form-error-banner {
     background: #FFEBEE;
     color: #C62828;
@@ -255,10 +468,19 @@
     private IBrowserFile? selectedBrowserFile;
     private string? uploadErrorMessage;
 
+    // Edit Photo Modal
+    private bool showEditPhotoModal = false;
+    private bool isSavingEdit = false;
+    private MemoryDto? editingMemory;
+    private string editCaption = string.Empty;
+    private DateTime editDate = DateTime.Today;
+    private string editSticker = "heart";
+    private IBrowserFile? editBrowserFile;
+    private string? editErrorMessage;
+
     // Lightbox
     private bool showLightboxModal = false;
-    private string? activeLightboxUrl;
-    private string? activeLightboxCaption;
+    private MemoryDto? activeLightboxMemory;
 
     protected override async Task OnInitializedAsync()
     {
@@ -336,10 +558,102 @@
         }
     }
 
-    private void OpenLightbox(string url, string caption)
+    private void OpenEditMemoryModal(MemoryDto memory)
     {
-        activeLightboxUrl = url;
-        activeLightboxCaption = caption;
+        editingMemory = memory;
+        editCaption = memory.Caption;
+        editDate = memory.MemoryDate;
+        editSticker = string.IsNullOrWhiteSpace(memory.StickerType) ? "heart" : memory.StickerType.ToLowerInvariant();
+        editBrowserFile = null;
+        editErrorMessage = null;
+        showEditPhotoModal = true;
+    }
+
+    private void HandleEditFileSelected(InputFileChangeEventArgs e)
+    {
+        editBrowserFile = e.File;
+        editErrorMessage = null;
+    }
+
+    private async Task SubmitEditMemory()
+    {
+        if (editingMemory == null || string.IsNullOrWhiteSpace(editCaption)) return;
+        isSavingEdit = true;
+        editErrorMessage = null;
+
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(editCaption), "caption");
+            content.Add(new StringContent(editSticker), "stickerType");
+            content.Add(new StringContent(editDate.ToString("o")), "memoryDate");
+
+            if (editBrowserFile != null)
+            {
+                var streamContent = new StreamContent(editBrowserFile.OpenReadStream(maxAllowedSize: 15 * 1024 * 1024));
+                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(editBrowserFile.ContentType);
+                content.Add(streamContent, "photo", editBrowserFile.Name);
+            }
+
+            var updated = await ApiClient.UpdateMemoryAsync(editingMemory.Id, content);
+            if (updated != null)
+            {
+                var index = memories.FindIndex(m => m.Id == updated.Id);
+                if (index >= 0)
+                {
+                    memories[index] = updated;
+                }
+                showEditPhotoModal = false;
+            }
+            else
+            {
+                editErrorMessage = "Could not update memory. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to update memory {Id}", editingMemory.Id);
+            editErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSavingEdit = false;
+        }
+    }
+
+    private async Task DeleteCurrentMemory()
+    {
+        if (editingMemory == null) return;
+        isSavingEdit = true;
+        editErrorMessage = null;
+
+        try
+        {
+            var ok = await ApiClient.DeleteMemoryAsync(editingMemory.Id);
+            if (ok)
+            {
+                memories.RemoveAll(m => m.Id == editingMemory.Id);
+                showEditPhotoModal = false;
+            }
+            else
+            {
+                editErrorMessage = "Could not delete memory. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete memory {Id}", editingMemory.Id);
+            editErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSavingEdit = false;
+        }
+    }
+
+    private void OpenLightbox(MemoryDto memory)
+    {
+        activeLightboxMemory = memory;
         showLightboxModal = true;
     }
 
@@ -356,6 +670,7 @@
         "bear" => "🧸",
         "sparkle" => "✨",
         "heart" => "💖",
+        "flower" => "🌸",
         _ => "🌸"
     };
 }

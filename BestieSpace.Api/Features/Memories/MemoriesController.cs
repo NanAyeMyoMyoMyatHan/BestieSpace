@@ -21,6 +21,17 @@ public class MemoriesController : ControllerBase
         return Ok(memories);
     }
 
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<MemoryDto>> GetById(int id)
+    {
+        var memory = await _memoriesService.GetMemoryByIdAsync(id);
+        if (memory == null)
+        {
+            return NotFound(new { message = $"Memory with ID {id} not found." });
+        }
+        return Ok(memory);
+    }
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<MemoryDto>> AddMemory(
@@ -30,6 +41,34 @@ public class MemoriesController : ControllerBase
         [FromForm] DateTime? memoryDate)
     {
         var memory = await _memoriesService.AddMemoryAsync(photo, caption ?? "", stickerType ?? "heart", memoryDate);
-        return CreatedAtAction(nameof(GetAll), new { id = memory.Id }, memory);
+        return CreatedAtAction(nameof(GetById), new { id = memory.Id }, memory);
+    }
+
+    [HttpPut("{id:int}")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<MemoryDto>> UpdateMemory(
+        int id,
+        [FromForm] IFormFile? photo,
+        [FromForm] string? caption,
+        [FromForm] string? stickerType,
+        [FromForm] DateTime? memoryDate)
+    {
+        var updated = await _memoriesService.UpdateMemoryAsync(id, photo, caption, stickerType, memoryDate);
+        if (updated == null)
+        {
+            return NotFound(new { message = $"Memory with ID {id} not found." });
+        }
+        return Ok(updated);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult> DeleteMemory(int id)
+    {
+        var success = await _memoriesService.DeleteMemoryAsync(id);
+        if (!success)
+        {
+            return NotFound(new { message = $"Memory with ID {id} not found." });
+        }
+        return NoContent();
     }
 }

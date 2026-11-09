@@ -5,6 +5,7 @@
 @using BestieSpace.Shared.DTOs
 @inject IBestieApiClient ApiClient
 @inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
 @inject ILogger<NotesPage> Logger
 
 <PageTitle>Secret Notes & Envelopes ✉️🌸 | BestieSpace</PageTitle>
@@ -18,8 +19,13 @@
                 <p>Click on any envelope to break its wax seal and uncover a heartfelt handwritten message 💕</p>
             </div>
         </div>
-        <div class="header-stats-badge">
-            <span>💌 @(secretNotes?.Count(n => n.IsUnlocked) ?? 0) of @(secretNotes?.Count ?? 0) Opened</span>
+        <div class="header-right-actions">
+            <div class="header-stats-badge">
+                <span>💌 @(secretNotes?.Count(n => n.IsUnlocked) ?? 0) of @(secretNotes?.Count ?? 0) Opened</span>
+            </div>
+            <button class="btn-kawaii-primary" @onclick="OpenCreateNoteModal">
+                <span>➕ Write New Note ✉️</span>
+            </button>
         </div>
     </div>
 
@@ -35,7 +41,10 @@
         <div class="empty-state-card">
             <span class="empty-icon">📬🌸</span>
             <h3>No secret envelopes found!</h3>
-            <p>Heartfelt notes and surprise letters from your bestie will appear here once they're written ✨</p>
+            <p>Write your first heartfelt letter or surprise note to your bestie ✨</p>
+            <button class="btn-kawaii-primary mt-3" @onclick="OpenCreateNoteModal">
+                <span>➕ Write First Secret Note</span>
+            </button>
         </div>
     }
     else
@@ -46,6 +55,11 @@
                 <div class="envelope-card @(note.IsUnlocked ? "unlocked-envelope" : "sealed-envelope")"
                      @onclick="() => HandleEnvelopeClick(note)">
                     <div class="envelope-stamp">POSTAGE 🌸</div>
+                    
+                    <button type="button" class="btn-card-edit-note" @onclick:stopPropagation="true" @onclick="() => OpenEditNoteModal(note)" title="Edit this secret note">
+                        ✏️ Edit
+                    </button>
+
                     <div class="envelope-icon-circle">
                         <span>@(note.IsUnlocked ? "📖" : (string.IsNullOrWhiteSpace(note.StickerIcon) ? "💌" : note.StickerIcon))</span>
                     </div>
@@ -71,7 +85,7 @@
 </div>
 
 <!-- =========================================================
-     MODAL: SECRET NOTE STATIONERY
+     MODAL 1: READ SECRET NOTE STATIONERY
      ========================================================= -->
 @if (showSecretNoteModal && activeSecretNote != null)
 {
@@ -97,8 +111,100 @@
                 </div>
             }
 
+            <div class="note-modal-bottom-actions">
+                <button type="button" class="btn-modal-edit" @onclick="() => SwitchToEditNote(activeSecretNote)">
+                    <span>✏️ Edit This Note</span>
+                </button>
+            </div>
+
             <div class="note-footer-note">
                 <span>🌸 Sealed with love • Forever your bestie 💕</span>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- =========================================================
+     MODAL 2: CREATE / EDIT SECRET NOTE
+     ========================================================= -->
+@if (showNoteEditorModal)
+{
+    <div class="kawaii-modal-backdrop" @onclick="() => showNoteEditorModal = false">
+        <div class="kawaii-modal-card note-modal-card editor-modal-card" @onclick:stopPropagation="true">
+            <div class="washi-tape-top"></div>
+            <button class="modal-close-btn" @onclick="() => showNoteEditorModal = false">✕</button>
+
+            <div class="modal-header-icon">@(string.IsNullOrWhiteSpace(editorStickerIcon) ? "💌" : editorStickerIcon)</div>
+            <h2 class="modal-title">@(isEditingExisting ? "Edit Secret Note" : "Write a New Secret Note")</h2>
+            <p class="modal-subtitle">@(isEditingExisting ? "Update the title, preview hint, wax seal, or heartfelt letter text." : "Craft a heartfelt mystery letter for your bestie to open!")</p>
+
+            @if (!string.IsNullOrWhiteSpace(editorErrorMessage))
+            {
+                <div class="form-error-banner">
+                    <span>🥺 @editorErrorMessage</span>
+                </div>
+            }
+
+            <div class="form-group">
+                <label class="form-label">Envelope Title *</label>
+                <input type="text" class="form-control-kawaii" placeholder="e.g., Open when you miss me 💕" 
+                       @bind="editorTitle" maxlength="100" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Preview Hint on Envelope *</label>
+                <input type="text" class="form-control-kawaii" placeholder="e.g., A warm, gentle reminder when you feel a little lonely..." 
+                       @bind="editorPreviewHint" maxlength="250" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Choose Wax Seal Sticker</label>
+                <div class="sticker-select-group">
+                    @foreach (var s in availableStickers)
+                    {
+                        <button type="button" class="sticker-pill-radio @(editorStickerIcon == s ? "selected" : "")" 
+                                @onclick="@(() => editorStickerIcon = s)">
+                            <span>@s</span>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Secret Handwritten Letter Content *</label>
+                <textarea class="form-control-kawaii stationery-textarea" rows="6" 
+                          placeholder="Write your heartfelt letter here... Tell your bestie how much they mean to you 💕" 
+                          @bind="editorContent"></textarea>
+            </div>
+
+            @if (isEditingExisting)
+            {
+                <div class="form-group form-check-kawaii">
+                    <label class="checkbox-container">
+                        <input type="checkbox" @bind="editorIsSealed" />
+                        <span class="checkmark"></span>
+                        <span class="check-label">🎀 Re-seal this envelope (lock it so it can be broken open again)</span>
+                    </label>
+                </div>
+            }
+
+            <div class="modal-form-actions">
+                @if (isEditingExisting)
+                {
+                    <button type="button" class="btn-modal-delete" @onclick="DeleteCurrentNoteAsync" disabled="@isSavingNote">
+                        <span>🗑️ Delete Note</span>
+                    </button>
+                }
+                <button type="button" class="btn-modal-save" @onclick="SaveNoteAsync" disabled="@isSavingNote">
+                    @if (isSavingNote)
+                    {
+                        <span>🌸 Saving note...</span>
+                    }
+                    else
+                    {
+                        <span>@(isEditingExisting ? "Save Changes 🌸" : "Seal & Pin Envelope ✉️✨")</span>
+                    }
+                </button>
             </div>
         </div>
     </div>
@@ -158,6 +264,13 @@
     margin: 0;
 }
 
+.header-right-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .header-stats-badge {
     background: #FFFFFF;
     color: #FB6F92;
@@ -167,6 +280,27 @@
     border: 2px dashed #FFC2D1;
     box-shadow: 0 4px 12px rgba(251, 111, 146, 0.15);
     font-size: 0.95rem;
+}
+
+.btn-kawaii-primary {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF !important;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(251, 111, 146, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-kawaii-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
 }
 
 .loading-state {
@@ -262,6 +396,31 @@
     transform: rotate(3deg);
 }
 
+.btn-card-edit-note {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    background: #FFF0F5;
+    border: 1.5px solid #FFC2D1;
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #FB6F92;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.15);
+}
+
+.btn-card-edit-note:hover {
+    background: #FB6F92;
+    color: #FFFFFF;
+    transform: scale(1.08);
+}
+
 .envelope-icon-circle {
     width: 68px;
     height: 68px;
@@ -272,7 +431,7 @@
     align-items: center;
     justify-content: center;
     font-size: 2rem;
-    margin: 0 auto 16px auto;
+    margin: 8px auto 16px auto;
     box-shadow: 0 6px 14px rgba(255, 143, 171, 0.2);
     transition: transform 0.3s ease;
 }
@@ -319,7 +478,7 @@
     border: 1px solid #C5E1A5;
 }
 
-/* Modal */
+/* Modals */
 .kawaii-modal-backdrop {
     position: fixed;
     top: 0;
@@ -346,6 +505,8 @@
     box-shadow: 0 24px 60px rgba(74, 59, 60, 0.3);
     text-align: center;
     animation: modalBounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 @@keyframes modalBounce {
@@ -435,7 +596,29 @@
 .note-unlocked-tag {
     font-size: 0.85rem;
     color: #7E6566;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+}
+
+.note-modal-bottom-actions {
+    margin-bottom: 14px;
+}
+
+.btn-modal-edit {
+    background: #FFF0F5;
+    border: 2px solid #FFC2D1;
+    color: #FB6F92;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 9999px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-modal-edit:hover {
+    background: #FFE5EC;
+    border-color: #FB6F92;
+    transform: translateY(-2px);
 }
 
 .note-footer-note {
@@ -443,13 +626,165 @@
     color: #FB6F92;
     font-weight: 600;
 }
+
+/* Editor Form */
+.form-group {
+    text-align: left;
+    margin-bottom: 18px;
+}
+
+.form-label {
+    display: block;
+    color: #4A3B3C;
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-bottom: 6px;
+}
+
+.form-control-kawaii {
+    width: 100%;
+    background: #FFFFFF;
+    border: 2px solid #FFC2D1;
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-family: 'Quicksand', sans-serif;
+    font-size: 1rem;
+    color: #4A3B3C;
+    transition: border-color 0.2s;
+    outline: none;
+}
+
+.form-control-kawaii:focus {
+    border-color: #FB6F92;
+    box-shadow: 0 0 0 3px rgba(251, 111, 146, 0.2);
+}
+
+.stationery-textarea {
+    background-image: repeating-linear-gradient(transparent, transparent 27px, #FFDEE7 28px);
+    line-height: 28px;
+    resize: vertical;
+}
+
+.sticker-select-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sticker-pill-radio {
+    background: #FFFDF9;
+    border: 1.5px solid #FFC2D1;
+    border-radius: 9999px;
+    padding: 6px 14px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sticker-pill-radio:hover {
+    background: #FFF0F5;
+    border-color: #FB6F92;
+    transform: scale(1.1);
+}
+
+.sticker-pill-radio.selected {
+    background: #FFE5EC;
+    border-color: #FB6F92;
+    box-shadow: 0 2px 8px rgba(251, 111, 146, 0.35);
+    transform: scale(1.12);
+}
+
+.form-check-kawaii {
+    margin: 14px 0 20px 0;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.92rem;
+    color: #4A3B3C;
+    font-weight: 600;
+}
+
+.form-error-banner {
+    background: #FFF0F2;
+    border: 1.5px solid #FF8FAB;
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: #D81159;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.modal-form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.btn-modal-save {
+    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
+    color: #FFFFFF;
+    font-weight: 700;
+    padding: 12px 24px;
+    border-radius: 9999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(251, 111, 146, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 0.95rem;
+}
+
+.btn-modal-save:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+}
+
+.btn-modal-delete {
+    background: #FFF0F5;
+    border: 1.5px solid #FF8FAB;
+    color: #D81159;
+    font-weight: 700;
+    padding: 12px 20px;
+    border-radius: 9999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+}
+
+.btn-modal-delete:hover {
+    background: #FFE5EC;
+    transform: translateY(-2px);
+}
 </style>
 
 @code {
     private List<SecretNoteDto>? secretNotes;
     private bool isLoading = true;
+
+    // Reading Modal
     private bool showSecretNoteModal = false;
     private SecretNoteDto? activeSecretNote;
+
+    // Editor Modal (Add / Edit)
+    private bool showNoteEditorModal = false;
+    private bool isEditingExisting = false;
+    private int? editingNoteId = null;
+    private string editorTitle = "";
+    private string editorPreviewHint = "";
+    private string editorContent = "";
+    private string editorStickerIcon = "💌";
+    private bool editorIsSealed = false;
+    private string? editorErrorMessage;
+    private bool isSavingNote = false;
+
+    private readonly string[] availableStickers = { "💌", "🎀", "🧸", "✨", "💖", "🌸", "🌟", "🍰", "🐱", "🗝️" };
 
     protected override async Task OnInitializedAsync()
     {
@@ -461,8 +796,12 @@
         isLoading = true;
         try
         {
-            var dashboard = await ApiClient.GetDashboardAsync();
-            secretNotes = dashboard?.SecretNotes ?? new List<SecretNoteDto>();
+            secretNotes = await ApiClient.GetAllNotesAsync();
+            if (secretNotes == null || !secretNotes.Any())
+            {
+                var dashboard = await ApiClient.GetDashboardAsync();
+                secretNotes = dashboard?.SecretNotes ?? new List<SecretNoteDto>();
+            }
         }
         catch (Exception ex)
         {
@@ -496,6 +835,147 @@
             {
                 Logger.LogError(ex, "Failed to unlock note ID {Id}", note.Id);
             }
+        }
+    }
+
+    private void OpenCreateNoteModal()
+    {
+        isEditingExisting = false;
+        editingNoteId = null;
+        editorTitle = "";
+        editorPreviewHint = "";
+        editorContent = "";
+        editorStickerIcon = "💌";
+        editorIsSealed = true;
+        editorErrorMessage = null;
+        showNoteEditorModal = true;
+    }
+
+    private void OpenEditNoteModal(SecretNoteDto note)
+    {
+        isEditingExisting = true;
+        editingNoteId = note.Id;
+        editorTitle = note.Title;
+        editorPreviewHint = note.PreviewHint;
+        editorContent = note.Content ?? "";
+        editorStickerIcon = string.IsNullOrWhiteSpace(note.StickerIcon) ? "💌" : note.StickerIcon;
+        editorIsSealed = !note.IsUnlocked;
+        editorErrorMessage = null;
+        showNoteEditorModal = true;
+    }
+
+    private void SwitchToEditNote(SecretNoteDto note)
+    {
+        showSecretNoteModal = false;
+        OpenEditNoteModal(note);
+    }
+
+    private async Task SaveNoteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(editorTitle) || string.IsNullOrWhiteSpace(editorContent))
+        {
+            editorErrorMessage = "Please fill in both the note title and heartfelt letter content! 🌸";
+            return;
+        }
+
+        isSavingNote = true;
+        editorErrorMessage = null;
+
+        try
+        {
+            if (isEditingExisting && editingNoteId.HasValue)
+            {
+                var req = new UpdateSecretNoteRequest
+                {
+                    Title = editorTitle.Trim(),
+                    PreviewHint = string.IsNullOrWhiteSpace(editorPreviewHint) ? "Tap to break the seal and read 💕" : editorPreviewHint.Trim(),
+                    Content = editorContent.Trim(),
+                    StickerIcon = editorStickerIcon,
+                    IsUnlocked = !editorIsSealed
+                };
+
+                var updated = await ApiClient.UpdateNoteAsync(editingNoteId.Value, req);
+                if (updated != null)
+                {
+                    var idx = secretNotes?.FindIndex(n => n.Id == updated.Id) ?? -1;
+                    if (idx >= 0 && secretNotes != null)
+                    {
+                        secretNotes[idx] = updated;
+                    }
+                    if (activeSecretNote?.Id == updated.Id)
+                    {
+                        activeSecretNote = updated;
+                    }
+                    showNoteEditorModal = false;
+                    await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
+                }
+                else
+                {
+                    editorErrorMessage = "Could not update the note. Please try again.";
+                }
+            }
+            else
+            {
+                var req = new CreateSecretNoteRequest
+                {
+                    Title = editorTitle.Trim(),
+                    PreviewHint = string.IsNullOrWhiteSpace(editorPreviewHint) ? "Tap to break the seal and read 💕" : editorPreviewHint.Trim(),
+                    Content = editorContent.Trim(),
+                    StickerIcon = editorStickerIcon
+                };
+
+                var created = await ApiClient.CreateNoteAsync(req);
+                if (created != null)
+                {
+                    secretNotes?.Insert(0, created);
+                    showNoteEditorModal = false;
+                    await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
+                    await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
+                }
+                else
+                {
+                    editorErrorMessage = "Could not create the secret note. Please try again.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save secret note");
+            editorErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSavingNote = false;
+        }
+    }
+
+    private async Task DeleteCurrentNoteAsync()
+    {
+        if (!editingNoteId.HasValue) return;
+
+        isSavingNote = true;
+        try
+        {
+            var success = await ApiClient.DeleteNoteAsync(editingNoteId.Value);
+            if (success)
+            {
+                secretNotes?.RemoveAll(n => n.Id == editingNoteId.Value);
+                showNoteEditorModal = false;
+                showSecretNoteModal = false;
+            }
+            else
+            {
+                editorErrorMessage = "Could not delete the note. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete secret note");
+            editorErrorMessage = ex.Message;
+        }
+        finally
+        {
+            isSavingNote = false;
         }
     }
 }

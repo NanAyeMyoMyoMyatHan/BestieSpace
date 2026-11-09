@@ -8,7 +8,10 @@ namespace BestieSpace.Api.Features.Memories;
 public interface IMemoriesService
 {
     Task<List<MemoryDto>> GetAllMemoriesAsync();
+    Task<MemoryDto?> GetMemoryByIdAsync(int id);
     Task<MemoryDto> AddMemoryAsync(IFormFile? photo, string caption, string stickerType, DateTime? memoryDate);
+    Task<MemoryDto?> UpdateMemoryAsync(int id, IFormFile? photo, string? caption, string? stickerType, DateTime? memoryDate);
+    Task<bool> DeleteMemoryAsync(int id);
 }
 
 public class MemoriesService : IMemoriesService
@@ -39,6 +42,24 @@ public class MemoriesService : IMemoriesService
                 CreatedAt = m.CreatedAt
             })
             .ToListAsync();
+    }
+
+    public async Task<MemoryDto?> GetMemoryByIdAsync(int id)
+    {
+        var memory = await _context.Memories.FindAsync(id);
+        if (memory == null) return null;
+
+        return new MemoryDto
+        {
+            Id = memory.Id,
+            Caption = memory.Caption,
+            ImageUrl = memory.ImageUrl,
+            MemoryDate = memory.MemoryDate,
+            StickerType = memory.StickerType,
+            RotationAngle = memory.RotationAngle,
+            DisplayOrder = memory.DisplayOrder,
+            CreatedAt = memory.CreatedAt
+        };
     }
 
     public async Task<MemoryDto> AddMemoryAsync(IFormFile? photo, string caption, string stickerType, DateTime? memoryDate)
@@ -103,5 +124,63 @@ public class MemoriesService : IMemoriesService
             DisplayOrder = memory.DisplayOrder,
             CreatedAt = memory.CreatedAt
         };
+    }
+
+    public async Task<MemoryDto?> UpdateMemoryAsync(int id, IFormFile? photo, string? caption, string? stickerType, DateTime? memoryDate)
+    {
+        var memory = await _context.Memories.FindAsync(id);
+        if (memory == null) return null;
+
+        if (!string.IsNullOrWhiteSpace(caption))
+            memory.Caption = caption.Trim();
+
+        if (!string.IsNullOrWhiteSpace(stickerType))
+            memory.StickerType = stickerType.ToLowerInvariant().Trim();
+
+        if (memoryDate.HasValue)
+            memory.MemoryDate = memoryDate.Value;
+
+        if (photo != null && photo.Length > 0)
+        {
+            var webRoot = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
+            var uploadsDir = Path.Combine(webRoot, "uploads", "memories");
+            Directory.CreateDirectory(uploadsDir);
+
+            var ext = Path.GetExtension(photo.FileName);
+            if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await photo.CopyToAsync(stream);
+            }
+
+            memory.ImageUrl = $"/uploads/memories/{fileName}";
+        }
+
+        await _context.SaveChangesAsync();
+
+        return new MemoryDto
+        {
+            Id = memory.Id,
+            Caption = memory.Caption,
+            ImageUrl = memory.ImageUrl,
+            MemoryDate = memory.MemoryDate,
+            StickerType = memory.StickerType,
+            RotationAngle = memory.RotationAngle,
+            DisplayOrder = memory.DisplayOrder,
+            CreatedAt = memory.CreatedAt
+        };
+    }
+
+    public async Task<bool> DeleteMemoryAsync(int id)
+    {
+        var memory = await _context.Memories.FindAsync(id);
+        if (memory == null) return false;
+
+        _context.Memories.Remove(memory);
+        await _context.SaveChangesAsync();
+        return true;
     }
 }
