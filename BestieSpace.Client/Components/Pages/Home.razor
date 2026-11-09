@@ -195,204 +195,196 @@
 }
 
 <!-- =========================================================
-     STEP 1: INTERACTIVE WELCOME GATE
+     MAIN SCRAPBOOK 6-CARD DASHBOARD EXPERIENCE
      ========================================================= -->
-<div class="welcome-gate-overlay @(isGateOpen || currentUserSession == null ? "gate-hidden" : "")">
-    <div class="welcome-card">
-        <div class="floating-sticker sticker-1">🎀</div>
-        <div class="floating-sticker sticker-2">✨</div>
-        <div class="floating-sticker sticker-3">🧸</div>
-        <div class="floating-sticker sticker-4">💖</div>
-
-        <div class="welcome-icon-box">
-            <span>💌</span>
-        </div>
-
-        <h1 class="welcome-title" tabindex="-1">Hi My Sweet @(currentUserSession?.DisplayName ?? "Bestie")!</h1>
-        <p class="welcome-subtitle">
-            Welcome to our cozy, pastel clubhouse. <br />
-            Packed with our photos, heartfelt letters, secret envelopes, and live chat!
-        </p>
-
-        <button class="welcome-btn" @onclick="OpenWelcomeGate">
-            <span>Click to enter our clubhouse 💌</span>
-            <span style="font-size: 1.4rem;">✨</span>
-        </button>
-    </div>
-</div>
-
-<!-- =========================================================
-     STEP 2: MAIN DASHBOARD EXPERIENCE
-     ========================================================= -->
-<div class="main-wrapper" style="@(isGateOpen && currentUserSession != null ? "opacity: 1;" : "opacity: 0.05; pointer-events: none;") transition: opacity 0.6s ease;">
-    
-    <!-- Top Header -->
-    <header class="kawaii-header">
-        <div class="brand-badge">
-            <span>🌸</span>
-            <span>Est. 2026 • Forever & Always</span>
-            <span>🎀</span>
-        </div>
-        <h1 class="brand-title">Bestie<span>Space</span> 💕</h1>
-        <p class="brand-tagline">Our secret digital memory box & real-time clubhouse</p>
-    </header>
-
-    <!-- SECTION 1: HEARTFELT LETTER & MISS YOU METER -->
-    <section class="letter-section" id="letter-section">
-        <div class="stationery-card">
-            <div class="washi-tape-top"></div>
-
-            <div class="letter-header">
-                <div class="letter-title">
-                    <span>💌</span>
-                    <span>@(dashboard?.AppStats.MainLetterTitle ?? "To My Favorite Human in the Entire World 🌸")</span>
+@if (currentUserSession != null)
+{
+    <div class="home-scrapbook-wrapper">
+        <div class="home-scrapbook-grid">
+            <!-- Card 1: Polaroid Memories -->
+            <div class="scrapbook-feature-card" @onclick='() => Navigation.NavigateTo("/photos")'>
+                <div class="deco-checkered-tape tape-top-left" aria-hidden="true"></div>
+                <div class="deco-heart-sticker sticker-bottom-left" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 88C50 88 12 62 12 36C12 21 24 12 36 12C43 12 47 16 50 20C53 16 57 12 64 12C76 12 88 21 88 36C88 62 50 88 50 88Z" fill="#FFFFFF" filter="drop-shadow(0 2px 5px rgba(251,111,146,0.35))" />
+                        <path d="M50 82C50 82 18 58 18 36C18 24 27 18 36 18C42 18 46 22 50 26C54 22 58 18 64 18C73 18 82 24 82 36C82 58 50 82 50 82Z" fill="#FFAFCC" stroke="#FF8FAB" stroke-width="2" />
+                        <ellipse cx="35" cy="45" rx="4" ry="3" fill="#FF6584" opacity="0.6" />
+                        <ellipse cx="65" cy="45" rx="4" ry="3" fill="#FF6584" opacity="0.6" />
+                    </svg>
                 </div>
-                <div class="letter-from-to">
-                    <span>With all my love: @(dashboard?.AppStats.SenderNickname ?? "Me 🎀") ➜ @(dashboard?.AppStats.RecipientNickname ?? "Bestie 🌸")</span>
-                </div>
-            </div>
 
-            <div class="letter-content">
-                @(dashboard?.AppStats.MainLetterContent ?? "Loading our heartfelt letter...")
-            </div>
-
-            <!-- Miss You Meter Box -->
-            <div class="miss-you-box">
-                <div class="miss-you-info">
-                    <div class="miss-you-counter-badge">
-                        <div class="miss-you-counter-number">@missYouCount</div>
-                        <div class="miss-you-counter-label">Hugs Sent 💖</div>
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>📷</span>
                     </div>
-                    <div class="miss-you-desc">
-                        <div class="miss-you-desc-title">The Live Miss-You Meter 🌸</div>
-                        <div class="miss-you-desc-text">
-                            Every time you miss me, tap the button! It syncs in real time across the database and sends warm virtual hugs!
-                        </div>
+                    <div class="card-pill-badge">
+                        <span>@(dashboard?.Memories.Count ?? 6) Memories 💖</span>
                     </div>
                 </div>
 
-                <button class="btn-miss-you-hug" @onclick="HandleMissYouClick">
-                    <span>I Miss You Too! 💖</span>
-                    <span style="font-size: 1.4rem;">🧸</span>
+                <h2 class="card-title">Polaroid Memories</h2>
+                <p class="card-description">
+                    Browse our photo albums pinned with washi tape and cute stickers. Upload new photos and view zoomable polaroids.
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick='() => Navigation.NavigateTo("/photos")'>
+                    <span>Open Photo Album 📸</span>
+                </button>
+            </div>
+
+            <!-- Card 2: Mystery Envelopes -->
+            <div class="scrapbook-feature-card" @onclick='() => Navigation.NavigateTo("/notes")'>
+                <div class="deco-checkered-tape tape-top-right" aria-hidden="true"></div>
+                <div class="deco-sakura-sticker sticker-bottom-right" aria-hidden="true">
+                    <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
+                        <path d="M22 65 C12 60 14 46 26 48 C32 49 32 60 22 65 Z" fill="#A8D5BA" stroke="#FFFFFF" stroke-width="2.5" />
+                        <circle cx="50" cy="50" r="32" fill="#FFFFFF" filter="drop-shadow(0 3px 6px rgba(251,111,146,0.3))" />
+                        <path d="M50 20 C42 8 58 8 50 20 Z M76 38 C88 32 82 48 76 38 Z M68 70 C74 82 60 84 68 70 Z M32 70 C40 84 26 82 32 70 Z M24 38 C18 48 12 32 24 38 Z" fill="#FFB7C5" stroke="#FF8FAB" stroke-width="2" />
+                        <circle cx="50" cy="50" r="14" fill="#FFE5EC" stroke="#FF6584" stroke-width="2" />
+                        <circle cx="50" cy="50" r="6" fill="#FF8FAB" />
+                    </svg>
+                </div>
+
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>✉️</span>
+                    </div>
+                    <div class="card-pill-badge">
+                        <span>@(dashboard?.SecretNotes.Count(n => n.IsUnlocked) ?? 2) / @(dashboard?.SecretNotes.Count ?? 2) Opened 🎀</span>
+                    </div>
+                </div>
+
+                <h2 class="card-title">Mystery Envelopes</h2>
+                <p class="card-description">
+                    Break the wax seal on surprise letters and heartfelt handwritten notes created just for your eyes.
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick='() => Navigation.NavigateTo("/notes")'>
+                    <span>Open Secret Notes ✉️</span>
+                </button>
+            </div>
+
+            <!-- Card 3: Clubhouse & Circle Chat -->
+            <div class="scrapbook-feature-card" @onclick='() => Navigation.NavigateTo("/chat")'>
+                <div class="deco-star-sticker sticker-top-right" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 12 L61 36 L88 39 L68 58 L73 85 L50 71 L27 85 L32 58 L12 39 L39 36 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="6" stroke-linejoin="round" filter="drop-shadow(0 3px 6px rgba(255,183,77,0.35))" />
+                        <path d="M50 16 L59 36 L82 39 L65 56 L69 80 L50 68 L31 80 L35 56 L18 39 L41 36 Z" fill="#FFE082" stroke="#FFB74D" stroke-width="2" stroke-linejoin="round" />
+                        <circle cx="50" cy="48" r="3" fill="#FFFFFF" opacity="0.8" />
+                    </svg>
+                </div>
+
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>💬</span>
+                    </div>
+                    <div class="card-pill-badge badge-signalr">
+                        <span>⚡ Live SignalR</span>
+                    </div>
+                </div>
+
+                <h2 class="card-title">Clubhouse & Circle Chat</h2>
+                <p class="card-description">
+                    Real-time private group chats with photo sharing, cute sticker trays, audio voice messages, and per-user read receipts.
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick='() => Navigation.NavigateTo("/chat")'>
+                    <span>Enter Chat Room 💬</span>
+                </button>
+            </div>
+
+            <!-- Card 4: Bestie Circles -->
+            <div class="scrapbook-feature-card" @onclick='() => Navigation.NavigateTo("/circles")'>
+                <div class="deco-paperclip-sticker sticker-top-left" aria-hidden="true">
+                    <svg width="24" height="34" viewBox="0 0 24 34" fill="none">
+                        <path d="M12 16 C12 16 5 11 5 6 C5 3 7.5 1 10.5 1 C12 1 12.5 2 13 3 C13.5 2 14 1 15.5 1 C18.5 1 21 3 21 6 C21 11 12 16 12 16" fill="#FF8FAB" stroke="#FFFFFF" stroke-width="1.8" filter="drop-shadow(0 2px 4px rgba(255,143,171,0.4))" />
+                        <path d="M7 12 V24 C7 27.5 9 30 12 30 C15 30 17 27.5 17 24 V8 C17 6 15.5 4 13.5 4 C11.5 4 10 6 10 8 V23 C10 24.5 11 25.5 12 25.5 C13 25.5 14 24.5 14 23 V10" stroke="#FFCCD5" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </div>
+
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>👑</span>
+                    </div>
+                    <div class="card-pill-badge">
+                        <span>Up to 9 Besties 🎀</span>
+                    </div>
+                </div>
+
+                <h2 class="card-title">Bestie Circles</h2>
+                <p class="card-description">
+                    Manage private friend circles. Invite close friends, view membership rosters, and customize circle icons and details.
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick='() => Navigation.NavigateTo("/circles")'>
+                    <span>Manage Circles 👑</span>
+                </button>
+            </div>
+
+            <!-- Card 5: Friends & Profiles -->
+            <div class="scrapbook-feature-card" @onclick='() => Navigation.NavigateTo("/friends")'>
+                <div class="deco-checkered-tape tape-top-right" aria-hidden="true"></div>
+                <div class="deco-heart-sticker sticker-bottom-right" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 100 100" fill="none">
+                        <path d="M50 88C50 88 12 62 12 36C12 21 24 12 36 12C43 12 47 16 50 20C53 16 57 12 64 12C76 12 88 21 88 36C88 62 50 88 50 88Z" fill="#FFFFFF" filter="drop-shadow(0 2px 5px rgba(251,111,146,0.35))" />
+                        <path d="M50 82C50 82 18 58 18 36C18 24 27 18 36 18C42 18 46 22 50 26C54 22 58 18 64 18C73 18 82 24 82 36C82 58 50 82 50 82Z" fill="#FFAFCC" stroke="#FF8FAB" stroke-width="2" />
+                        <ellipse cx="35" cy="45" rx="4" ry="3" fill="#FF6584" opacity="0.6" />
+                        <ellipse cx="65" cy="45" rx="4" ry="3" fill="#FF6584" opacity="0.6" />
+                    </svg>
+                </div>
+
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>👭</span>
+                    </div>
+                    <div class="card-pill-badge">
+                        <span>Social Hub 🌸</span>
+                    </div>
+                </div>
+
+                <h2 class="card-title">Friends & Profiles</h2>
+                <p class="card-description">
+                    Search for besties, manage incoming friend requests, update your display name, bio, and choose your favorite avatar sticker.
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick='() => Navigation.NavigateTo("/friends")'>
+                    <span>View Friends Hub 👭</span>
+                </button>
+            </div>
+
+            <!-- Card 6: Official VIP Pass -->
+            <div class="scrapbook-feature-card" @onclick="() => showVipModal = true">
+                <div class="deco-sakura-sticker sticker-top-right" aria-hidden="true">
+                    <svg width="34" height="34" viewBox="0 0 100 100" fill="none">
+                        <path d="M22 65 C12 60 14 46 26 48 C32 49 32 60 22 65 Z" fill="#A8D5BA" stroke="#FFFFFF" stroke-width="2.5" />
+                        <circle cx="50" cy="50" r="32" fill="#FFFFFF" filter="drop-shadow(0 3px 6px rgba(251,111,146,0.3))" />
+                        <path d="M50 20 C42 8 58 8 50 20 Z M76 38 C88 32 82 48 76 38 Z M68 70 C74 82 60 84 68 70 Z M32 70 C40 84 26 82 32 70 Z M24 38 C18 48 12 32 24 38 Z" fill="#FFB7C5" stroke="#FF8FAB" stroke-width="2" />
+                        <circle cx="50" cy="50" r="14" fill="#FFE5EC" stroke="#FF6584" stroke-width="2" />
+                        <circle cx="50" cy="50" r="6" fill="#FF8FAB" />
+                    </svg>
+                </div>
+
+                <div class="card-top-row">
+                    <div class="card-icon-frame">
+                        <span>🎟️</span>
+                    </div>
+                    <div class="card-pill-badge">
+                        <span>Keepsake Pass 🎀</span>
+                    </div>
+                </div>
+
+                <h2 class="card-title">Official VIP Pass</h2>
+                <p class="card-description">
+                    View, copy, or print your official Bestie Clubhouse VIP Pass to invite your best friends into your cozy circle!
+                </p>
+
+                <button type="button" class="btn-card-action" @onclick:stopPropagation="true" @onclick="() => showVipModal = true">
+                    <span>View VIP Pass 🎟️</span>
                 </button>
             </div>
         </div>
-    </section>
-
-    <!-- SECTION 2: CLUBHOUSE FEATURE MENU GRID -->
-    <section class="features-menu-section">
-        <div class="section-header-center">
-            <span class="badge-pill-kawaii">🌸 Clubhouse Navigation Menu</span>
-            <h2 class="section-title">Explore BestieSpace Features</h2>
-            <p class="section-subtitle">Everything is organized cleanly into dedicated spaces for you and your besties 💕</p>
-        </div>
-
-        <div class="features-cards-grid">
-            <!-- Feature 1: Polaroid Photos -->
-            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/photos")'>
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">📸</span>
-                    <span class="feature-badge">@(dashboard?.Memories.Count ?? 0) Memories</span>
-                </div>
-                <h3 class="feature-card-title">Polaroid Memories</h3>
-                <p class="feature-card-desc">
-                    Browse our photo albums pinned with washi tape and cute stickers. Upload new photos and view zoomable polaroids.
-                </p>
-                <div class="feature-card-footer">
-                    <a href="/photos" class="btn-feature-link" @onclick:stopPropagation="true">
-                        <span>Open Photo Album 📸</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Feature 2: Secret Notes -->
-            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/notes")'>
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">✉️</span>
-                    <span class="feature-badge">@(dashboard?.SecretNotes.Count(n => n.IsUnlocked) ?? 0) / @(dashboard?.SecretNotes.Count ?? 0) Opened</span>
-                </div>
-                <h3 class="feature-card-title">Mystery Envelopes</h3>
-                <p class="feature-card-desc">
-                    Break the wax seal on surprise letters and heartfelt handwritten notes created just for your eyes.
-                </p>
-                <div class="feature-card-footer">
-                    <a href="/notes" class="btn-feature-link" @onclick:stopPropagation="true">
-                        <span>Open Secret Notes ✉️</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Feature 3: Private Chat -->
-            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/chat")'>
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">💬</span>
-                    <span class="feature-badge badge-signalr">⚡ Live SignalR</span>
-                </div>
-                <h3 class="feature-card-title">Clubhouse & Circle Chat</h3>
-                <p class="feature-card-desc">
-                    Real-time private group chats with photo sharing, cute sticker trays, audio voice messages, and per-user read receipts.
-                </p>
-                <div class="feature-card-footer">
-                    <a href="/chat" class="btn-feature-link" @onclick:stopPropagation="true">
-                        <span>Enter Chat Room 💬</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Feature 4: Bestie Circles -->
-            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/circles")'>
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">👑</span>
-                    <span class="feature-badge">Up to 9 Besties</span>
-                </div>
-                <h3 class="feature-card-title">Bestie Circles</h3>
-                <p class="feature-card-desc">
-                    Manage private friend circles. Invite close friends, view membership rosters, and customize circle icons and details.
-                </p>
-                <div class="feature-card-footer">
-                    <a href="/circles" class="btn-feature-link" @onclick:stopPropagation="true">
-                        <span>Manage Circles 👑</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Feature 5: Friends & Profile -->
-            <div class="feature-menu-card" @onclick='() => Navigation.NavigateTo("/friends")'>
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">👭</span>
-                    <span class="feature-badge">Social Hub</span>
-                </div>
-                <h3 class="feature-card-title">Friends & Profiles</h3>
-                <p class="feature-card-desc">
-                    Search for besties, manage incoming friend requests, update your display name, bio, and choose your favorite avatar sticker.
-                </p>
-                <div class="feature-card-footer">
-                    <a href="/friends" class="btn-feature-link" @onclick:stopPropagation="true">
-                        <span>View Friends Hub 👭</span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Feature 6: VIP Pass Keepsake -->
-            <div class="feature-menu-card card-vip-keepsake" @onclick="() => showVipModal = true">
-                <div class="feature-card-header">
-                    <span class="feature-card-icon">🎟️</span>
-                    <span class="feature-badge">Keepsake Pass</span>
-                </div>
-                <h3 class="feature-card-title">Official VIP Pass</h3>
-                <p class="feature-card-desc">
-                    View, copy, or print your official Bestie Clubhouse VIP Pass to invite your best friends into your cozy circle!
-                </p>
-                <div class="feature-card-footer">
-                    <button type="button" class="btn-feature-link btn-vip-link" @onclick:stopPropagation="true" @onclick="() => showVipModal = true">
-                        <span>View VIP Pass 🎟️</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-</div>
+    </div>
+}
 
 <!-- =========================================================
      MODAL: CUTE VIP INVITATION PASS
@@ -460,163 +452,239 @@
 }
 
 <style>
-/* Dashboard Specific Styles */
-.features-menu-section {
-    max-width: 1100px;
-    margin: 40px auto 80px auto;
-    padding: 0 20px;
+/* Scrapbook 6-Card Dashboard Layout */
+.home-scrapbook-wrapper {
+    max-width: 1220px;
+    margin: 14px auto 60px auto;
+    padding: 0 16px;
+    font-family: 'Fredoka', 'Quicksand', sans-serif;
 }
 
-.section-header-center {
-    text-align: center;
-    margin-bottom: 32px;
-}
-
-.badge-pill-kawaii {
-    display: inline-block;
-    background: #FFF0F5;
-    color: #FB6F92;
-    border: 1.5px solid #FFC2D1;
-    font-size: 0.88rem;
-    font-weight: 700;
-    padding: 6px 16px;
-    border-radius: 9999px;
-    margin-bottom: 12px;
-}
-
-.section-header-center .section-title {
-    color: #4A3B3C;
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.section-header-center .section-subtitle {
-    color: #7E6566;
-    font-size: 1.05rem;
-}
-
-.features-cards-grid {
+.home-scrapbook-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 28px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px 22px;
 }
 
-.feature-menu-card {
-    background: linear-gradient(135deg, #FFFFFF 0%, #FFFDF9 100%);
-    border: 3px solid #FFC2D1;
+@@media (max-width: 1024px) {
+    .home-scrapbook-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@@media (max-width: 680px) {
+    .home-scrapbook-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Individual Scrapbook Card Frame */
+.scrapbook-feature-card {
+    background: #FFFFFF;
+    border: 2px solid #FFD1DC;
     border-radius: 26px;
-    padding: 26px 24px;
-    box-shadow: 0 10px 24px rgba(255, 143, 171, 0.16);
-    cursor: pointer;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+    padding: 24px 22px 20px 22px;
+    position: relative;
+    box-shadow: 0 8px 24px rgba(255, 143, 171, 0.14), 0 2px 6px rgba(74, 59, 60, 0.04);
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.25s ease, border-color 0.25s ease;
+    cursor: pointer;
 }
 
-.feature-menu-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 16px 36px rgba(251, 111, 146, 0.28);
-    border-color: #FB6F92;
+.scrapbook-feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 32px rgba(255, 112, 147, 0.24);
+    border-color: #FF8FAB;
 }
 
-.feature-card-header {
+/* Card Top Row */
+.card-top-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
-.feature-card-icon {
-    font-size: 2.4rem;
-    background: #FFF0F5;
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
+.card-icon-frame {
+    width: 48px;
+    height: 48px;
+    background: #FFF5F8;
+    border: 1.5px solid #FFCCD5;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid #FFC2D1;
-    transition: transform 0.2s ease;
+    font-size: 24px;
+    box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(255, 143, 171, 0.12);
 }
 
-.feature-menu-card:hover .feature-card-icon {
-    transform: scale(1.1) rotate(5deg);
-}
-
-.feature-badge {
+.card-pill-badge {
     background: #FFF0F5;
-    color: #FB6F92;
-    font-size: 0.8rem;
+    border: 1.5px solid #FFCCD5;
+    color: #FF5D8F;
+    font-size: 0.82rem;
     font-weight: 700;
-    padding: 5px 12px;
+    padding: 4px 13px;
     border-radius: 9999px;
-    border: 1px solid #FFC2D1;
+    letter-spacing: -0.2px;
 }
 
-.feature-badge.badge-signalr {
-    background: #E2F0CB;
-    color: #4A6B2C;
-    border-color: #C5E1A5;
+.card-pill-badge.badge-signalr {
+    background: #E8F8F0;
+    border: 1.5px solid #A3E4D7;
+    color: #2E7D32;
 }
 
-.feature-card-title {
-    color: #4A3B3C;
+.card-title {
+    font-family: 'Fredoka', cursive, sans-serif;
     font-size: 1.35rem;
     font-weight: 700;
-    margin-bottom: 8px;
+    color: #4A3B3C;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.3px;
 }
 
-.feature-card-desc {
+.card-description {
+    font-family: 'Quicksand', sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.52;
     color: #7E6566;
-    font-size: 0.95rem;
-    line-height: 1.5;
     margin-bottom: 20px;
-    flex: 1;
+    min-height: 64px;
+    flex-grow: 1;
 }
 
-.feature-card-footer {
-    margin-top: auto;
-}
-
-.btn-feature-link {
+/* Full-Width Pink Action Button */
+.btn-card-action {
+    width: 100%;
+    height: 42px;
+    background: linear-gradient(135deg, #FF758F 0%, #FF5D8F 100%);
+    border: none;
+    border-radius: 9999px;
+    color: #FFFFFF;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    width: 100%;
-    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
-    color: #FFFFFF !important;
-    text-decoration: none;
-    font-weight: 700;
-    font-size: 0.95rem;
-    padding: 12px;
-    border-radius: 14px;
-    box-shadow: 0 4px 14px rgba(251, 111, 146, 0.3);
-    transition: transform 0.2s, box-shadow 0.2s;
-    border: none;
+    gap: 6px;
+    box-shadow: 0 4px 12px rgba(255, 93, 143, 0.32);
     cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.btn-feature-link:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(251, 111, 146, 0.45);
+.btn-card-action:hover {
+    background: linear-gradient(135deg, #FF5D8F 0%, #F72585 100%);
+    transform: scale(1.02);
+    box-shadow: 0 6px 16px rgba(255, 93, 143, 0.45);
 }
 
-.btn-vip-link {
-    background: linear-gradient(135deg, #FFB703 0%, #FB8500 100%);
-    box-shadow: 0 4px 14px rgba(251, 133, 0, 0.3);
+/* =========================================================
+   DECORATIVE SCRAPBOOK STICKERS FOR CARDS
+   ========================================================= */
+
+/* Pink Checkered / Gingham Washi Tape */
+.deco-checkered-tape {
+    position: absolute;
+    width: 54px;
+    height: 22px;
+    background-color: #FFF0F5;
+    background-image: 
+        linear-gradient(45deg, rgba(255, 143, 171, 0.45) 25%, transparent 25%, transparent 75%, rgba(255, 143, 171, 0.45) 75%),
+        linear-gradient(45deg, rgba(255, 143, 171, 0.45) 25%, transparent 25%, transparent 75%, rgba(255, 143, 171, 0.45) 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 4px 4px;
+    border-left: 2px dashed rgba(255, 105, 180, 0.55);
+    border-right: 2px dashed rgba(255, 105, 180, 0.55);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0.92;
 }
 
-.btn-vip-link:hover {
-    box-shadow: 0 6px 18px rgba(251, 133, 0, 0.45);
+.tape-top-left {
+    top: -10px;
+    left: -10px;
+    transform: rotate(-24deg);
+}
+
+.tape-top-right {
+    top: -10px;
+    right: -10px;
+    transform: rotate(24deg);
+}
+
+/* Pink Heart Sticker */
+.deco-heart-sticker {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+}
+
+.sticker-bottom-left {
+    bottom: -12px;
+    left: -10px;
+    transform: rotate(-14deg);
+}
+
+.sticker-bottom-right {
+    bottom: -12px;
+    right: -10px;
+    transform: rotate(14deg);
+}
+
+/* Sakura Flower Sticker */
+.deco-sakura-sticker {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+}
+
+.sticker-bottom-right.deco-sakura-sticker {
+    bottom: -14px;
+    right: -12px;
+    transform: rotate(8deg);
+}
+
+.sticker-top-right.deco-sakura-sticker {
+    top: -14px;
+    right: -12px;
+    transform: rotate(12deg);
+}
+
+/* Yellow Star Sticker */
+.deco-star-sticker {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+}
+
+.sticker-top-right.deco-star-sticker {
+    top: -14px;
+    right: -10px;
+    transform: rotate(15deg);
+}
+
+/* Heart Paperclip Sticker */
+.deco-paperclip-sticker {
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+}
+
+.sticker-top-left.deco-paperclip-sticker {
+    top: -16px;
+    left: -8px;
+    transform: rotate(-10deg);
 }
 </style>
 
 @code {
     private DashboardDto? dashboard;
     private int missYouCount = 0;
-    private bool isGateOpen = false;
 
     // Login Gate State
     private UserSessionDto? currentUserSession;
@@ -643,7 +711,6 @@
         if (AuthProvider.CurrentUser != null)
         {
             currentUserSession = AuthProvider.CurrentUser;
-            isGateOpen = true;
         }
 
         await LoadDashboardAsync();
@@ -658,7 +725,6 @@
             if (AuthProvider.CurrentUser != null)
             {
                 currentUserSession = AuthProvider.CurrentUser;
-                isGateOpen = true;
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -735,7 +801,6 @@
             if (res.IsSuccess && res.User != null)
             {
                 currentUserSession = res.User;
-                isGateOpen = true;
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
                 enteredPin = "";
@@ -787,7 +852,6 @@
             if (res.IsSuccess && res.User != null)
             {
                 currentUserSession = res.User;
-                isGateOpen = true;
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.playCutePopSound");
                 await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
             }
@@ -832,12 +896,6 @@
             isLoginWiggling = false;
             await InvokeAsync(StateHasChanged);
         });
-    }
-
-    private async Task OpenWelcomeGate()
-    {
-        isGateOpen = true;
-        await JSRuntime.InvokeVoidAsync("bestieAnimations.triggerConfettiBurst");
     }
 
     private async Task HandleMissYouClick()
