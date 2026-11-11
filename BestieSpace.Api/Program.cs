@@ -33,9 +33,6 @@ builder.Services.AddDbContext<BestieDbContext>(options =>
             errorNumbersToAdd: null);
     }));
 
-// Register SQLite-to-SQL Server Data Migrator
-builder.Services.AddScoped<SqliteToSqlServerDataMigrator>();
-
 // Add Feature Services
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IMemoriesService, MemoriesService>();

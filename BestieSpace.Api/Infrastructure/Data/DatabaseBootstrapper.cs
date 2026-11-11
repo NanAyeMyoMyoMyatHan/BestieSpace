@@ -75,28 +75,7 @@ public static class DatabaseBootstrapper
             }
         }
 
-        // 2. Safe one-time SQLite-to-SQL Server data import
-        try
-        {
-            var dataDir = Environment.GetEnvironmentVariable("DATA_DIR");
-            var sqliteCandidate1 = !string.IsNullOrWhiteSpace(dataDir) ? Path.Combine(dataDir, "bestiespace.db") : null;
-            var sqliteCandidate2 = Path.Combine(environment.ContentRootPath, "bestiespace.db");
-            var sqliteDbPath = (sqliteCandidate1 != null && File.Exists(sqliteCandidate1))
-                ? sqliteCandidate1
-                : sqliteCandidate2;
-
-            if (File.Exists(sqliteDbPath))
-            {
-                var migrator = scope.ServiceProvider.GetRequiredService<SqliteToSqlServerDataMigrator>();
-                await migrator.MigrateIfSourceExistsAsync(sqliteDbPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger?.LogError(ex, "Error occurred during SQLite-to-SQL Server data migration.");
-        }
-
-        // 3. Seed initial heartfelt data & system roles/permissions if not yet populated
+        // 2. Seed initial heartfelt data & system roles/permissions if not yet populated
         await SeedDataAsync(context);
     }
 
