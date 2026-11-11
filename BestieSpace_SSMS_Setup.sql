@@ -5,19 +5,13 @@
 -- User: sa / sasa@123
 -- ==============================================================================
 
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'BestieSpaceDb')
-BEGIN
-    PRINT 'Creating database [BestieSpaceDb]...';
-    CREATE DATABASE [BestieSpaceDb];
-END
-ELSE
-BEGIN
-    PRINT 'Database [BestieSpaceDb] already exists.';
-END
-GO
-
-USE [BestieSpaceDb];
-GO
+-- ==============================================================================
+-- Cloud Hosting & Local SSMS Setup Script
+-- Note:
+-- On Cloud Hosting (MonsterASP / SmarterASP): The panel executes this directly
+-- inside your assigned database (e.g. db79191). No CREATE DATABASE or USE needed!
+-- On Local SSMS: Select your target database (e.g. BestieSpaceDb) before executing.
+-- ==============================================================================
 
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
