@@ -1,8 +1,156 @@
-.bestiespace-app {
+.bestiespace-layout {
     min-height: 100vh;
     display: flex;
+    flex-direction: row;
+    background-color: #FDF1F4; /* Ultra-soft pastel blush pink matching user screenshot */
+    background-image: 
+        radial-gradient(#FFCCD9 0.75px, transparent 0.75px), 
+        radial-gradient(#FFE5EC 0.75px, #FDF1F4 0.75px);
+    background-size: 32px 32px;
+    background-position: 0 0, 16px 16px;
+    padding: 20px;
+    gap: 24px;
+    box-sizing: border-box;
+    font-family: 'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Main stage takes remaining horizontal space */
+.bestiespace-stage {
+    flex: 1;
+    min-width: 0;
+    display: flex;
     flex-direction: column;
-    background-color: var(--bg-cream, #FFFDF9);
+    gap: 18px;
+}
+
+/* Top App Bar */
+.bestiespace-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: transparent;
+}
+
+/* Search Card */
+.topbar-search-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #FFFFFF;
+    border: 1.5px solid #FFD9E6;
+    border-radius: 9999px;
+    padding: 9px 20px;
+    box-shadow: 0 4px 16px rgba(251, 111, 146, 0.08);
+    max-width: 360px;
+    width: 100%;
+    transition: all 0.2s ease;
+}
+
+.topbar-search-card:focus-within {
+    border-color: #FB6F92;
+    box-shadow: 0 6px 20px rgba(251, 111, 146, 0.18);
+}
+
+.search-icon {
+    font-size: 1rem;
+    color: #B38692;
+}
+
+.topbar-search-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.95rem;
+    color: #4A3B3C;
+    width: 100%;
+    font-family: inherit;
+    font-weight: 500;
+}
+
+.topbar-search-input::placeholder {
+    color: #B38692;
+}
+
+/* Topbar Actions */
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-topbar-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 9999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: none;
+}
+
+.btn-premium-pill {
+    background: linear-gradient(135deg, #B584E8, #9B62D4);
+    color: #FFFFFF;
+    box-shadow: 0 4px 14px rgba(181, 132, 232, 0.35);
+}
+
+.btn-premium-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(181, 132, 232, 0.45);
+    color: #FFFFFF;
+}
+
+.crown-icon {
+    font-size: 1.05rem;
+}
+
+.btn-topbar-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 1.5px solid #FFD9E6;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    color: #4A3B3C;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.08);
+    transition: all 0.2s ease;
+}
+
+.btn-topbar-icon:hover {
+    transform: translateY(-2px);
+    border-color: #FB6F92;
+    background: #FFF5F8;
+    color: #FB6F92;
+}
+
+.topbar-avatar-pill {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #FFE5EC;
+    border: 2px solid #FF8FAB;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.15);
+    transition: all 0.2s ease;
+}
+
+.topbar-avatar-pill:hover {
+    transform: scale(1.08);
+    border-color: #FB6F92;
 }
 
 .bestiespace-main {
@@ -42,4 +190,28 @@
     right: 1.25rem;
     top: 0.75rem;
     font-size: 1.2rem;
+}
+
+/* Mobile & Tablet Adjustments (< 992px) */
+@media (max-width: 991px) {
+    .bestiespace-layout {
+        flex-direction: column;
+        padding: 12px;
+        gap: 14px;
+    }
+
+    .bestiespace-topbar {
+        flex-wrap: wrap;
+    }
+
+    .topbar-search-card {
+        order: 2;
+        max-width: 100%;
+    }
+
+    .topbar-actions {
+        order: 1;
+        width: 100%;
+        justify-content: flex-end;
+    }
 }

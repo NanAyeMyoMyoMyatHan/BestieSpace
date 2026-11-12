@@ -5,839 +5,231 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject BestieAuthenticationStateProvider BestieAuth
 @inject NavigationManager Navigation
+@implements IDisposable
 
-<header class="scrapbook-navbar-container">
-    <div class="scrapbook-navbar-card">
-        <!-- Decorative Scrapbook Detail 1: Top-left washi tape -->
-        <div class="scrapbook-tape-tl" aria-hidden="true"></div>
+<!-- =========================================================
+     MOBILE TOP BAR (Visible only on screens < 992px)
+     ========================================================= -->
+<div class="sidebar-mobile-bar">
+    <NavLink href="" class="mobile-brand-link" Match="NavLinkMatch.All">
+        <span class="mobile-brand-icon">🍓</span>
+        <span class="mobile-brand-text">Bestie<span>Space</span> 💕</span>
+    </NavLink>
 
-        <!-- Decorative Scrapbook Detail 4: Top-right pink gingham tape -->
-        <div class="scrapbook-tape-tr-checkered" aria-hidden="true"></div>
+    <div class="mobile-actions">
+        <AuthorizeView>
+            <Authorized>
+                <NotificationCenter />
+            </Authorized>
+        </AuthorizeView>
 
-        <!-- Brand Logo (Left) -->
-        <NavLink href="" class="navbar-brand" Match="NavLinkMatch.All">
-            <span class="brand-strawberry-icon">🍓</span>
-            <span class="brand-name">Bestie<span class="brand-name-highlight">Space</span> 🌸</span>
+        <button type="button" class="btn-hamburger" @onclick="ToggleMobileMenu" aria-label="Toggle navigation">
+            <span>@(isMobileMenuOpen ? "✕" : "☰")</span>
+        </button>
+    </div>
+</div>
+
+<!-- =========================================================
+     MOBILE DRAWER BACKDROP OVERLAY
+     ========================================================= -->
+@if (isMobileMenuOpen)
+{
+    <div class="sidebar-drawer-backdrop" @onclick="CloseMobileMenu"></div>
+}
+
+<!-- =========================================================
+     LEFT SIDEBAR NAVIGATION CARD (Matching Reference Image)
+     ========================================================= -->
+<aside class="bestie-sidebar @(isMobileMenuOpen ? "drawer-open" : "")">
+    <div class="sidebar-card">
+        <!-- 1. Brand Logo Header -->
+        <NavLink href="" class="sidebar-brand-header" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
+            <div class="brand-heart-emblem">
+                <svg width="46" height="46" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100" height="100" rx="30" fill="#FFE5EC"/>
+                    <!-- Two besties silhouettes hugging inside sweet heart -->
+                    <path d="M50 82C50 82 18 60 18 38C18 24 29 16 41 16C47 16 50 19 50 23C50 19 53 16 59 16C71 16 82 24 82 38C82 60 50 82 50 82Z" fill="#FB6F92"/>
+                    <!-- Cute bestie head silhouettes -->
+                    <circle cx="41" cy="36" r="6.5" fill="#FFFFFF"/>
+                    <circle cx="59" cy="36" r="6.5" fill="#FFFFFF"/>
+                    <path d="M33 55 C33 46 47 46 47 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M53 55 C53 46 67 46 67 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="brand-text-block">
+                <div class="brand-main-title">Bestie<span>Space</span></div>
+                <div class="brand-sub-tagline">Better Together ♡</div>
+            </div>
         </NavLink>
 
-        <!-- Desktop Navigation Items (Center) -->
-        <nav class="navbar-links">
-            <div class="nav-home-anchor">
-                <div class="scrapbook-paperclip-home" aria-hidden="true" title="Paperclip 📎💖">
-                    <svg width="22" height="32" viewBox="0 0 24 34" fill="none">
-                        <path d="M12 16 C12 16 5 11 5 6 C5 3 7.5 1 10.5 1 C12 1 12.5 2 13 3 C13.5 2 14 1 15.5 1 C18.5 1 21 3 21 6 C21 11 12 16 12 16" fill="#FF8FAB" stroke="#FFFFFF" stroke-width="1.8" filter="drop-shadow(0 2px 4px rgba(255,143,171,0.4))" />
-                        <path d="M7 12 V24 C7 27.5 9 30 12 30 C15 30 17 27.5 17 24 V8 C17 6 15.5 4 13.5 4 C11.5 4 10 6 10 8 V23 C10 24.5 11 25.5 12 25.5 C13 25.5 14 24.5 14 23 V10" stroke="#FFCCD5" stroke-width="2" stroke-linecap="round" />
-                    </svg>
-                </div>
-                <NavLink class="nav-link-item" href="" Match="NavLinkMatch.All">
-                    <span class="nav-icon">🏠</span>
-                    <span class="nav-text">Home</span>
-                </NavLink>
-            </div>
-
-            <NavLink class="nav-link-item" href="photos">
-                <span class="nav-icon">📷</span>
-                <span class="nav-text">Photos</span>
+        <!-- 2. Navigation Menu Links (Vertical List Matching Reference Image) -->
+        <nav class="sidebar-nav-items">
+            <!-- 🏠 Home -->
+            <NavLink class="sidebar-nav-link" href="" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">🏠</span>
+                <span class="nav-item-text">Home</span>
             </NavLink>
 
-            <NavLink class="nav-link-item" href="notes">
-                <span class="nav-icon">✉️</span>
-                <span class="nav-text">Notes</span>
+            <!-- 👥 Friends -->
+            <NavLink class="sidebar-nav-link" href="friends" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">👥</span>
+                <span class="nav-item-text">Friends</span>
             </NavLink>
 
-            <NavLink class="nav-link-item" href="chat">
-                <span class="nav-icon">💬</span>
-                <span class="nav-text">Chat</span>
+            <!-- 💬 Messages -->
+            <NavLink class="sidebar-nav-link" href="chat" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">💬</span>
+                <span class="nav-item-text">Messages</span>
                 @if (unreadChatCount > 0)
                 {
-                    <span class="nav-unread-dot">@unreadChatCount</span>
+                    <span class="nav-counter-pill">@unreadChatCount</span>
                 }
             </NavLink>
 
-            <NavLink class="nav-link-item" href="circles">
-                <span class="nav-icon">👑</span>
-                <span class="nav-text">Circles</span>
+            <!-- 🕒 Memories / Photos -->
+            <NavLink class="sidebar-nav-link" href="photos" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">🕒</span>
+                <span class="nav-item-text">Memories</span>
             </NavLink>
 
-            <NavLink class="nav-link-item" href="friends">
-                <span class="nav-icon">👭</span>
-                <span class="nav-text">Friends</span>
+            <!-- ✉️ Notes -->
+            <NavLink class="sidebar-nav-link" href="notes" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">✉️</span>
+                <span class="nav-item-text">Notes</span>
             </NavLink>
 
+            <!-- 🧭 Explore / Circles -->
+            <NavLink class="sidebar-nav-link" href="circles" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">🧭</span>
+                <span class="nav-item-text">Explore</span>
+            </NavLink>
+
+            <!-- 🔔 Notifications -->
+            <NavLink class="sidebar-nav-link" href="friends" @onclick="CloseMobileMenu">
+                <span class="nav-item-icon">🔔</span>
+                <span class="nav-item-text">Notifications</span>
+                @if (unreadNotificationCount > 0)
+                {
+                    <span class="nav-counter-pill">@unreadNotificationCount</span>
+                }
+            </NavLink>
+
+            <!-- ⚙️ Settings / Admin -->
             @if (isAdmin)
             {
-                <NavLink class="nav-link-item admin-link" href="admin/rbac">
-                    <span class="nav-icon">🛡️</span>
-                    <span class="nav-text">Admin</span>
+                <NavLink class="sidebar-nav-link admin-nav-link" href="admin/rbac" @onclick="CloseMobileMenu">
+                    <span class="nav-item-icon">⚙️</span>
+                    <span class="nav-item-text">Admin Settings</span>
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="sidebar-nav-link" href="friends" @onclick="CloseMobileMenu">
+                    <span class="nav-item-icon">⚙️</span>
+                    <span class="nav-item-text">Settings</span>
                 </NavLink>
             }
         </nav>
 
-        <!-- Utility Actions (Right: Notifications, User Profile, Sign Out) -->
-        <div class="navbar-actions">
+        <!-- 3. Decorative Good Friends Good Vibes Sticker (Matching Reference Image) -->
+        <div class="sidebar-sticker-card">
+            <div class="sticker-vibe-quote">Good Friends<br/>Good Vibes ♡</div>
+            <div class="bestie-group-art">
+                <svg width="190" height="96" viewBox="0 0 200 105" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Little floating hearts & sparkles -->
+                    <path d="M22 22 C22 17 15 13 10 17 C5 13 0 17 0 22 C0 29 10 36 10 36 C10 36 22 29 22 22 Z" fill="#FFAFCC" opacity="0.8"/>
+                    <path d="M198 18 C198 13 191 10 187 13 C183 10 177 13 177 18 C177 25 187 31 187 31 C187 31 198 25 198 18 Z" fill="#FFAFCC" opacity="0.8"/>
+                    <circle cx="100" cy="10" r="3" fill="#FFC2D1"/>
+                    <circle cx="65" cy="16" r="2.5" fill="#FB6F92"/>
+                    <circle cx="135" cy="16" r="2.5" fill="#FB6F92"/>
+
+                    <!-- 4 Besties Hugging from Behind (Artwork matching user photo) -->
+                    <!-- Bestie 1 (Leftmost, pink hoodie) -->
+                    <path d="M42 42 C42 30 54 30 54 42 C54 45 53 48 52 53 L43 53 C42 48 42 45 42 42 Z" fill="#5C3828"/>
+                    <rect x="38" y="52" width="22" height="46" rx="8" fill="#F8B4C8"/>
+                    <!-- Bestie 2 (Brown hair, white sweater) -->
+                    <path d="M64 36 C62 26 78 24 79 36 C79 41 77 46 77 52 L65 52 C65 46 64 41 64 36 Z" fill="#3D261C"/>
+                    <rect x="61" y="52" width="24" height="48" rx="8" fill="#FFFFFF" stroke="#FFCCD5" stroke-width="1.5"/>
+                    <!-- Bestie 3 (Warm brown hair, blush sweater) -->
+                    <path d="M89 38 C87 28 103 26 104 38 C104 43 102 48 102 53 L90 53 C90 48 89 43 89 38 Z" fill="#7A4B3A"/>
+                    <rect x="86" y="53" width="24" height="47" rx="8" fill="#FFCCD9"/>
+                    <!-- Bestie 4 (Rightmost, lavender sweater) -->
+                    <path d="M113 40 C111 30 125 28 126 40 C126 44 124 49 124 54 L114 54 C114 49 113 44 113 40 Z" fill="#2E1C14"/>
+                    <rect x="111" y="53" width="22" height="46" rx="8" fill="#D6C7FF"/>
+
+                    <!-- Linked arms/hugs -->
+                    <path d="M42 63 C51 71 64 69 68 61" stroke="#FB6F92" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M66 63 C76 71 90 69 94 61" stroke="#FB6F92" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M92 63 C102 71 114 69 118 61" stroke="#9D74FF" stroke-width="2.5" stroke-linecap="round"/>
+
+                    <!-- Denim jeans / skirts -->
+                    <rect x="39" y="85" width="10" height="18" rx="4" fill="#6A85B6"/>
+                    <rect x="49" y="85" width="10" height="18" rx="4" fill="#6A85B6"/>
+                    <rect x="63" y="85" width="10" height="18" rx="4" fill="#4B6584"/>
+                    <rect x="73" y="85" width="10" height="18" rx="4" fill="#4B6584"/>
+                    <rect x="88" y="85" width="10" height="18" rx="4" fill="#474787"/>
+                    <rect x="98" y="85" width="10" height="18" rx="4" fill="#474787"/>
+                    <rect x="112" y="85" width="10" height="18" rx="4" fill="#57606F"/>
+                    <rect x="122" y="85" width="10" height="18" rx="4" fill="#57606F"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 4. User Profile Card at Bottom of Sidebar (Matching Reference Image) -->
+        <div class="sidebar-user-footer">
             <AuthorizeView>
                 <Authorized>
-                    <NotificationCenter />
-
-                    <a href="/friends" class="user-profile-pill" title="View Profile & Friends">
-                        <span class="user-avatar-sticker">@(userSession?.AvatarSticker ?? "🎀")</span>
-                        <span class="user-display-name">@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "pinky")</span>
+                    <a href="friends" class="sidebar-user-pill" title="View Profile">
+                        <div class="user-avatar-circle">
+                            <span>@(userSession?.AvatarSticker ?? "🎀")</span>
+                        </div>
+                        <div class="user-meta-text">
+                            <span class="user-name">@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "Han Han ♡")</span>
+                            <span class="user-handle">@@@(userSession?.Username ?? "hannah_dev")</span>
+                        </div>
                     </a>
-
-                    <button type="button" class="btn-navbar-logout" @onclick="HandleLogoutAsync" title="Sign Out or Switch Account">
-                        <span class="logout-icon">🔒</span>
-                        <span class="logout-text">Sign Out</span>
+                    <button type="button" class="btn-sidebar-logout" @onclick="HandleLogoutAsync" title="Sign Out">
+                        <span>🔒</span>
                     </button>
                 </Authorized>
                 <NotAuthorized>
-                    <a href="/login" class="btn-navbar-login">
-                        <span>🔑</span> Sign In
-                    </a>
-                    <a href="/register" class="btn-navbar-register">
-                        <span>✨</span> Register
-                    </a>
+                    <div class="sidebar-guest-actions">
+                        <a href="/login" class="btn-sidebar-auth btn-auth-signin" @onclick="CloseMobileMenu">
+                            <span>🔑</span> Sign In
+                        </a>
+                        <a href="/register" class="btn-sidebar-auth btn-auth-signup" @onclick="CloseMobileMenu">
+                            <span>✨</span> Register
+                        </a>
+                    </div>
                 </NotAuthorized>
             </AuthorizeView>
-
-            <!-- Mobile Hamburger Toggle -->
-            <button type="button" class="navbar-hamburger" @onclick="ToggleMobileMenu" aria-label="Toggle navigation menu">
-                <span>@(isMobileMenuOpen ? "✕" : "☰")</span>
-            </button>
-        </div>
-
-        <!-- Decorative Scrapbook Detail 2: Bottom-right smiling pink heart sticker -->
-        <div class="scrapbook-heart-br" aria-hidden="true" title="Bestie Love 💕">
-            <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- White sticker die-cut border -->
-                <path d="M50 89C50 89 10 63 10 36C10 20 23 11 36 11C43.5 11 47.5 15.5 50 19.5C52.5 15.5 56.5 11 64 11C77 11 90 20 90 36C90 63 50 89 50 89Z" fill="#FFFFFF" filter="drop-shadow(0px 3px 6px rgba(251,111,146,0.35))" />
-                <!-- Pastel pink heart body -->
-                <path d="M50 83C50 83 17 59 17 36C17 24 26 17 36 17C43 17 47 21 50 25C53 21 57 17 64 17C74 17 83 24 83 36C83 59 50 83 50 83Z" fill="#FFAFCC" stroke="#FF8FAB" stroke-width="2.5" />
-                <!-- Blushing pink cheeks -->
-                <ellipse cx="33" cy="46" rx="5" ry="3.5" fill="#FF6584" opacity="0.65" />
-                <ellipse cx="67" cy="46" rx="5" ry="3.5" fill="#FF6584" opacity="0.65" />
-                <!-- Cute happy closed eyes ^ ^ -->
-                <path d="M29 39C31 35 36 35 38 39" stroke="#4A3B3C" stroke-width="3.5" stroke-linecap="round" />
-                <path d="M62 39C64 35 69 35 71 39" stroke="#4A3B3C" stroke-width="3.5" stroke-linecap="round" />
-                <!-- Sweet smiling mouth -->
-                <path d="M45 46C47 50 53 50 55 46" stroke="#4A3B3C" stroke-width="3" stroke-linecap="round" />
-            </svg>
         </div>
     </div>
-
-    <!-- Mobile Navigation Drawer / Dropdown (Scrapbook Diary Card Style) -->
-    @if (isMobileMenuOpen)
-    {
-        <div class="mobile-nav-drawer" @onclick="CloseMobileMenu">
-            <div class="mobile-nav-content" @onclick:stopPropagation="true">
-                <!-- Washi tape on mobile card -->
-                <div class="mobile-washi-tape" aria-hidden="true"></div>
-
-                <div class="mobile-nav-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="brand-strawberry-icon">🍓</span>
-                        <span class="brand-name">BestieSpace 🌸</span>
-                    </div>
-                    <button class="mobile-close-btn" @onclick="CloseMobileMenu" aria-label="Close menu">✕</button>
-                </div>
-
-                <div class="mobile-nav-links">
-                    <NavLink class="mobile-link" href="" Match="NavLinkMatch.All" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">🏠 Home</span>
-                    </NavLink>
-                    <NavLink class="mobile-link" href="photos" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">📷 Photos</span>
-                    </NavLink>
-                    <NavLink class="mobile-link" href="notes" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">✉️ Notes</span>
-                    </NavLink>
-                    <NavLink class="mobile-link" href="chat" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">💬 Chat</span>
-                        @if (unreadChatCount > 0)
-                        {
-                            <span class="nav-unread-dot">@unreadChatCount</span>
-                        }
-                    </NavLink>
-                    <NavLink class="mobile-link" href="circles" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">👑 Circles</span>
-                    </NavLink>
-                    <NavLink class="mobile-link" href="friends" @onclick="CloseMobileMenu">
-                        <span class="mobile-link-text">👭 Friends</span>
-                    </NavLink>
-                    @if (isAdmin)
-                    {
-                        <NavLink class="mobile-link admin-link" href="admin/rbac" @onclick="CloseMobileMenu">
-                            <span class="mobile-link-text">🛡️ Dynamic RBAC Admin</span>
-                        </NavLink>
-                    }
-                </div>
-
-                <div class="mobile-auth-footer">
-                    <AuthorizeView>
-                        <Authorized>
-                            <div class="mobile-user-info">
-                                <span>@(userSession?.AvatarSticker ?? "🎀")</span>
-                                <span>Signed in as <strong>@(userSession?.DisplayName ?? context.User.Identity?.Name ?? "pinky")</strong></span>
-                            </div>
-                            <button type="button" class="btn-mobile-logout" @onclick="HandleLogoutAsync">
-                                <span>🔒 Sign Out</span>
-                            </button>
-                        </Authorized>
-                        <NotAuthorized>
-                            <div class="mobile-auth-buttons">
-                                <a href="/login" class="btn-navbar-login" @onclick="CloseMobileMenu">
-                                    <span>🔑 Sign In</span>
-                                </a>
-                                <a href="/register" class="btn-navbar-register" @onclick="CloseMobileMenu">
-                                    <span>✨ Register</span>
-                                </a>
-                            </div>
-                        </NotAuthorized>
-                    </AuthorizeView>
-                </div>
-            </div>
-        </div>
-    }
-</header>
-
-<style>
-/* =========================================================
-   1. FLOATING SCRAPBOOK NAVBAR CONTAINER
-   ========================================================= */
-.scrapbook-navbar-container {
-    position: sticky;
-    top: 14px;
-    left: 0;
-    width: 100%;
-    z-index: 1000;
-    padding: 0 20px;
-    pointer-events: none;
-    font-family: 'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-
-/* Scrapbook Layered Paper Card */
-.scrapbook-navbar-card {
-    pointer-events: auto;
-    max-width: 1220px;
-    margin: 0 auto;
-    background: #FFFFFF;
-    border: 2.5px solid #FFC2D1;
-    border-radius: 50px;
-    padding: 8px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    position: relative;
-    /* Soft layered paper-card shadow effect */
-    box-shadow: 
-        0 4px 0 #FFE5EC,
-        0 10px 28px rgba(255, 143, 171, 0.22),
-        0 2px 8px rgba(251, 111, 146, 0.12);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-/* Subtle Pink Dashed Inner Border (Handmade Stitched Scrapbook look) */
-.scrapbook-navbar-card::before {
-    content: "";
-    position: absolute;
-    top: 5px;
-    left: 5px;
-    right: 5px;
-    bottom: 5px;
-    border: 1.5px dashed #FFB6C1;
-    border-radius: 42px;
-    pointer-events: none;
-    z-index: 1;
-}
-
-/* =========================================================
-   2. SCRAPBOOK DECORATIVE ELEMENTS (Tape & Heart Sticker)
-   ========================================================= */
-/* Top-left translucent washi tape */
-.scrapbook-tape-tl {
-    position: absolute;
-    top: -9px;
-    left: 22px;
-    width: 48px;
-    height: 18px;
-    background: rgba(255, 182, 193, 0.72);
-    border: 1px dashed rgba(251, 111, 146, 0.45);
-    border-radius: 2px;
-    transform: rotate(-24deg);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    pointer-events: none;
-    z-index: 10;
-}
-
-/* Top-right pink gingham / checkered washi tape */
-.scrapbook-tape-tr-checkered {
-    position: absolute;
-    top: -10px;
-    right: 80px;
-    width: 54px;
-    height: 22px;
-    background-color: #FFF0F5;
-    background-image: 
-        linear-gradient(45deg, rgba(255, 143, 171, 0.45) 25%, transparent 25%, transparent 75%, rgba(255, 143, 171, 0.45) 75%),
-        linear-gradient(45deg, rgba(255, 143, 171, 0.45) 25%, transparent 25%, transparent 75%, rgba(255, 143, 171, 0.45) 75%);
-    background-size: 8px 8px;
-    background-position: 0 0, 4px 4px;
-    border-left: 2px dashed rgba(255, 105, 180, 0.5);
-    border-right: 2px dashed rgba(255, 105, 180, 0.5);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    transform: rotate(18deg);
-    pointer-events: none;
-    z-index: 10;
-}
-
-/* Paperclip holding heart over Home button */
-.nav-home-anchor {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-.scrapbook-paperclip-home {
-    position: absolute;
-    top: -17px;
-    left: 45%;
-    transform: translateX(-50%);
-    pointer-events: none;
-    z-index: 15;
-}
-
-/* Bottom-right smiling pink heart sticker */
-.scrapbook-heart-br {
-    position: absolute;
-    bottom: -14px;
-    right: -8px;
-    pointer-events: none;
-    z-index: 10;
-    transform: rotate(12deg);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    animation: gentleHeartFloat 4s ease-in-out infinite;
-}
-
-@@keyframes gentleHeartFloat {
-    0%, 100% { transform: rotate(12deg) translateY(0); }
-    50% { transform: rotate(15deg) translateY(-3px); }
-}
-
-/* Ensure navbar interactive children sit cleanly above inner border */
-.navbar-brand,
-.navbar-links,
-.navbar-actions {
-    position: relative;
-    z-index: 2;
-}
-
-/* =========================================================
-   3. BRAND LOGO (Left)
-   ========================================================= */
-.navbar-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    font-size: 1.45rem;
-    font-weight: 700;
-    color: #4A3B3C;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    user-select: none;
-}
-
-.navbar-brand:hover {
-    transform: scale(1.04);
-}
-
-.brand-strawberry-icon {
-    font-size: 1.6rem;
-    animation: gentleWiggle 3.5s infinite ease-in-out;
-}
-
-@@keyframes gentleWiggle {
-    0%, 100% { transform: rotate(0deg); }
-    25% { transform: rotate(-7deg); }
-    75% { transform: rotate(7deg); }
-}
-
-.brand-name {
-    letter-spacing: -0.3px;
-}
-
-.brand-name-highlight {
-    color: #FB6F92;
-}
-
-/* =========================================================
-   4. NAVIGATION LINKS (Center)
-   ========================================================= */
-.navbar-links {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.nav-link-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 16px;
-    border-radius: 9999px;
-    border: 1.5px solid transparent;
-    background: transparent;
-    text-decoration: none;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: #4A3B3C;
-    position: relative;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    user-select: none;
-}
-
-.nav-icon {
-    font-size: 1.05rem;
-}
-
-/* Hover lift and scale animation */
-.nav-link-item:hover:not(.active) {
-    transform: translateY(-2px) scale(1.03);
-    background: #FFF5F7;
-    border-color: #FFDEE7;
-    color: #FB6F92;
-}
-
-/* Active Navigation Item: Cute Outlined Pink Pill (Matches Photo) */
-.nav-link-item.active {
-    background: #FFF0F5;
-    border: 1.5px solid #FF8FAB;
-    color: #FB6F92 !important;
-    border-radius: 9999px;
-    font-weight: 700;
-    box-shadow: 0 2px 8px rgba(255, 143, 171, 0.22);
-}
-
-.nav-link-item.active:hover {
-    transform: translateY(-1.5px);
-    box-shadow: 0 4px 12px rgba(255, 143, 171, 0.32);
-}
-
-/* Admin Link Styling */
-.nav-link-item.admin-link {
-    color: #7B2CBF;
-}
-
-.nav-link-item.admin-link:hover:not(.active) {
-    background: #F8F0FF;
-    border-color: #E2C7FF;
-    color: #6A1B9A;
-}
-
-.nav-link-item.admin-link.active {
-    background: #F5EAFF;
-    border-color: #9D4EDD;
-    color: #6A1B9A !important;
-    box-shadow: 0 2px 8px rgba(157, 78, 221, 0.2);
-}
-
-/* Live Unread Indicator Dot */
-.nav-unread-dot {
-    background: #FF0055;
-    color: #FFFFFF;
-    font-size: 0.72rem;
-    font-weight: 800;
-    padding: 2px 7px;
-    border-radius: 9999px;
-    box-shadow: 0 2px 6px rgba(255, 0, 85, 0.4);
-    line-height: 1.2;
-}
-
-/* =========================================================
-   5. RIGHT ACTIONS: NOTIFICATIONS, PROFILE, SIGN OUT
-   ========================================================= */
-.navbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* User Profile Pill */
-.user-profile-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    border-radius: 9999px;
-    padding: 6px 14px;
-    text-decoration: none;
-    color: #FB6F92;
-    font-weight: 700;
-    font-size: 0.92rem;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
-}
-
-.user-profile-pill:hover {
-    background: #FFF0F5;
-    border-color: #FB6F92;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(255, 143, 171, 0.25);
-}
-
-.user-avatar-sticker {
-    font-size: 1.15rem;
-}
-
-.user-display-name {
-    max-width: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Sign Out Outlined Pill Button */
-.btn-navbar-logout {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    border-radius: 9999px;
-    padding: 6px 16px;
-    color: #FB6F92;
-    font-weight: 700;
-    font-size: 0.92rem;
-    cursor: pointer;
-    transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
-}
-
-.btn-navbar-logout:hover {
-    background: #FFE5EC;
-    border-color: #FB6F92;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.28);
-}
-
-/* Not Authorized Action Pills */
-.btn-navbar-login {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    color: #FB6F92;
-    font-weight: 700;
-    font-size: 0.92rem;
-    padding: 6px 15px;
-    border-radius: 9999px;
-    text-decoration: none;
-    transition: all 0.22s ease;
-    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
-}
-
-.btn-navbar-login:hover {
-    background: #FFF0F5;
-    border-color: #FB6F92;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(255, 143, 171, 0.22);
-}
-
-.btn-navbar-register {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
-    color: #FFFFFF;
-    font-weight: 700;
-    font-size: 0.92rem;
-    padding: 6px 16px;
-    border-radius: 9999px;
-    text-decoration: none;
-    border: 1.5px solid #FB6F92;
-    transition: all 0.22s ease;
-    box-shadow: 0 3px 10px rgba(251, 111, 146, 0.35);
-}
-
-.btn-navbar-register:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(251, 111, 146, 0.45);
-}
-
-/* Mobile Hamburger Button */
-.navbar-hamburger {
-    display: none;
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    border-radius: 14px;
-    padding: 6px 14px;
-    font-size: 1.25rem;
-    color: #FB6F92;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
-    transition: all 0.2s ease;
-}
-
-.navbar-hamburger:hover {
-    background: #FFF0F5;
-    border-color: #FB6F92;
-    transform: scale(1.05);
-}
-
-/* =========================================================
-   6. RESPONSIVE DESIGN (Desktop / Tablet / Mobile)
-   ========================================================= */
-@@media (max-width: 992px) {
-    .navbar-links {
-        display: none;
-    }
-
-    .logout-text {
-        display: none;
-    }
-
-    .navbar-hamburger {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .scrapbook-navbar-card {
-        padding: 8px 18px;
-    }
-}
-
-@@media (max-width: 576px) {
-    .scrapbook-navbar-container {
-        top: 8px;
-        padding: 0 10px;
-    }
-
-    .scrapbook-navbar-card {
-        border-radius: 36px;
-        padding: 6px 14px;
-    }
-
-    .scrapbook-navbar-card::before {
-        border-radius: 30px;
-    }
-
-    .brand-name {
-        font-size: 1.25rem;
-    }
-
-    .user-display-name {
-        display: none;
-    }
-
-    .user-profile-pill {
-        padding: 6px 10px;
-    }
-
-    .scrapbook-tape-tl {
-        left: 12px;
-        width: 36px;
-        height: 14px;
-    }
-
-    .scrapbook-heart-br {
-        right: -4px;
-        bottom: -10px;
-    }
-
-    .scrapbook-heart-br svg {
-        width: 28px;
-        height: 28px;
-    }
-}
-
-/* =========================================================
-   7. MOBILE SCRAPBOOK DRAWER
-   ========================================================= */
-.mobile-nav-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(74, 59, 60, 0.45);
-    backdrop-filter: blur(5px);
-    z-index: 10001;
-    display: flex;
-    justify-content: flex-end;
-    pointer-events: auto;
-}
-
-.mobile-nav-content {
-    background: #FFFDF9;
-    border-left: 3px solid #FFC2D1;
-    width: 300px;
-    height: 100%;
-    padding: 26px 22px;
-    box-shadow: -8px 0 28px rgba(74, 59, 60, 0.25);
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    animation: slideInRight 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@@keyframes slideInRight {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
-}
-
-/* Stitched dashed inner border on mobile drawer */
-.mobile-nav-content::before {
-    content: "";
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    border: 1.5px dashed #FFDEE7;
-    border-radius: 18px;
-    pointer-events: none;
-}
-
-.mobile-washi-tape {
-    position: absolute;
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%) rotate(-1deg);
-    width: 80px;
-    height: 16px;
-    background: rgba(255, 182, 193, 0.72);
-    border: 1px dashed rgba(251, 111, 146, 0.4);
-    border-radius: 2px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
-    pointer-events: none;
-    z-index: 5;
-}
-
-.mobile-nav-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 14px;
-    border-bottom: 2px solid #FFDEE7;
-    margin-bottom: 16px;
-    position: relative;
-    z-index: 2;
-}
-
-.mobile-close-btn {
-    background: #FFF0F5;
-    border: 1.5px solid #FFC2D1;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #FB6F92;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s ease, background 0.2s ease;
-}
-
-.mobile-close-btn:hover {
-    transform: rotate(90deg) scale(1.1);
-    background: #FB6F92;
-    color: #FFFFFF;
-}
-
-.mobile-nav-links {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-    overflow-y: auto;
-    position: relative;
-    z-index: 2;
-}
-
-.mobile-link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 11px 16px;
-    border-radius: 9999px;
-    border: 1.5px solid transparent;
-    text-decoration: none;
-    color: #4A3B3C;
-    font-weight: 600;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-}
-
-.mobile-link:hover {
-    background: #FFF5F7;
-    border-color: #FFDEE7;
-    color: #FB6F92;
-    transform: translateX(4px);
-}
-
-.mobile-link.active {
-    background: #FFF0F5;
-    border-color: #FF8FAB;
-    color: #FB6F92 !important;
-    font-weight: 700;
-    box-shadow: 0 2px 8px rgba(255, 143, 171, 0.2);
-}
-
-.mobile-auth-footer {
-    padding-top: 16px;
-    border-top: 2px solid #FFDEE7;
-    position: relative;
-    z-index: 2;
-}
-
-.mobile-user-info {
-    font-size: 0.9rem;
-    color: #7E6566;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.btn-mobile-logout {
-    width: 100%;
-    background: #FFFDF9;
-    border: 1.5px solid #FFC2D1;
-    color: #FB6F92;
-    font-weight: 700;
-    padding: 10px;
-    border-radius: 9999px;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(255, 143, 171, 0.12);
-    transition: all 0.2s ease;
-}
-
-.btn-mobile-logout:hover {
-    background: #FFE5EC;
-    border-color: #FB6F92;
-    transform: translateY(-1px);
-}
-
-.mobile-auth-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-</style>
+</aside>
 
 @code {
     private bool isMobileMenuOpen = false;
     private bool isAdmin = false;
     private int unreadChatCount = 0;
+    private int unreadNotificationCount = 0;
     private UserSessionDto? userSession;
 
     protected override async Task OnInitializedAsync()
+    {
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        await LoadUserAndCountsAsync();
+    }
+
+    private void HandleAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadUserAndCountsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task LoadUserAndCountsAsync()
     {
         userSession = BestieAuth.CurrentUser;
         isAdmin = BestieAuth.HasRole("Admin") || BestieAuth.HasRole("Administrator") || BestieAuth.HasPermission("USER_MANAGE");
@@ -852,6 +244,13 @@
                 {
                     unreadChatCount = summary.TotalUnreadCount;
                 }
+
+                unreadNotificationCount = await ApiClient.GetUnreadNotificationCountAsync();
+            }
+            else
+            {
+                unreadChatCount = 0;
+                unreadNotificationCount = 0;
             }
         }
         catch { }
@@ -872,5 +271,10 @@
         CloseMobileMenu();
         await BestieAuth.LogoutAsync();
         Navigation.NavigateTo("/login", true);
+    }
+
+    public void Dispose()
+    {
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
     }
 }

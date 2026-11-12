@@ -1,10 +1,55 @@
 @inherits LayoutComponentBase
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BestieAuthenticationStateProvider BestieAuth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
 
-<div class="bestiespace-app">
+<div class="bestiespace-layout">
+    <!-- 1. Left Sidebar Navigation -->
     <NavMenu />
-    <main class="bestiespace-main">
-        @Body
-    </main>
+
+    <!-- 2. Main Stage (Top Bar + Dynamic Page Content) -->
+    <div class="bestiespace-stage">
+        <!-- Top App Bar (Matching the Reference Screenshot) -->
+        <header class="bestiespace-topbar">
+            <!-- Search Pill -->
+            <div class="topbar-search-card">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="topbar-search-input" placeholder="Search BestieSpace..." />
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div class="topbar-actions">
+                <a href="circles" class="btn-topbar-pill btn-premium-pill" title="Bestie Clubhouse VIP">
+                    <span class="crown-icon">👑</span>
+                    <span>Go Premium</span>
+                </a>
+
+                <button type="button" class="btn-topbar-icon" title="Theme">
+                    <span>☀️</span>
+                </button>
+
+                <NavLink href="chat" class="btn-topbar-icon" title="Messages">
+                    <span>💬</span>
+                </NavLink>
+
+                <div class="topbar-notification-wrapper">
+                    <NotificationCenter />
+                </div>
+
+                <a href="friends" class="topbar-avatar-pill" title="My Profile">
+                    <span class="avatar-sticker">@(BestieAuth.CurrentUser?.AvatarSticker ?? "🎀")</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Dynamic Body Content -->
+        <main class="bestiespace-main">
+            @Body
+        </main>
+    </div>
 </div>
 
 <div id="blazor-error-ui" data-nosnippet>
