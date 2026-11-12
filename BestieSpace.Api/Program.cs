@@ -73,7 +73,8 @@ builder.Services.AddSingleton<IMediaStorageService, MediaStorageService>();
 builder.Services.AddScoped<IStickerService, StickerService>();
 builder.Services.AddScoped<IChatMediaService, ChatMediaService>();
 
-// Offline Messaging, Read Receipts & Notifications (Phase 8)
+// Offline Messaging, Read Receipts & Notifications (Phase 8 & Firebase FCM)
+builder.Services.AddSingleton<IFcmService, FcmService>();
 builder.Services.AddScoped<IMessageReadService, MessageReadService>();
 builder.Services.AddScoped<IMessageDeliveryService, MessageDeliveryService>();
 builder.Services.AddScoped<IMessageSyncService, MessageSyncService>();
@@ -340,13 +341,14 @@ using (var scope = app.Services.CreateScope())
             throw new Exception("Phase 7 dynamic multimedia policies verification failed");
         Console.WriteLine("[PASS] Dynamic Phase 7 policies verified (CHAT_SEND_IMAGE, CHAT_SEND_STICKER, CHAT_SEND_VOICE, CHAT_VIEW_MEDIA, CHAT_DELETE_MEDIA, STICKER_VIEW, STICKER_MANAGE)");
 
-        // 9. Phase 8 Offline Messaging, Read Receipts & Notifications Verification
+        // 9. Phase 8 Offline Messaging, Read Receipts, Notifications & Firebase FCM Verification
         var readSvc = scope.ServiceProvider.GetRequiredService<IMessageReadService>();
         var deliverySvc = scope.ServiceProvider.GetRequiredService<IMessageDeliveryService>();
         var syncSvc = scope.ServiceProvider.GetRequiredService<IMessageSyncService>();
         var notifSvc = scope.ServiceProvider.GetRequiredService<INotificationService>();
-        if (readSvc == null || deliverySvc == null || syncSvc == null || notifSvc == null)
-            throw new Exception("Phase 8 Offline messaging, read receipts & notification services DI resolution failed");
+        var fcmSvc = scope.ServiceProvider.GetRequiredService<IFcmService>();
+        if (readSvc == null || deliverySvc == null || syncSvc == null || notifSvc == null || fcmSvc == null)
+            throw new Exception("Phase 8 Offline messaging, read receipts, notification & FCM services DI resolution failed");
 
         // Verify Phase 8 dynamic policies
         var notifViewPolicy = await policyProvider.GetPolicyAsync("NOTIFICATION_VIEW");

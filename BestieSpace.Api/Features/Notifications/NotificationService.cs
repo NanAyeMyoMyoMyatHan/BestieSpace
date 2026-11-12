@@ -25,15 +25,18 @@ public class NotificationService : INotificationService
 {
     private readonly BestieDbContext _context;
     private readonly IHubContext<BestieChatHub> _hubContext;
+    private readonly IFcmService _fcmService;
     private readonly ILogger<NotificationService> _logger;
 
     public NotificationService(
         BestieDbContext context,
         IHubContext<BestieChatHub> hubContext,
+        IFcmService fcmService,
         ILogger<NotificationService> logger)
     {
         _context = context;
         _hubContext = hubContext;
+        _fcmService = fcmService;
         _logger = logger;
     }
 
@@ -85,6 +88,25 @@ public class NotificationService : INotificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to broadcast notification {Id} via SignalR to user {UserId}", notification.NotificationId, userId);
+        }
+
+        // Broadcast real-time Push Notification via Firebase Cloud Messaging (FCM)
+        try
+        {
+            var fcmData = new Dictionary<string, string>
+            {
+                { "notificationId", dto.NotificationId.ToString() },
+                { "type", dto.NotificationType },
+                { "relatedEntityId", dto.RelatedEntityId?.ToString() ?? "" },
+                { "relatedEntityType", dto.RelatedEntityType ?? "" },
+                { "clickUrl", dto.TargetUrl ?? "/" }
+            };
+
+            await _fcmService.SendPushToUserAsync(userId, dto.Title, dto.Message, dto.TargetUrl ?? "/", fcmData);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send FCM push for notification {Id} to user {UserId}", notification.NotificationId, userId);
         }
 
         return dto;

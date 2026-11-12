@@ -115,6 +115,12 @@ public interface IBestieApiClient
     Task<int> GetUnreadNotificationCountAsync();
     Task<bool> MarkNotificationAsReadAsync(int notificationId);
     Task<int> MarkAllNotificationsAsReadAsync();
+
+    // Firebase Cloud Messaging (FCM) Push Notifications
+    Task<FcmWebConfigDto?> GetFcmWebConfigAsync();
+    Task<bool> RegisterFcmTokenAsync(string token, string deviceType = "Web", string? deviceModel = null);
+    Task<bool> UnregisterFcmTokenAsync(string token);
+    Task<FcmPushResultDto?> SendTestPushNotificationAsync(string? title = null, string? message = null);
 }
 
 public class BestieApiClient : IBestieApiClient
@@ -1741,6 +1747,76 @@ public class BestieApiClient : IBestieApiClient
             _logger.LogError(ex, "Failed to mark all notifications as read");
         }
         return 0;
+    }
+
+    public async Task<FcmWebConfigDto?> GetFcmWebConfigAsync()
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<FcmWebConfigDto>("/api/notifications/fcm-config");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to get FCM web config");
+            return null;
+        }
+    }
+
+    public async Task<bool> RegisterFcmTokenAsync(string token, string deviceType = "Web", string? deviceModel = null)
+    {
+        try
+        {
+            var req = new RegisterFcmTokenRequestDto
+            {
+                Token = token,
+                DeviceType = deviceType,
+                DeviceModel = deviceModel
+            };
+            var res = await _http.PostAsJsonAsync("/api/notifications/fcm-token", req);
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to register FCM device token");
+            return false;
+        }
+    }
+
+    public async Task<bool> UnregisterFcmTokenAsync(string token)
+    {
+        try
+        {
+            var req = new UnregisterFcmTokenRequestDto { Token = token };
+            var message = new HttpRequestMessage(HttpMethod.Delete, "/api/notifications/fcm-token")
+            {
+                Content = JsonContent.Create(req)
+            };
+            var res = await _http.SendAsync(message);
+            return res.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to unregister FCM device token");
+            return false;
+        }
+    }
+
+    public async Task<FcmPushResultDto?> SendTestPushNotificationAsync(string? title = null, string? message = null)
+    {
+        try
+        {
+            var req = new SendPushTestRequestDto { Title = title, Message = message };
+            var res = await _http.PostAsJsonAsync("/api/notifications/test-push", req);
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadFromJsonAsync<FcmPushResultDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send test push notification");
+        }
+        return null;
     }
 
     private static List<ChatMessageDto> CreateFallbackMessages()

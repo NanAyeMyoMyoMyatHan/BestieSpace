@@ -15,11 +15,16 @@ namespace BestieSpace.Api.Features.Notifications;
 public class NotificationController : ControllerBase
 {
     private readonly INotificationService _notificationService;
+    private readonly IFcmService _fcmService;
     private readonly ILogger<NotificationController> _logger;
 
-    public NotificationController(INotificationService notificationService, ILogger<NotificationController> logger)
+    public NotificationController(
+        INotificationService notificationService,
+        IFcmService fcmService,
+        ILogger<NotificationController> logger)
     {
         _notificationService = notificationService;
+        _fcmService = fcmService;
         _logger = logger;
     }
 
@@ -98,6 +103,97 @@ public class NotificationController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error marking all notifications as read for user {UserId}", currentUserId.Value);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("fcm-config")]
+    [AllowAnonymous]
+    public ActionResult<FcmWebConfigDto> GetFcmWebConfig()
+    {
+        try
+        {
+            var config = _fcmService.GetWebConfig();
+            return Ok(config);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving FCM web config");
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("fcm-token")]
+    public async Task<ActionResult> RegisterFcmToken([FromBody] RegisterFcmTokenRequestDto request)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request?.Token))
+        {
+            return BadRequest(new { message = "FCM device token is required." });
+        }
+
+        try
+        {
+            var success = await _fcmService.RegisterTokenAsync(currentUserId.Value, request.Token, request.DeviceType ?? "Web", request.DeviceModel);
+            return Ok(new { success, message = "FCM device token registered successfully! 🌸" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error registering FCM token for user {UserId}", currentUserId.Value);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("fcm-token")]
+    public async Task<ActionResult> UnregisterFcmToken([FromBody] UnregisterFcmTokenRequestDto request)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request?.Token))
+        {
+            return BadRequest(new { message = "FCM device token is required." });
+        }
+
+        try
+        {
+            var success = await _fcmService.UnregisterTokenAsync(currentUserId.Value, request.Token);
+            return Ok(new { success, message = "FCM device token unregistered." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unregistering FCM token for user {UserId}", currentUserId.Value);
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("test-push")]
+    public async Task<ActionResult<FcmPushResultDto>> SendTestPush([FromBody] SendPushTestRequestDto? request)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (!currentUserId.HasValue) return Unauthorized();
+
+        try
+        {
+            var title = !string.IsNullOrWhiteSpace(request?.Title) ? request.Title : "BestieSpace Realtime Alert 🌸";
+            var message = !string.IsNullOrWhiteSpace(request?.Message) ? request.Message : "FCM Realtime push notification is working like magic! 💕✨";
+
+            var devicesDelivered = await _fcmService.SendPushToUserAsync(currentUserId.Value, title, message, request?.ClickUrl ?? "/");
+
+            return Ok(new FcmPushResultDto
+            {
+                Success = true,
+                DevicesTargeted = devicesDelivered,
+                Message = devicesDelivered > 0 
+                    ? $"Push sent successfully to {devicesDelivered} device(s)! 🌸"
+                    : "Push processed! (Register a browser/device token to receive native OS push notifications)"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending test push to user {UserId}", currentUserId.Value);
             return BadRequest(new { message = ex.Message });
         }
     }

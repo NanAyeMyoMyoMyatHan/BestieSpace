@@ -7,6 +7,7 @@
 @inject IBestieApiClient ApiClient
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Nav
+@inject IJSRuntime JSRuntime
 @inject ILogger<NotificationCenter> Logger
 @implements IAsyncDisposable
 
@@ -44,6 +45,28 @@
                         </button>
                     }
                     <button class="btn-close-dropdown" @onclick="CloseDropdown">✕</button>
+                </div>
+            </div>
+
+            <!-- Firebase FCM Realtime Push Notification Status Bar -->
+            <div class="fcm-push-bar">
+                <div class="fcm-push-info">
+                    <span>@(isPushActive ? "🟢" : "🔔")</span>
+                    <span>@(isPushActive ? "FCM Push Active" : "Realtime Browser Push")</span>
+                </div>
+                <div class="fcm-push-actions">
+                    @if (!isPushActive)
+                    {
+                        <button type="button" class="btn-fcm-action" @onclick="EnablePushNotificationsAsync" disabled="@isRequestingPush">
+                            @(isRequestingPush ? "Activating..." : "Enable Push 💖")
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn-fcm-test" @onclick="SendTestPushAsync" disabled="@isSendingTestPush" title="Test realtime FCM push">
+                            @(isSendingTestPush ? "Sending..." : "Test Push 🚀")
+                        </button>
+                    }
                 </div>
             </div>
 
@@ -417,6 +440,13 @@
     private HubConnection? hubConnection;
     private int currentUserId = 0;
 
+    // Firebase FCM Fields
+    private FcmWebConfigDto? fcmWebConfig;
+    private bool isPushActive = false;
+    private bool isRequestingPush = false;
+    private bool isSendingTestPush = false;
+    private DotNetObjectReference<NotificationCenter>? dotNetRef;
+
     protected override async Task OnInitializedAsync()
     {
         AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
@@ -655,9 +685,135 @@
         return dt.ToLocalTime().ToString("MMM d");
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeFcmAsync();
+        }
+    }
+
+    private async Task InitializeFcmAsync()
+    {
+        try
+        {
+            fcmWebConfig = await ApiClient.GetFcmWebConfigAsync();
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            var isSupported = await JSRuntime.InvokeAsync<bool>("bestieFcm.isSupported");
+            if (!isSupported) return;
+
+            await JSRuntime.InvokeAsync<bool>("bestieFcm.init", fcmWebConfig, dotNetRef);
+
+            var perm = await JSRuntime.InvokeAsync<string>("bestieFcm.getPermissionState");
+            if (perm == "granted")
+            {
+                isPushActive = true;
+                await RegisterCurrentDeviceTokenSilently();
+            }
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Optional FCM init in browser: {Msg}", ex.Message);
+        }
+    }
+
+    private async Task RegisterCurrentDeviceTokenSilently()
+    {
+        try
+        {
+            var vapidKey = fcmWebConfig?.VapidKey;
+            var result = await JSRuntime.InvokeAsync<System.Text.Json.JsonElement>("bestieFcm.requestToken", vapidKey);
+            if (result.TryGetProperty("success", out var s) && s.GetBoolean())
+            {
+                if (result.TryGetProperty("token", out var t))
+                {
+                    var token = t.GetString();
+                    if (!string.IsNullOrEmpty(token) && currentUserId > 0)
+                    {
+                        await ApiClient.RegisterFcmTokenAsync(token, "Web", "Browser");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Silent FCM token registration: {Msg}", ex.Message);
+        }
+    }
+
+    private async Task EnablePushNotificationsAsync()
+    {
+        if (isRequestingPush) return;
+        isRequestingPush = true;
+        try
+        {
+            var vapidKey = fcmWebConfig?.VapidKey;
+            var result = await JSRuntime.InvokeAsync<System.Text.Json.JsonElement>("bestieFcm.requestToken", vapidKey);
+
+            bool success = result.TryGetProperty("success", out var s) && s.GetBoolean();
+            if (success && result.TryGetProperty("token", out var t))
+            {
+                var token = t.GetString();
+                if (!string.IsNullOrEmpty(token))
+                {
+                    await ApiClient.RegisterFcmTokenAsync(token, "Web", "Browser");
+                    isPushActive = true;
+                    await JSRuntime.InvokeVoidAsync("bestieFcm.showKawaiiToast", "FCM Push Enabled! 🌸", "Realtime push notifications are now active on this browser! 💕", "/");
+                }
+            }
+            else
+            {
+                var errMsg = result.TryGetProperty("error", out var e) ? e.GetString() : "Permission not granted.";
+                await JSRuntime.InvokeVoidAsync("bestieFcm.showKawaiiToast", "Push Permission 🥺", errMsg ?? "Notification permission was not enabled.", "/");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to request FCM push permission");
+        }
+        finally
+        {
+            isRequestingPush = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task SendTestPushAsync()
+    {
+        if (isSendingTestPush) return;
+        isSendingTestPush = true;
+        try
+        {
+            var res = await ApiClient.SendTestPushNotificationAsync("BestieSpace Realtime Alert 🌸", "FCM push notification is active and delivered in realtime! 💕✨");
+            if (res != null)
+            {
+                await JSRuntime.InvokeVoidAsync("bestieFcm.showKawaiiToast", "FCM Push Dispatched! 🚀", res.Message, "/");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending test push");
+        }
+        finally
+        {
+            isSendingTestPush = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnFcmForegroundMessage(string title, string body, string clickUrl)
+    {
+        unreadCount++;
+        await LoadNotificationsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
     public async ValueTask DisposeAsync()
     {
         AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
+        dotNetRef?.Dispose();
         if (hubConnection != null)
         {
             try

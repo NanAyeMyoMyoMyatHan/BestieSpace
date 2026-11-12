@@ -54,6 +54,8 @@ public partial class BestieDbContext : DbContext
 
     public virtual DbSet<UserRole> UserRoles { get; set; }
 
+    public virtual DbSet<UserFcmToken> UserFcmTokens { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AppStat>(entity =>
@@ -424,6 +426,26 @@ public partial class BestieDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.UserRoles)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("FK_UserRoles_Users");
+        });
+
+        modelBuilder.Entity<UserFcmToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => e.UserId, "IX_UserFcmTokens_UserId");
+            entity.HasIndex(e => new { e.UserId, e.IsActive }, "IX_UserFcmTokens_UserId_IsActive");
+            entity.HasIndex(e => e.Token, "IX_UserFcmTokens_Token");
+
+            entity.Property(e => e.Token).HasMaxLength(512);
+            entity.Property(e => e.DeviceType).HasMaxLength(50).HasDefaultValue("Web");
+            entity.Property(e => e.DeviceModel).HasMaxLength(150);
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserFcmTokens)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_UserFcmTokens_Users");
         });
 
         OnModelCreatingPartial(modelBuilder);

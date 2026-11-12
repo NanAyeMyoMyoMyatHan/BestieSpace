@@ -159,3 +159,45 @@ public class NotificationEventDto
     public DateTime CreatedAt { get; set; }
     public int UnreadNotificationCount { get; set; }
 }
+
+// =============================================================================
+// Firebase Cloud Messaging (FCM) DTOs
+// =============================================================================
+
+public class RegisterFcmTokenRequestDto
+{
+    public string Token { get; set; } = string.Empty;
+    public string DeviceType { get; set; } = "Web";
+    public string? DeviceModel { get; set; }
+}
+
+public class UnregisterFcmTokenRequestDto
+{
+    public string Token { get; set; } = string.Empty;
+}
+
+public class FcmWebConfigDto
+{
+    public string? ApiKey { get; set; }
+    public string? AuthDomain { get; set; }
+    public string? ProjectId { get; set; }
+    public string? StorageBucket { get; set; }
+    public string? MessagingSenderId { get; set; }
+    public string? AppId { get; set; }
+    public string? VapidKey { get; set; }
+    public bool IsConfigured { get; set; }
+}
+
+public class SendPushTestRequestDto
+{
+    public string? Title { get; set; }
+    public string? Message { get; set; }
+    public string? ClickUrl { get; set; }
+}
+
+public class FcmPushResultDto
+{
+    public bool Success { get; set; }
+    public int DevicesTargeted { get; set; }
+    public string Message { get; set; } = string.Empty;
+}

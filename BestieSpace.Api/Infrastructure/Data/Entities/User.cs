@@ -69,6 +69,8 @@ public partial class User
 
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 
+    public virtual ICollection<UserFcmToken> UserFcmTokens { get; set; } = new List<UserFcmToken>();
+
     public virtual ICollection<UserBlock> UserBlockBlockedUsers { get; set; } = new List<UserBlock>();
 
     public virtual ICollection<UserBlock> UserBlockBlockerUsers { get; set; } = new List<UserBlock>();

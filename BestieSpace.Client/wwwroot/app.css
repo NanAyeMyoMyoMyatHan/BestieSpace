@@ -3642,3 +3642,163 @@ body {
         gap: 0 !important;
     }
 }
+
+/* =========================================================
+   FIREBASE CLOUD MESSAGING (FCM) TOAST & PUSH STYLES
+   ========================================================= */
+.fcm-toast-container {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    pointer-events: none !important;
+    max-width: 360px !important;
+    width: calc(100vw - 40px) !important;
+}
+
+.fcm-toast-item {
+    pointer-events: auto !important;
+    background: linear-gradient(135deg, #FFF5F8 0%, #FFEBF1 100%) !important;
+    border: 2px solid #FFC2D1 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 10px 30px rgba(251, 111, 146, 0.28), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+    padding: 12px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    cursor: pointer !important;
+    animation: fcmToastSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    transition: all 0.25s ease !important;
+}
+
+.fcm-toast-item:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 14px 36px rgba(251, 111, 146, 0.36) !important;
+}
+
+.fcm-toast-item.hide {
+    opacity: 0 !important;
+    transform: translateX(50px) scale(0.9) !important;
+}
+
+@keyframes fcmToastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.fcm-toast-icon {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #FFB3C6 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.25rem !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 2px 8px rgba(251, 111, 146, 0.15) !important;
+}
+
+.fcm-toast-body {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.fcm-toast-title {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: #4A3B3C !important;
+    margin-bottom: 2px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.fcm-toast-text {
+    font-size: 0.8rem !important;
+    color: #7A5C61 !important;
+    line-height: 1.3 !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+
+.fcm-toast-close {
+    background: transparent !important;
+    border: none !important;
+    color: #B38692 !important;
+    font-size: 1.2rem !important;
+    cursor: pointer !important;
+    padding: 0 4px !important;
+    line-height: 1 !important;
+    transition: color 0.15s ease !important;
+}
+
+.fcm-toast-close:hover {
+    color: #FB6F92 !important;
+}
+
+/* FCM Permission Bar in Notification Center */
+.fcm-push-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 8px 14px !important;
+    background: #FFF0F5 !important;
+    border-bottom: 1px solid #FFE5EC !important;
+    font-size: 0.8rem !important;
+    color: #5C4A4C !important;
+    gap: 8px !important;
+}
+
+.fcm-push-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.btn-fcm-action {
+    background: linear-gradient(135deg, #FB6F92 0%, #FF8FAB 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    padding: 3px 10px !important;
+    border-radius: 12px !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap !important;
+}
+
+.btn-fcm-action:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 2px 8px rgba(251, 111, 146, 0.4) !important;
+}
+
+.btn-fcm-test {
+    background: #FFFFFF !important;
+    color: #FB6F92 !important;
+    border: 1px solid #FFB3C6 !important;
+    padding: 3px 8px !important;
+    border-radius: 12px !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-fcm-test:hover {
+    background: #FFE5EC !important;
+}
+

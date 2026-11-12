@@ -75,6 +75,34 @@ public static class DatabaseBootstrapper
             }
         }
 
+        // Ensure UserFcmTokens table exists for Firebase Cloud Messaging
+        try
+        {
+            var ensureFcmTableSql = @"
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserFcmTokens' AND xtype='U')
+                BEGIN
+                    CREATE TABLE [UserFcmTokens] (
+                        [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [UserId] INT NOT NULL,
+                        [Token] NVARCHAR(512) NOT NULL,
+                        [DeviceType] NVARCHAR(50) NOT NULL CONSTRAINT [DF_UserFcmTokens_DeviceType] DEFAULT ('Web'),
+                        [DeviceModel] NVARCHAR(150) NULL,
+                        [IsActive] BIT NOT NULL CONSTRAINT [DF_UserFcmTokens_IsActive] DEFAULT (1),
+                        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_UserFcmTokens_CreatedAt] DEFAULT (sysutcdatetime()),
+                        [LastUsedAt] DATETIME2 NULL,
+                        CONSTRAINT [FK_UserFcmTokens_Users] FOREIGN KEY ([UserId]) REFERENCES [Users]([UserId]) ON DELETE CASCADE
+                    );
+                    CREATE NONCLUSTERED INDEX [IX_UserFcmTokens_UserId] ON [UserFcmTokens]([UserId]);
+                    CREATE NONCLUSTERED INDEX [IX_UserFcmTokens_UserId_IsActive] ON [UserFcmTokens]([UserId], [IsActive]);
+                    CREATE NONCLUSTERED INDEX [IX_UserFcmTokens_Token] ON [UserFcmTokens]([Token]);
+                END";
+            await context.Database.ExecuteSqlRawAsync(ensureFcmTableSql);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "DatabaseBootstrapper: Could not check/create UserFcmTokens table.");
+        }
+
         // 2. Seed initial heartfelt data & system roles/permissions if not yet populated
         await SeedDataAsync(context);
     }
