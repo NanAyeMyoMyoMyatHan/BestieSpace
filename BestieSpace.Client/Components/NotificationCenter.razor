@@ -419,9 +419,36 @@
 
     protected override async Task OnInitializedAsync()
     {
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+        await SyncNotificationSessionAsync();
+    }
+
+    private void HandleAuthStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await SyncNotificationSessionAsync();
+        });
+    }
+
+    private async Task SyncNotificationSessionAsync()
+    {
         await LoadCurrentUserAsync();
-        await RefreshUnreadCountAsync();
-        await InitializeNotificationSignalRAsync();
+        if (currentUserId > 0)
+        {
+            await RefreshUnreadCountAsync();
+            await InitializeNotificationSignalRAsync();
+        }
+        else
+        {
+            unreadCount = 0;
+            notifications.Clear();
+            if (hubConnection != null)
+            {
+                try { await hubConnection.StopAsync(); } catch { }
+            }
+            StateHasChanged();
+        }
     }
 
     private async Task LoadCurrentUserAsync()
@@ -436,6 +463,10 @@
                               ?? user.FindFirst("sub")?.Value;
                 int.TryParse(idClaim, out currentUserId);
             }
+            else
+            {
+                currentUserId = 0;
+            }
         }
         catch (Exception ex)
         {
@@ -445,6 +476,7 @@
 
     private async Task RefreshUnreadCountAsync()
     {
+        if (currentUserId <= 0) return;
         try
         {
             unreadCount = await ApiClient.GetUnreadNotificationCountAsync();
@@ -452,7 +484,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Failed to refresh unread notification count");
+            Logger.LogDebug(ex, "Failed to refresh unread notification count");
         }
     }
 
@@ -625,6 +657,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
         if (hubConnection != null)
         {
             try

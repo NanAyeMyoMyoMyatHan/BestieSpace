@@ -1223,8 +1223,22 @@ Every time you miss me, press that little pink heart button below so I can feel 
     {
         try
         {
+            if (hubConnection != null && hubConnection.State != HubConnectionState.Disconnected)
+            {
+                return;
+            }
+
+            var hubUrl = $"{ApiClient.ApiBaseUrl.TrimEnd('/')}/chathub";
+            var token = AuthProvider.AccessToken;
+
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(Navigation.ToAbsoluteUri("/hubs/bestieChat"))
+                .WithUrl(hubUrl, options =>
+                {
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                    }
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
@@ -1238,7 +1252,7 @@ Every time you miss me, press that little pink heart button below so I can feel 
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to connect SignalR in Home dashboard");
+            Logger.LogDebug(ex, "SignalR Hub is not currently reachable from Home dashboard");
         }
     }
 

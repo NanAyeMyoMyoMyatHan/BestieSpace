@@ -589,6 +589,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.MapHub<BestieChatHub>("/chathub");
+app.MapHub<BestieChatHub>("/hubs/bestieChat");
 
 // Direct browser requests to the Blazor Client UI, or return API status
 app.MapGet("/", (HttpContext context, IWebHostEnvironment env) =>

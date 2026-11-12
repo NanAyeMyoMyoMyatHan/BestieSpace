@@ -1669,6 +1669,10 @@ public class BestieApiClient : IBestieApiClient
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_bearerToken))
+            {
+                return null;
+            }
             var url = $"/api/notifications?pageNumber={pageNumber}&pageSize={pageSize}";
             if (unreadOnly.HasValue)
             {
@@ -1678,7 +1682,7 @@ public class BestieApiClient : IBestieApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get notifications");
+            _logger.LogDebug(ex, "Failed to get notifications");
             return null;
         }
     }
@@ -1687,6 +1691,10 @@ public class BestieApiClient : IBestieApiClient
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(_bearerToken))
+            {
+                return 0;
+            }
             var res = await _http.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/notifications/unread-count");
             if (res.TryGetProperty("unreadCount", out var countProp))
             {
@@ -1695,7 +1703,7 @@ public class BestieApiClient : IBestieApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get unread notification count");
+            _logger.LogDebug(ex, "Failed to get unread notification count");
         }
         return 0;
     }
