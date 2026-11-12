@@ -590,78 +590,17 @@ app.MapHealthChecks("/health").AllowAnonymous();
 app.MapControllers();
 app.MapHub<BestieChatHub>("/chathub");
 
-// Welcome launchpad if opened directly in browser on port 5000
-app.MapGet("/", () => Results.Content(@"
-<!DOCTYPE html>
-<html lang=""en"">
-<head>
-    <meta charset=""utf-8""/>
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0""/>
-    <title>BestieSpace 🌸 API & Launchpad</title>
-    <meta http-equiv=""refresh"" content=""1;url=http://localhost:5002/"" />
-    <style>
-        body {
-            font-family: 'Fredoka', 'Quicksand', -apple-system, BlinkMacSystemFont, ""Segoe UI"", Roboto, sans-serif;
-            background: #FFFDF9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            color: #4A3B3C;
-            text-align: center;
-            padding: 20px;
-        }
-        .launchpad-card {
-            background: #FFE5EC;
-            padding: 44px 36px;
-            border-radius: 32px;
-            border: 3px solid #FFC2D1;
-            box-shadow: 0 16px 40px rgba(255, 143, 171, 0.3);
-            max-width: 520px;
-            width: 100%;
-        }
-        h1 {
-            color: #FB6F92;
-            font-size: 2.2rem;
-            margin: 14px 0 10px;
-        }
-        p {
-            font-size: 1.15rem;
-            color: #7E6566;
-            margin-bottom: 28px;
-            line-height: 1.6;
-        }
-        .btn-launch {
-            background: linear-gradient(135deg, #FF8FAB, #FB6F92);
-            color: #FFFFFF;
-            padding: 16px 36px;
-            border-radius: 9999px;
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 1.2rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 8px 24px rgba(251, 111, 146, 0.4);
-            transition: transform 0.2s ease;
-        }
-        .btn-launch:hover {
-            transform: scale(1.05);
-        }
-    </style>
-</head>
-<body>
-    <div class=""launchpad-card"">
-        <div style=""font-size: 58px;"">🌸💌✨</div>
-        <h1>BestieSpace is Live!</h1>
-        <p>Your backend API, database, and SignalR hub are active.<br/>Opening our cozy Blazor Clubhouse at <b>http://localhost:5002</b>...</p>
-        <a class=""btn-launch"" href=""http://localhost:5002/"">
-            <span>Open BestieSpace UI 💖</span>
-        </a>
-    </div>
-</body>
-</html>
-", "text/html"));
+// Direct browser requests to the Blazor Client UI, or return API status
+app.MapGet("/", (HttpContext context, IWebHostEnvironment env) =>
+{
+    var acceptsHtml = context.Request.Headers.Accept.Any(a => a != null && a.Contains("text/html"));
+    if (acceptsHtml)
+    {
+        var targetUrl = env.IsDevelopment() ? "http://localhost:5002/" : "http://bestiespaceclient.runasp.net/";
+        return Results.Redirect(targetUrl);
+    }
+
+    return Results.Ok(new { service = "BestieSpace API", status = "Healthy" });
+});
 
 app.Run();
