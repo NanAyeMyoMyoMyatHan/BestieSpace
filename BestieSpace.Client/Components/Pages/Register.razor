@@ -1,408 +1,195 @@
 @page "/register"
+@using BestieSpace.Client.Services
+@using BestieSpace.Shared.DTOs
 @inject NavigationManager Navigation
 @inject BestieAuthenticationStateProvider AuthProvider
 @inject IJSRuntime JSRuntime
 
 <PageTitle>Join BestieSpace 🌸 | Register</PageTitle>
 
-<div class="auth-page-container">
-    <div class="auth-card @(isWiggling ? "kawaii-wiggle" : "")">
-        <!-- Floating decorative pastel stickers -->
-        <div class="auth-deco deco-tl">🌸</div>
-        <div class="auth-deco deco-tr">✨</div>
-        <div class="auth-deco deco-bl">🎀</div>
-        <div class="auth-deco deco-br">🧸</div>
+<div class="bestie-login-page">
+    <div class="login-split-card @(isWiggling ? "kawaii-wiggle" : "")">
+        <!-- ================= LEFT BANNER PANEL ================= -->
+        <div class="login-left-panel">
+            <div class="left-panel-content">
+                <!-- Crown & Emblem Header -->
+                <div class="panel-brand-header">
+                    <span class="crown-sticker">👑</span>
+                    <div class="brand-heart-emblem">
+                        <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
+                            <rect width="100" height="100" rx="30" fill="#FFE5EC"/>
+                            <path d="M50 82C50 82 18 60 18 38C18 24 29 16 41 16C47 16 50 19 50 23C50 19 53 16 59 16C71 16 82 24 82 38C82 60 50 82 50 82Z" fill="#FB6F92"/>
+                            <circle cx="41" cy="36" r="6.5" fill="#FFFFFF"/>
+                            <circle cx="59" cy="36" r="6.5" fill="#FFFFFF"/>
+                            <path d="M33 55 C33 46 47 46 47 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                            <path d="M53 55 C53 46 67 46 67 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <h1 class="panel-brand-title">Bestie<span>Space</span> 💕</h1>
+                    <p class="panel-brand-subtitle">Connect • Share • Make Memories Together ♡</p>
+                </div>
 
-        <div class="auth-header">
-            <div class="auth-logo-badge">🌸</div>
-            <h1 class="auth-title" tabindex="-1">Become a Bestie!</h1>
-            <p class="auth-subtitle">Create your personal account to share memories & chat forever ✨</p>
+                <!-- Besties Anime Squad Illustration -->
+                <div class="panel-illustration-container">
+                    <div class="speech-bubble-tag">
+                        <span>Better Together ♡</span>
+                    </div>
+                    <img src="images/besties-squad.png" alt="BestieSpace Squad" class="besties-squad-img" />
+                </div>
+
+                <!-- Bottom Pill -->
+                <div class="panel-bottom-pill">
+                    <span class="pill-icon-box">👥</span>
+                    <span class="pill-text">Join BestieSpace and keep your friendship closer! ♡</span>
+                </div>
+            </div>
         </div>
 
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <div class="auth-error-banner">
-                <span class="auth-error-icon">🥺</span>
-                <span>@errorMessage</span>
+        <!-- ================= RIGHT FORM PANEL ================= -->
+        <div class="login-right-panel">
+            <!-- Top Right Sign In Link -->
+            <div class="top-register-row">
+                <span>Already a bestie?</span>
+                <a href="/login" class="signup-link">Sign In →</a>
             </div>
-        }
 
-        @if (!string.IsNullOrWhiteSpace(successMessage))
-        {
-            <div class="auth-success-banner">
-                <span class="auth-success-icon">✨</span>
-                <span>@successMessage</span>
+            <!-- Welcome Header Block -->
+            <div class="form-header-block">
+                <h2 class="form-title">Create Account! ✨</h2>
+                <p class="form-subtitle">Join our cozy world to share memories & chat forever ♡</p>
             </div>
-        }
 
-        <EditForm Model="registerModel" OnValidSubmit="HandleRegister">
-            <!-- Username / Nickname -->
-            <div class="auth-form-group">
-                <label class="auth-label">Cute Nickname / Username *</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">👤</span>
-                    <input type="text" 
-                           class="auth-input" 
-                           placeholder="e.g. pastel_bunny or sakura_tea" 
-                           @bind="registerModel.Username" 
-                           required 
-                           minlength="3" 
-                           maxlength="30" />
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="form-error-banner">
+                    <span>🥺</span>
+                    <span>@errorMessage</span>
                 </div>
-                <small class="auth-hint">3-30 characters, letters, numbers, hyphens, and underscores.</small>
-            </div>
+            }
 
-            <!-- Email Address -->
-            <div class="auth-form-group">
-                <label class="auth-label">Email Address *</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">💌</span>
-                    <input type="email" 
-                           class="auth-input" 
-                           placeholder="bestie@friendship.com" 
-                           @bind="registerModel.Email" 
-                           required />
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="form-success-banner">
+                    <span>✨</span>
+                    <span>@successMessage</span>
                 </div>
-            </div>
+            }
 
-            <!-- Display Name -->
-            <div class="auth-form-group">
-                <label class="auth-label">Display Name (How friends see you)</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">🎀</span>
-                    <input type="text" 
-                           class="auth-input" 
-                           placeholder="e.g. Sweet Bunny 🐰" 
-                           @bind="registerModel.DisplayName" 
-                           maxlength="50" />
+            <!-- Register Form -->
+            <EditForm Model="registerModel" OnValidSubmit="HandleRegister" class="login-form-inner">
+                <!-- Row 1: Nickname & Email -->
+                <div class="form-row-2col">
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">👤</span>
+                        <input type="text" 
+                               class="pill-input" 
+                               placeholder="Cute Nickname *" 
+                               @bind="registerModel.Username" 
+                               required 
+                               minlength="3" 
+                               maxlength="30" />
+                    </div>
+
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">✉️</span>
+                        <input type="email" 
+                               class="pill-input" 
+                               placeholder="Email Address *" 
+                               @bind="registerModel.Email" 
+                               required />
+                    </div>
                 </div>
-            </div>
 
-            <!-- Avatar Sticker Picker -->
-            <div class="auth-form-group">
-                <label class="auth-label">Pick Your Bestie Avatar Sticker</label>
-                <div class="sticker-selector">
-                    @foreach (var sticker in availableStickers)
-                    {
-                        <button type="button" 
-                                class="sticker-choice-btn @(registerModel.AvatarSticker == sticker ? "selected" : "")" 
-                                @onclick="() => registerModel.AvatarSticker = sticker">
-                            @sticker
+                <!-- Row 2: Display Name & Strawberry PIN -->
+                <div class="form-row-2col">
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">🎀</span>
+                        <input type="text" 
+                               class="pill-input" 
+                               placeholder="Display Name (How friends see you)" 
+                               @bind="registerModel.DisplayName" 
+                               maxlength="50" />
+                    </div>
+
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">🍓</span>
+                        <input type="@(showPin ? "text" : "password")" 
+                               class="pill-input" 
+                               placeholder="4-Digit PIN * (e.g. 1234)" 
+                               @bind="registerModel.QuickPin" 
+                               required 
+                               maxlength="4" 
+                               pattern="\d{4}" 
+                               inputmode="numeric" />
+                        <button type="button" class="btn-eye-toggle" @onclick="() => showPin = !showPin" title="Show/Hide PIN">
+                            @(showPin ? "👁️" : "🙈")
                         </button>
-                    }
+                    </div>
                 </div>
-            </div>
 
-            <!-- Password -->
-            <div class="auth-form-group">
-                <label class="auth-label">Secret Password *</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">🔒</span>
-                    <input type="@(showPassword ? "text" : "password")" 
-                           class="auth-input" 
-                           placeholder="At least 6 characters" 
-                           @bind="registerModel.Password" 
-                           required 
-                           minlength="6" />
-                    <button type="button" class="auth-eye-btn" @onclick="() => showPassword = !showPassword">
-                        @(showPassword ? "🙈" : "👁️")
-                    </button>
+                <!-- Row 3: Secret Password & Confirm Password -->
+                <div class="form-row-2col">
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">🔒</span>
+                        <input type="@(showPassword ? "text" : "password")" 
+                               class="pill-input" 
+                               placeholder="Secret Password *" 
+                               @bind="registerModel.Password" 
+                               required 
+                               minlength="6" />
+                        <button type="button" class="btn-eye-toggle" @onclick="() => showPassword = !showPassword" title="Show/Hide Password">
+                            @(showPassword ? "👁️" : "🙈")
+                        </button>
+                    </div>
+
+                    <div class="form-pill-input-group">
+                        <span class="pill-icon">🛡️</span>
+                        <input type="@(showPassword ? "text" : "password")" 
+                               class="pill-input" 
+                               placeholder="Confirm Password *" 
+                               @bind="registerModel.ConfirmPassword" 
+                               required 
+                               minlength="6" />
+                    </div>
                 </div>
-            </div>
 
-            <!-- Confirm Password -->
-            <div class="auth-form-group">
-                <label class="auth-label">Confirm Password *</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">🛡️</span>
-                    <input type="@(showPassword ? "text" : "password")" 
-                           class="auth-input" 
-                           placeholder="Type your password again" 
-                           @bind="registerModel.ConfirmPassword" 
-                           required 
-                           minlength="6" />
+                <!-- Row 4: Pick Your Bestie Avatar Sticker -->
+                <div class="sticker-picker-block">
+                    <label class="sticker-picker-label">Choose Your Avatar Sticker 🌸</label>
+                    <div class="sticker-picker-row">
+                        @foreach (var sticker in availableStickers)
+                        {
+                            <button type="button" 
+                                    class="sticker-pill-btn @(registerModel.AvatarSticker == sticker ? "selected" : "")" 
+                                    @onclick="() => registerModel.AvatarSticker = sticker">
+                                @sticker
+                            </button>
+                        }
+                    </div>
                 </div>
-            </div>
 
-            <!-- 4-Digit Strawberry Quick PIN -->
-            <div class="auth-form-group">
-                <label class="auth-label">4-Digit Strawberry PIN *</label>
-                <div class="auth-input-wrapper">
-                    <span class="auth-input-icon">🍓</span>
-                    <input type="@(showPin ? "text" : "password")" 
-                           class="auth-input" 
-                           placeholder="e.g. 1234 (4 digits)" 
-                           @bind="registerModel.QuickPin" 
-                           required 
-                           maxlength="4" 
-                           pattern="\d{4}" 
-                           inputmode="numeric" />
-                    <button type="button" class="auth-eye-btn" @onclick="() => showPin = !showPin" title="Show/Hide PIN">
-                        @(showPin ? "🙈" : "👁️")
-                    </button>
-                </div>
-                <small class="auth-hint">4 digits used to quickly unlock the clubhouse using the cute Strawberry PIN Pad 🍓✨</small>
-            </div>
-
-            <div class="auth-actions">
-                <button type="submit" class="auth-submit-btn" disabled="@isLoading">
+                <!-- Submit Button -->
+                <button type="submit" class="btn-main-login" disabled="@isLoading">
                     @if (isLoading)
                     {
-                        <span class="auth-spinner">🌸</span>
+                        <span class="spinner-dot">🌸</span>
                         <span>Creating your bestie profile...</span>
                     }
                     else
                     {
-                        <span>🌸 Register Account ✨</span>
+                        <span class="login-icon">✨</span>
+                        <span>Register Account</span>
                     }
                 </button>
-            </div>
-        </EditForm>
+            </EditForm>
 
-        <div class="auth-footer">
-            <p>Already a bestie?</p>
-            <a href="/login" class="auth-link">
-                💖 Click here to log in!
-            </a>
+            <!-- Bottom Friendly Greeting Pill -->
+            <div class="bottom-greeting-card">
+                <span>💖 Forever Besties, Forever Together! 💕</span>
+            </div>
         </div>
     </div>
 </div>
-
-<style>
-.auth-page-container {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #FFF0F5 0%, #FFE4E8 50%, #F3E5F5 100%);
-    padding: 2.5rem 1rem;
-    position: relative;
-    overflow-y: auto;
-    font-family: 'Quicksand', sans-serif;
-}
-
-.auth-card {
-    position: relative;
-    width: 100%;
-    max-width: 480px;
-    background: rgba(255, 255, 255, 0.98);
-    border-radius: 28px;
-    padding: 2.2rem 2rem;
-    box-shadow: 0 16px 40px rgba(255, 143, 171, 0.2), 0 0 0 1px rgba(255, 182, 193, 0.4);
-    backdrop-filter: blur(12px);
-    z-index: 10;
-    margin: auto;
-}
-
-.auth-deco {
-    position: absolute;
-    font-size: 1.6rem;
-    pointer-events: none;
-    opacity: 0.6;
-}
-.deco-tl { top: 12px; left: 16px; }
-.deco-tr { top: 12px; right: 16px; }
-.deco-bl { bottom: 12px; left: 16px; }
-.deco-br { bottom: 12px; right: 16px; }
-
-.auth-header {
-    text-align: center;
-    margin-bottom: 1.5rem;
-}
-.auth-logo-badge {
-    font-size: 3rem;
-    margin-bottom: 0.4rem;
-    filter: drop-shadow(0 4px 8px rgba(255, 107, 139, 0.3));
-    animation: bounce 2s infinite;
-}
-.auth-title {
-    font-family: 'Fredoka', cursive;
-    font-size: 1.8rem;
-    color: #4A3B3C;
-    margin-bottom: 0.3rem;
-    outline: none !important;
-}
-.auth-title:focus,
-.auth-title:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-}
-.auth-subtitle {
-    font-size: 0.95rem;
-    color: #8C7576;
-    margin-bottom: 0;
-}
-
-.auth-error-banner {
-    background: #FFE5E9;
-    color: #D6336C;
-    padding: 0.75rem 1rem;
-    border-radius: 14px;
-    margin-bottom: 1.2rem;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid #FFCCD5;
-}
-.auth-success-banner {
-    background: #E8F5E9;
-    color: #2E7D32;
-    padding: 0.75rem 1rem;
-    border-radius: 14px;
-    margin-bottom: 1.2rem;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid #C8E6C9;
-}
-
-.auth-form-group {
-    margin-bottom: 1.1rem;
-}
-.auth-label {
-    display: block;
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: #5A4A4B;
-    margin-bottom: 0.35rem;
-}
-.auth-hint {
-    display: block;
-    font-size: 0.78rem;
-    color: #A38F90;
-    margin-top: 0.25rem;
-}
-.auth-input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-.auth-input-icon {
-    position: absolute;
-    left: 1rem;
-    font-size: 1.1rem;
-    color: #A38F90;
-    pointer-events: none;
-}
-.auth-input {
-    width: 100%;
-    padding: 0.75rem 1rem 0.75rem 2.8rem;
-    border: 2px solid #FFE5EC;
-    border-radius: 16px;
-    font-size: 0.95rem;
-    color: #4A3B3C;
-    background: #FFFDFD;
-    transition: all 0.2s ease;
-    outline: none;
-}
-.auth-input:focus {
-    border-color: #FF8FAB;
-    background: #FFFFFF;
-    box-shadow: 0 0 0 4px rgba(255, 143, 171, 0.15);
-}
-.auth-eye-btn {
-    position: absolute;
-    right: 0.8rem;
-    background: none;
-    border: none;
-    font-size: 1.1rem;
-    cursor: pointer;
-    color: #8C7576;
-}
-
-.sticker-selector {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-top: 0.3rem;
-}
-.sticker-choice-btn {
-    background: #FFF0F5;
-    border: 2px solid #FFE5EC;
-    font-size: 1.5rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 14px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-.sticker-choice-btn:hover {
-    background: #FFE4E8;
-    transform: scale(1.1);
-}
-.sticker-choice-btn.selected {
-    background: #FFFFFF;
-    border-color: #FB6F92;
-    box-shadow: 0 0 0 3px rgba(251, 111, 146, 0.25);
-    transform: scale(1.15);
-}
-
-.auth-submit-btn {
-    width: 100%;
-    padding: 0.85rem;
-    margin-top: 0.5rem;
-    border: none;
-    border-radius: 16px;
-    background: linear-gradient(135deg, #FF8FAB 0%, #FB6F92 100%);
-    color: white;
-    font-family: 'Fredoka', cursive;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 8px 20px rgba(251, 111, 146, 0.35);
-    transition: all 0.25s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-}
-.auth-submit-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(251, 111, 146, 0.45);
-}
-.auth-submit-btn:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.auth-footer {
-    text-align: center;
-    margin-top: 1.8rem;
-    padding-top: 1.2rem;
-    border-top: 1px dashed #FFE5EC;
-    font-size: 0.9rem;
-    color: #8C7576;
-}
-.auth-footer p {
-    margin-bottom: 0.3rem;
-}
-.auth-link {
-    color: #FB6F92;
-    text-decoration: none;
-    font-weight: 600;
-    transition: color 0.2s ease;
-}
-.auth-link:hover {
-    color: #D6336C;
-    text-decoration: underline;
-}
-
-.kawaii-wiggle {
-    animation: wiggle 0.5s ease;
-}
-
-@@keyframes wiggle {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-8px) rotate(-1deg); }
-    40%, 80% { transform: translateX(8px) rotate(1deg); }
-}
-
-@@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-}
-</style>
 
 @code {
     private RegisterRequestDto registerModel = new() { AvatarSticker = "🌸" };

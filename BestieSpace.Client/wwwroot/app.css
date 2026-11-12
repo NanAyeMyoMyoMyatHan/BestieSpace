@@ -3566,3 +3566,79 @@ body {
         flex-direction: column !important;
     }
 }
+
+
+/* =========================================================
+   REGISTER FORM SPLIT-CARD ENHANCEMENTS
+   ========================================================= */
+.form-row-2col {
+    display: flex !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+.form-row-2col .form-pill-input-group {
+    flex: 1 !important;
+}
+
+.sticker-picker-block {
+    margin-bottom: 14px !important;
+}
+
+.sticker-picker-label {
+    font-size: 0.86rem !important;
+    font-weight: 700 !important;
+    color: #5C4A4C !important;
+    margin-bottom: 6px !important;
+    display: block !important;
+}
+
+.sticker-picker-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+
+.sticker-pill-btn {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 50% !important;
+    background: #FFFDF9 !important;
+    border: 1.5px solid #FFD9E6 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 1.25rem !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.sticker-pill-btn:hover {
+    transform: scale(1.15) !important;
+    background: #FFF0F5 !important;
+    border-color: #FB6F92 !important;
+}
+
+.sticker-pill-btn.selected {
+    background: #FFD2DF !important;
+    border-color: #FB6F92 !important;
+    transform: scale(1.18) !important;
+    box-shadow: 0 4px 12px rgba(251, 111, 146, 0.3) !important;
+}
+
+.auth-field-hint {
+    font-size: 0.78rem !important;
+    color: #B38692 !important;
+    margin-top: -8px !important;
+    margin-bottom: 12px !important;
+    padding-left: 12px !important;
+    display: block !important;
+}
+
+@media (max-width: 600px) {
+    .form-row-2col {
+        flex-direction: column !important;
+        gap: 0 !important;
+    }
+}
