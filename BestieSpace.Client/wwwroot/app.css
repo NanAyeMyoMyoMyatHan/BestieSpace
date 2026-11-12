@@ -3802,3 +3802,16 @@ body {
     background: #FFE5EC !important;
 }
 
+/* =========================================================
+   AUTH PAGES FULLSCREEN CANVAS (No Sidebar / No Topbar)
+   ========================================================= */
+.bestiespace-auth-layout-root {
+    width: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background-color: #FDF1F5 !important;
+}
+
