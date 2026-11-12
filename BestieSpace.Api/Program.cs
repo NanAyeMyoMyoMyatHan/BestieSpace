@@ -19,9 +19,9 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure SQL Server DbContext
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? Environment.GetEnvironmentVariable("SQL_SERVER_CONNECTION_STRING")
+// Configure SQL Server DbContext (Environment Variable takes precedence for Cloud Deployment)
+var connectionString = Environment.GetEnvironmentVariable("SQL_SERVER_CONNECTION_STRING")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=BestieSpaceDb;User Id=sa;Password=sasa@123;MultipleActiveResultSets=true;TrustServerCertificate=True;";
 
 builder.Services.AddDbContext<BestieDbContext>(options =>
