@@ -15,179 +15,181 @@
 @if (currentUserSession == null)
 {
     <div class="login-gate-overlay">
-        <div class="login-card @(isLoginWiggling ? "kawaii-wiggle" : "")">
-            <!-- Floating Stickers -->
-            <div class="floating-sticker sticker-1">🎀</div>
-            <div class="floating-sticker sticker-2">✨</div>
-            <div class="floating-sticker sticker-3">🧸</div>
-            <div class="floating-sticker sticker-4">💖</div>
-
-            <div class="login-header-icon">🍓✨</div>
-            <h1 class="login-title" tabindex="-1">Secret Bestie Clubhouse</h1>
-            <p class="login-subtitle">
-                Enter your 4-digit strawberry PIN or secret password to unlock our cozy world 💕
-            </p>
-
-            <!-- Prominent Register CTA Banner -->
-            <div class="login-register-banner">
-                <span>🌸 New to BestieSpace?</span>
-                <a href="/register" class="btn-register-link">Register Account Here ✨</a>
-            </div>
-
-            <!-- Login Tabs: PIN Pad vs Password vs Register -->
-            <div class="login-tabs-nav">
-                <button type="button" class="login-tab-btn @(activeLoginTab == "pin" ? "active" : "")" 
-                        @onclick='() => { activeLoginTab = "pin"; loginErrorMessage = null; }'>
-                    <span>🍓</span> Cute PIN Pad
-                </button>
-                <button type="button" class="login-tab-btn @(activeLoginTab == "password" ? "active" : "")" 
-                        @onclick='() => { activeLoginTab = "password"; loginErrorMessage = null; }'>
-                    <span>🔑</span> Password
-                </button>
-                <a href="/register" class="login-tab-btn register-tab-btn" title="Create a new account">
-                    <span>✨</span> Register
-                </a>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(loginErrorMessage))
-            {
-                <div class="login-error-badge">
-                    <span>🥺</span>
-                    <span>@loginErrorMessage</span>
-                </div>
-            }
-
-            @if (activeLoginTab == "pin")
-            {
-                <!-- Strawberry PIN Pad View -->
-                <div class="strawberry-pin-container">
-                    <div class="pin-slots-row @(isPinWiggling ? "kawaii-wiggle" : "")">
-                        <div class="pin-slot @(enteredPin.Length >= 1 ? "filled" : "")">
-                            @if (enteredPin.Length >= 1)
-                            {
-                                <span class="bouncing-strawberry">🍓</span>
-                            }
+        <div class="login-split-card @(isLoginWiggling ? "kawaii-wiggle" : "")">
+            <!-- ================= LEFT BANNER PANEL ================= -->
+            <div class="login-left-panel">
+                <div class="left-panel-content">
+                    <!-- Crown & Emblem Header -->
+                    <div class="panel-brand-header">
+                        <span class="crown-sticker">👑</span>
+                        <div class="brand-heart-emblem">
+                            <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
+                                <rect width="100" height="100" rx="30" fill="#FFE5EC"/>
+                                <path d="M50 82C50 82 18 60 18 38C18 24 29 16 41 16C47 16 50 19 50 23C50 19 53 16 59 16C71 16 82 24 82 38C82 60 50 82 50 82Z" fill="#FB6F92"/>
+                                <circle cx="41" cy="36" r="6.5" fill="#FFFFFF"/>
+                                <circle cx="59" cy="36" r="6.5" fill="#FFFFFF"/>
+                                <path d="M33 55 C33 46 47 46 47 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M53 55 C53 46 67 46 67 55" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+                            </svg>
                         </div>
-                        <div class="pin-slot @(enteredPin.Length >= 2 ? "filled" : "")">
-                            @if (enteredPin.Length >= 2)
-                            {
-                                <span class="bouncing-strawberry">🍓</span>
-                            }
-                        </div>
-                        <div class="pin-slot @(enteredPin.Length >= 3 ? "filled" : "")">
-                            @if (enteredPin.Length >= 3)
-                            {
-                                <span class="bouncing-strawberry">🍓</span>
-                            }
-                        </div>
-                        <div class="pin-slot @(enteredPin.Length >= 4 ? "filled" : "")">
-                            @if (enteredPin.Length >= 4)
-                            {
-                                <span class="bouncing-strawberry">🍓</span>
-                            }
-                        </div>
+                        <h1 class="panel-brand-title">Bestie<span>Space</span> 💕</h1>
+                        <p class="panel-brand-subtitle">Connect • Share • Make Memories Together ♡</p>
                     </div>
 
-                    <div class="strawberry-keypad">
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("1")'>1</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("2")'>2</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("3")'>3</button>
-
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("4")'>4</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("5")'>5</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("6")'>6</button>
-
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("7")'>7</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("8")'>8</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("9")'>9</button>
-
-                        <button type="button" class="keypad-btn keypad-btn-special" @onclick="ClearPin" title="Clear PIN">Clear 🌸</button>
-                        <button type="button" class="keypad-btn" @onclick='() => AppendPinDigit("0")'>0</button>
-                        <button type="button" class="keypad-btn keypad-btn-special" @onclick="ToggleHintBox" title="Need a hint?">Hint 💡</button>
+                    <!-- Besties Anime Squad Illustration -->
+                    <div class="panel-illustration-container">
+                        <div class="speech-bubble-tag">
+                            <span>Better Together ♡</span>
+                        </div>
+                        <img src="images/besties-squad.png" alt="BestieSpace Squad" class="besties-squad-img" />
                     </div>
 
-                    <div class="pin-hint-tag">
-                        <span>Tap your 4-digit secret PIN to unlock automatically ✨</span>
+                    <!-- Bottom Pill -->
+                    <div class="panel-bottom-pill">
+                        <span class="pill-icon-box">👥</span>
+                        <span class="pill-text">Join BestieSpace and keep your friendship closer! ♡</span>
                     </div>
                 </div>
-            }
-            else
-            {
-                <!-- Secret Password Form View -->
-                <div class="login-input-group">
-                    <div class="login-field">
-                        <label class="login-label">Cute Nickname or Email</label>
-                        <div class="login-input-box">
-                            <span class="login-input-icon">🍓</span>
+            </div>
+
+            <!-- ================= RIGHT FORM PANEL ================= -->
+            <div class="login-right-panel">
+                <!-- Top Right Sign Up Link -->
+                <div class="top-register-row">
+                    <span>Don't have an account?</span>
+                    <a href="/register" class="signup-link">Sign Up →</a>
+                </div>
+
+                <!-- Welcome Header Block -->
+                <div class="form-header-block">
+                    <h2 class="form-title">Welcome Back! 💕</h2>
+                    <p class="form-subtitle">Login to your BestieSpace account</p>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(loginErrorMessage))
+                {
+                    <div class="form-error-banner">
+                        <span>🥺</span>
+                        <span>@loginErrorMessage</span>
+                    </div>
+                }
+
+                @if (activeLoginTab == "password")
+                {
+                    <!-- Password Form -->
+                    <div class="login-form-inner">
+                        <!-- Email / Username Input -->
+                        <div class="form-pill-input-group">
+                            <span class="pill-icon">✉️</span>
                             <input type="text" 
-                                   class="login-input" 
-                                   placeholder="e.g., strawberry_bestie or email" 
+                                   class="pill-input" 
+                                   placeholder="Email or Username" 
                                    @bind="loginUsername" 
                                    @bind:event="oninput"
                                    @onkeydown="HandleLoginKeyDown" />
                         </div>
-                    </div>
 
-                    <div class="login-field">
-                        <label class="login-label">Secret Password</label>
-                        <div class="login-input-box">
-                            <span class="login-input-icon">🗝️</span>
+                        <!-- Password Input -->
+                        <div class="form-pill-input-group">
+                            <span class="pill-icon">🔒</span>
                             <input type="@(showPassword ? "text" : "password")" 
-                                   class="login-input" 
-                                   placeholder="••••••••" 
+                                   class="pill-input" 
+                                   placeholder="Password" 
                                    @bind="loginPassword" 
                                    @bind:event="oninput"
                                    @onkeydown="HandleLoginKeyDown" />
-                            <button type="button" class="login-toggle-eye" @onclick="() => showPassword = !showPassword" title="Show/Hide Password">
-                                @(showPassword ? "👀" : "🫣")
+                            <button type="button" class="btn-eye-toggle" @onclick="() => showPassword = !showPassword" title="Show/Hide Password">
+                                @(showPassword ? "👁️" : "🙈")
                             </button>
                         </div>
-                    </div>
-                </div>
 
-                <button class="login-btn-primary" @onclick="HandleLoginAsync" disabled="@isLoggingIn">
-                    @if (isLoggingIn)
-                    {
-                        <span>Checking secret code... 🌸</span>
-                    }
-                    else
-                    {
-                        <span>Unlock Clubhouse 💖 ✨</span>
-                    }
-                </button>
-            }
-
-            <!-- VIP Pass & Hint Helper Row -->
-            <div class="login-hint-section">
-                <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px;">
-                    <button type="button" class="btn-vip-ticket-shortcut" @onclick="() => showVipModal = true">
-                        <span>🎟️</span>
-                        <span>View VIP Pass</span>
-                    </button>
-                    <button type="button" class="login-hint-trigger" @onclick="ToggleHintBox">
-                        <span>💡</span>
-                        <span>Need Help Signing In?</span>
-                    </button>
-                </div>
-
-                @if (showHintBox)
-                {
-                    <div class="login-hint-box">
-                        <div class="login-hint-title">
-                            <span>✨ Account Sign In Information:</span>
+                        <!-- Remember Me & PIN Mode Toggle Row -->
+                        <div class="form-sub-row">
+                            <label class="remember-label">
+                                <input type="checkbox" class="cute-checkbox" checked />
+                                <span>Remember Me</span>
+                            </label>
+                            <button type="button" class="btn-pin-toggle" @onclick='() => { activeLoginTab = "pin"; loginErrorMessage = null; }'>
+                                Use 4-Digit PIN? 🍓
+                            </button>
                         </div>
-                        <div style="margin-top: 6px; line-height: 1.5; font-size: 0.88rem; color: #5C4A4C;">
-                            You can sign in using your registered <strong>Username or Email</strong> and secret password, or enter your 4-digit PIN! 🌸<br />
-                            If you don't have an account yet, <a href="/register" style="color: #FB6F92; font-weight: 700;">click here to register</a> and create your custom bestie profile! 💕
+
+                        <!-- Primary Login Button -->
+                        <button type="button" class="btn-main-login" @onclick="HandleLoginAsync" disabled="@isLoggingIn">
+                            @if (isLoggingIn)
+                            {
+                                <span class="spinner-dot">🌸</span>
+                                <span>Logging in...</span>
+                            }
+                            else
+                            {
+                                <span class="login-icon">→]</span>
+                                <span>Login</span>
+                            }
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <!-- Strawberry PIN Pad View -->
+                    <div class="pin-pad-view">
+                        <div class="pin-display-slots @(isPinWiggling ? "kawaii-wiggle" : "")">
+                            @for (int i = 0; i < 4; i++)
+                            {
+                                var filled = i < enteredPin.Length;
+                                <div class="pin-slot @(filled ? "filled" : "")">
+                                    @(filled ? "🍓" : "○")
+                                </div>
+                            }
+                        </div>
+
+                        <div class="pin-keys-grid">
+                            @for (int n = 1; n <= 9; n++)
+                            {
+                                var digit = n.ToString();
+                                <button type="button" class="pin-key-btn" @onclick="() => AppendPinDigit(digit)" disabled="@isPinLoggingIn">
+                                    @digit
+                                </button>
+                            }
+                            <button type="button" class="pin-key-btn key-action" @onclick="ClearPin" disabled="@isPinLoggingIn">C</button>
+                            <button type="button" class="pin-key-btn" @onclick='() => AppendPinDigit("0")' disabled="@isPinLoggingIn">0</button>
+                            <button type="button" class="pin-key-btn key-action" @onclick="ToggleHintBox" disabled="@isPinLoggingIn">💡</button>
+                        </div>
+
+                        <div style="text-align: center; margin-top: 14px;">
+                            <button type="button" class="btn-back-to-password" @onclick='() => { activeLoginTab = "password"; loginErrorMessage = null; }'>
+                                ← Switch to Password Login
+                            </button>
                         </div>
                     </div>
                 }
 
-                <div style="text-align: center; margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255, 143, 171, 0.4);">
-                    <a href="/register" style="color: #FB6F92; font-weight: 700; text-decoration: none; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>✨</span>
-                        <span>Don't have an account yet? Click here to Register! 🌸</span>
-                    </a>
+                <!-- Separator -->
+                <div class="form-or-divider">
+                    <span>or</span>
+                </div>
+
+                <!-- Social / Quick Shortcut Buttons -->
+                <div class="social-login-row">
+                    <button type="button" class="btn-social-pill" @onclick='() => { activeLoginTab = "password"; loginErrorMessage = null; }'>
+                        <svg class="social-icon" width="18" height="18" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Continue with Google</span>
+                    </button>
+
+                    <button type="button" class="btn-social-pill" @onclick='() => { activeLoginTab = activeLoginTab == "pin" ? "password" : "pin"; loginErrorMessage = null; }'>
+                        <span class="social-icon">🍓</span>
+                        <span>@(activeLoginTab == "pin" ? "Password Login" : "Continue with PIN")</span>
+                    </button>
+                </div>
+
+                <!-- Bottom Friendly Greeting Pill -->
+                <div class="bottom-greeting-card">
+                    <span>💖 Good to see you again! 💕</span>
                 </div>
             </div>
         </div>
